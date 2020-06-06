@@ -25,6 +25,7 @@ body {
   border-color: black;
   border-radius: var(--border-radius);
   outline: none;
+  cursor: text;
 }
 .msl-active {
   box-shadow: var(--option-bg-shadow);
@@ -56,6 +57,8 @@ body {
   font-size: calc(var(--font-size) - 3px);
   display: inline-flex;
   align-items: center;
+  line-break: anywhere;
+  white-space: break-spaces;
 }
 
 .msl-options {
@@ -72,24 +75,32 @@ body {
   border-radius: calc(var(--border-radius) - 3px);
   padding: 5px;
   cursor: pointer;
-  margin: 3px;
+  margin: 3px 5px 4px 5px;
   line-height: 1;
+  line-break: anywhere;
+  line-height: 1.2;
+  white-space: break-spaces;
 }
 .msl-options > .msl-option:hover {
   background: var(--option-bg-hover);
+}
+.msl-option-active {
+  background: #e6f4fa;
+  color: #0351ff;
 }
 
 .msl-btn {
   border-radius: 50%;
   border: none;
+  outline: none;
   padding: 0;
   justify-content: center;
   cursor: pointer;
   background: transparent;
 }
-.msl-actions{
+.msl-actions {
   position: absolute;
-  top: 5px;
+  top: 4px;
   right: 5px;
 }
 .msl-arrow-btn,
@@ -99,10 +110,10 @@ body {
   transition: transform var(--transition);
 }
 
-.msl-clear-btn .msl-close-icn{
-  transform: scale(.8);
+.msl-clear-btn .msl-close-icn {
+  transform: scale(0.8);
 }
-.msl-clear-btn .msl-close-icn >line{
+.msl-clear-btn .msl-close-icn > line {
   stroke-width: 2;
 }
 .msl-clear-btn:hover,
@@ -124,6 +135,8 @@ body {
 .msl-chip-delete {
   width: 20px;
   height: 20px;
+  min-width: 20px;
+  min-height: 20px;
   margin-left: 3px;
   background: rgb(218, 218, 218);
 }
