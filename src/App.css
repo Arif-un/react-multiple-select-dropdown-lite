@@ -1,38 +1,147 @@
-.App {
-  text-align: center;
+html,
+body {
+  padding: 100px;
+  font-size: 10px;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
 }
-
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
+.flx {
+  display: inline-flex;
   align-items: center;
+}
+
+.msl-wrp {
+  position: relative;
+  margin: 20px;
+  --font-size: 16px;
+  --bg: white;
+  --border-radius: 8px;
+  --transition: 200ms;
+  --option-bg-shadow: 1px 1px 5px 0px gray;
+  --option-bg-hover: rgb(233, 233, 233);
+}
+.msl {
+  overflow: hidden;
+  border: 1px solid;
+  border-color: black;
+  border-radius: var(--border-radius);
+  outline: none;
+}
+.msl-active {
+  box-shadow: var(--option-bg-shadow);
+  border-color: transparent;
+  border-radius: var(--border-radius) var(--border-radius) 0 0;
+}
+.msl-active ~ .msl-options {
+  box-shadow: var(--option-bg-shadow);
+  clip-path: inset(0px -10px -10px -10px);
+  max-height: 200px;
+}
+.msl-input-wrp {
+  display: inline-block;
+  align-items: center;
+}
+.msl-input {
+  display: inline-block;
+  outline: none;
+  margin: 5px;
+  font-size: var(--font-size);
+}
+
+.msl-chip {
+  background: rgb(238, 238, 238);
+  border-radius: calc(var(--border-radius) - 3px);
+  margin: 5px;
+  padding: 3px 3px 3px 6px;
+  white-space: nowrap;
+  font-size: calc(var(--font-size) - 3px);
+  display: inline-flex;
+  align-items: center;
+}
+
+.msl-options {
+  position: absolute;
+  width: 100%;
+  border-radius: 0 0 var(--border-radius) var(--border-radius);
+  background: var(--bg);
+  max-height: 0;
+  overflow: auto;
+  transition: max-height 100ms ease-in;
+}
+.msl-options > .msl-option {
+  font-size: var(--font-size);
+  border-radius: calc(var(--border-radius) - 3px);
+  padding: 5px;
+  cursor: pointer;
+  margin: 3px;
+  line-height: 1;
+}
+.msl-options > .msl-option:hover {
+  background: var(--option-bg-hover);
+}
+
+.msl-btn {
+  border-radius: 50%;
+  border: none;
+  padding: 0;
   justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+  cursor: pointer;
+  background: transparent;
+}
+.msl-actions{
+  position: absolute;
+  top: 5px;
+  right: 5px;
+}
+.msl-arrow-btn,
+.msl-clear-btn {
+  width: 25px;
+  height: 25px;
+  transition: transform var(--transition);
 }
 
-.App-link {
-  color: #61dafb;
+.msl-clear-btn .msl-close-icn{
+  transform: scale(.8);
+}
+.msl-clear-btn .msl-close-icn >line{
+  stroke-width: 2;
+}
+.msl-clear-btn:hover,
+.msl-arrow-btn:hover {
+  background: lightgray;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.msl-arrow-icn {
+  height: 20px;
+  width: 20px;
+  transform: scale(0.8);
+}
+.msl-arrow-icn > line {
+  stroke: rgb(75, 75, 75);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.msl-chip-delete {
+  width: 20px;
+  height: 20px;
+  margin-left: 3px;
+  background: rgb(218, 218, 218);
+}
+.msl-chip-delete:hover {
+  background: lightgray;
+}
+
+.msl-chip-delete .msl-close-icn {
+  transform: scale(0.6);
+}
+
+.msl-close-icn {
+  height: 15px;
+  width: 15px;
+}
+
+.msl-close-icn > line {
+  stroke: rgb(75, 75, 75);
+  stroke-width: 1.5;
+  stroke-linecap: round;
 }

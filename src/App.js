@@ -1,24 +1,24 @@
 import React from 'react';
-import logo from './logo.svg';
 import './App.css';
+import MultiSelectDropdown from './MultiSelectDropdown';
 
 function App() {
+   // multiselect
+  // creatable
+  // icon
+  // searchable
+  // group
+  // select limit
+
+  const options = [
+    { label: "option 1", value: "opt1", icon: "red" },
+    { label: "Option 2", value: "opt2", icon: "red" },
+    { label: "Option 3", value: "opt3", icon: "red" }
+  ];
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div>
+      <MultiSelectDropdown width={300} options={options} />
     </div>
   );
 }
