@@ -1,30 +1,59 @@
-import React, { useState, useRef, memo } from 'react'
+import React, { useState, memo } from 'react'
 import CloseIcon from './CloseIcon';
 import DownIcon from './DownIcon';
 
 MultiSelectDropdown.defaultProps = {
   clearable: true,
-  downArrow: true
+  downArrow: true,
+  width: 300,
+  singleSelect: false,
+  jsonValue: false,
+  defaultValue: '',
+  disableChip: false,
+  placeholder: 'Select...',
+  onChange: () => { },
+  options: [{ label: 'Empty', value: '', disabled: true, style: { textAlign: 'center' } }],
 }
 
-function MultiSelectDropdown(props) {
-  const { options, width, downArrowIcon, clearable, downArrow, onChange } = props;
-  const mslInputRef = useRef(null);
+function MultiSelectDropdown({ options, width, downArrowIcon, clearable, downArrow, onChange, singleSelect, jsonValue, defaultValue, className, placeholder, disableChip }) {
+
   const [menuOpen, setMenuOpen] = useState(false);
-  const [value, setValue] = useState([]);
+
+  let preDefinedValue = []
+  if (defaultValue !== '' || defaultValue.length > 0) {
+    if (typeof defaultValue === 'string') {
+      const valueArr = defaultValue.split(",")
+      preDefinedValue = options.filter(itm => -1 !== valueArr.indexOf(itm.value))
+      if (singleSelect && preDefinedValue.length > 1) {
+        preDefinedValue = [preDefinedValue[0]]
+      }
+    } else if (Array.isArray(preDefinedValue)) {
+      preDefinedValue = options.filter(opt => defaultValue.some(pval => opt.value === pval.value));
+      if (singleSelect && preDefinedValue.length > 1) {
+        preDefinedValue = [preDefinedValue[0]]
+      }
+    }
+  }
+  const [value, setValue] = useState(preDefinedValue);
   let stopPropagation = true
 
   const setNewValue = val => {
     setValue(val)
-    onChange(val)
+    if (jsonValue) {
+      onChange(val)
+    } else {
+      let stringvalue = ''
+      stringvalue += val.map(itm => itm.value)
+      onChange(stringvalue)
+    }
   }
 
   const inputRefFocus = (e, focus) => {
     let parentNode = null
     let inputNode = null
-    if(e.target.hasAttribute('data-msl')){
+    if (e.target.hasAttribute('data-msl')) {
       parentNode = e.target
-    }else if (e.target.parentNode.hasAttribute('data-msl')) {
+    } else if (e.target.parentNode.hasAttribute('data-msl')) {
       parentNode = e.target.parentNode
     } else if (e.target.parentNode.parentNode.hasAttribute('data-msl')) {
       parentNode = e.target.parentNode.parentNode
@@ -38,7 +67,6 @@ function MultiSelectDropdown(props) {
     }
 
     if (inputNode !== null) {
-      console.log('----------',inputNode)
       focus ? inputNode.focus() : inputNode.blur()
     }
   }
@@ -98,13 +126,17 @@ function MultiSelectDropdown(props) {
   }
 
   const addValue = (i) => {
-    const tmp = [...value]
-    if (!checkValueExist(options[i], value)) {
-      tmp.push(options[i])
-      setNewValue(tmp)
+    let tmp = [...value]
+    if (singleSelect) {
+      tmp = [options[i]]
     } else {
-      deleteValue(i)
+      if (!checkValueExist(options[i], value)) {
+        tmp.push(options[i])
+      } else {
+        tmp = tmp.filter(itm => itm.value !== options[i].value)
+      }
     }
+    setNewValue(tmp)
   }
 
   const deleteValue = i => {
@@ -116,18 +148,28 @@ function MultiSelectDropdown(props) {
   const clearValue = () => {
     setNewValue([])
   }
+  const showSearchOption = () => {
+    if (!singleSelect && !disableChip ) {
+      return true
+    } else if (singleSelect && !value.length) {
+      return true
+    }else if(!singleSelect && disableChip && !value.length){
+      return true
+    }
+    return false
+  }
 
   return (
     <>
       {console.log('----------mounted')}
-      <div onClick={handleClickInput} style={{ width }} className="msl-wrp">
+      <div onClick={handleClickInput} style={{ width }} className={`msl-wrp msl-vars ${className}`}>
         <div
           data-msl
-          className={`msl ${menuOpen ? "msl-active" : ""}`}
+          className={`msl ${menuOpen ? "msl-active" : ""} `}
         >
           <div data-msl className="msl-input-wrp"
-            style={{ marginRight: clearable && downArrow ? 60 : downArrow || clearable ? 40 : 0 }}>
-            {value.map((val, i) => (
+            style={{ marginRight: clearable && downArrow ? 60 : downArrow || clearable ? 40 : 5 }}>
+            {(!singleSelect && !disableChip) && value.map((val, i) => (
               <div key={`chip-${i + 11}`} className="msl-chip">
                 {val.label}
                 <button onClick={() => deleteValue(i)} className="msl-btn msl-chip-delete flx">
@@ -136,7 +178,9 @@ function MultiSelectDropdown(props) {
                 <span />
               </div>
             ))}
-            <div data-msl /* onBlur={onInputBlur} */ ref={mslInputRef} className="msl-input" contentEditable />
+            {!singleSelect && disableChip && value.length === 1 ? <span className="msl-single-value" data-msl style={{ width: width - (clearable && downArrow ? 60 : downArrow || clearable ? 40 : 5) }}>{value[0].label}d</span> : disableChip && value.length > 1 && <span className="msl-single-value" data-msl style={{ width: width - (clearable && downArrow ? 60 : downArrow || clearable ? 40 : 5) }}>{value.length} Selected</span>}
+            {singleSelect && value.length === 1 && <span className="msl-single-value" data-msl style={{ width: width - (clearable && downArrow ? 60 : downArrow || clearable ? 40 : 5) }}>{value[0].label}</span>}
+            {showSearchOption() && <div data-msl data-placeholder={placeholder} className="msl-input" contentEditable />}
           </div>
           {(clearable || downArrow) && (
             <div className="msl-actions flx">
@@ -160,11 +204,12 @@ function MultiSelectDropdown(props) {
         <div className="msl-options">
           {options.map((opt, i) => (
             <option
-              data-msl
-              onClick={() => addValue(i)}
+              {...!singleSelect && { 'data-msl': true }}
+              style={{ ...opt.style && opt.style }}
+              onClick={() => { !opt.disabled && addValue(i) }}
               title={opt.label}
               key={opt.value + i + 10}
-              className={`msl-option ${checkValueExist(opt, value) && 'msl-option-active'}`}
+              className={`msl-option ${checkValueExist(opt, value) && 'msl-option-active'} ${opt.disabled && 'msl-option-disable'} ${opt.classes}`}
               value={opt.value}>
               {opt.label}
             </option>
