@@ -4,7 +4,10 @@
   "description": "React Multiple Select Light Weight Dropdown list | Searchable | Addable | Groupable etc",
   "author": "Arif-un",
   "license": "MIT",
-  "repository": "Arif-un/project-name",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Arif-un/react-multiple-select-dropdown-lite"
+  },
   "main": "dist/index.js",
   "module": "dist/index.modern.js",
   "source": "src/index.js",
@@ -12,7 +15,6 @@
     "node": ">=10"
   },
   "scripts": {
-    "ss": "microbundle-crl --css-modules false",
     "build": "microbundle-crl --compress --css-modules false",
     "start": "microbundle-crl watch --compress --css-modules false",
     "prepare": "run-s build",
