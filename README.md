@@ -1,68 +1,70 @@
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+## React Multiple Select Dropdown Lite
+A lightweight Multiple/Single Select component for react using React-Hooks
 
-## Available Scripts
+### Install
 
-In the project directory, you can run:
+    npm i react-multiple-select-dropdown-lite
 
-### `yarn start`
+### Basic Initialization
+```
+import React, { useState } from 'react'
+import MultiSelect from  'react-multiple-select-dropdown-lite'
+import  'react-multiple-select-dropdown-lite/dist/index.css'
 
-Runs the app in the development mode.<br />
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+const App = () => {
 
-The page will reload if you make edits.<br />
-You will also see any lint errors in the console.
+	const [value, setvalue] = useState('')
 
-### `yarn test`
+	const  handleOnchange  =  val  => {
+		setvalue(val)
+	}
 
-Launches the test runner in the interactive watch mode.<br />
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+	const  options  = [
+		{ label:  'Option 1', value:  'option_1'  },
+		{ label:  'Option 2', value:  'option_2'  },
+		{ label:  'Option 3', value:  'option_3'  },
+		{ label:  'Option 4', value:  'option_4'  },
+	]
 
-### `yarn build`
+	return(
+		<div className="app">
+			<div  className="preview-values">
+				<h4>Values</h4>
+				{value}
+			</div>
 
-Builds the app for production to the `build` folder.<br />
-It correctly bundles React in production mode and optimizes the build for the best performance.
+		<MultiSelect
+		onChange={handleOnchange}
+		options={options}
+		/>
 
-The build is minified and the filenames include the hashes.<br />
-Your app is ready to be deployed!
+		</div>
+)}
+export  default App
+```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### Options
+|Props| type | default | description
+|-----|------| ------- | ----------|
+| width | int | 300 | Specify width in px
+| options| array |  | pass options as array of object <br> example: <br> `[ { label : 'Option 1', value : 'opt_1' } ]`
+|onChange | function | |Return value on input change
+| defaultValue | string \| array of object |  | specify default value
+|jsonValue | bool | false | get value from input as json
+|singleSelect | bool | false | allow one select only
+|downArrowIcon| string \| icon \| component | Icon | Specify custom down arrow icon
+|clearable | bool | true | show / hide close icon to clear value
+downArrow |bool | true|  show / hide down icon in dropdown
+| className | string \| object | | specify custom class
+|placeholder | string | Select... | Input Placeholder
+|disableChip | bool | false | disable multiple select chips show value or total selected value only   
+||
 
-### `yarn eject`
+### Sponsor
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+[<img src="https://www.bitcode.pro/wp-content/uploads/2019/09/final.svg_-3.png">](https://www.bitcode.pro/)
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+### License
+MIT © [Arif-Un]([https://github.com/arif-un](https://github.com/arif-un)) | Build for Bit Form
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/code-splitting
-
-### Analyzing the Bundle Size
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size
-
-### Making a Progressive Web App
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app
-
-### Advanced Configuration
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/advanced-configuration
-
-### Deployment
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/deployment
-
-### `yarn build` fails to minify
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify

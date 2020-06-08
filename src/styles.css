@@ -1,10 +1,4 @@
-html,
-body {
-  padding: 100px;
-  font-size: 10px;
-  font-family: "Montserrat", sans-serif;
-}
-.flx {
+.msl-flx {
   display: inline-flex;
   align-items: center;
 }
@@ -19,15 +13,17 @@ body {
 
 .msl-wrp {
   position: relative;
-  margin: 20px;
 }
 .msl {
   overflow: hidden;
   border: 1px solid;
-  border-color: rgb(117, 117, 117);
+  border-color: rgb(156, 156, 156);
   border-radius: var(--border-radius);
   outline: none;
   cursor: text;
+}
+.msl:not(.msl-active):hover{
+  border-color: rgb(80, 80, 80);
 }
 .msl-active {
   box-shadow: var(--menu-shadow);
@@ -110,12 +106,15 @@ body {
   border-radius: calc(var(--border-radius) - 3px);
   padding: 5px;
   cursor: pointer;
-  margin: 4px 6px 6px 6px;
+  margin: 4px 6px 4px;
   line-height: 1;
   line-break: anywhere;
   line-height: 1.2;
   white-space: break-spaces;
   transition: background 200ms;
+}
+.msl-options > .msl-option:last-child{
+  margin-bottom: 5px;
 }
 .msl-options > .msl-option:hover {
   background: var(--option-bg-hover);
@@ -139,7 +138,7 @@ body {
 }
 .msl-actions {
   position: absolute;
-  top: 4px;
+  top: 16%;
   right: 5px;
 }
 .msl-arrow-btn,
