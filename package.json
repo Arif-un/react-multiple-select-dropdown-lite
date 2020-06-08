@@ -57,13 +57,19 @@
     "npm",
     "react",
     "dropdown",
-    "multiselect",
     "multilist",
     "list",
     "autocomplete",
     "multiselect-react-dropdown",
     "react-multiselect-dropdown",
     "multiselect react dropdown",
-    "react multiselect dropdown"
+    "react multiselect dropdown",
+    "combobox",
+    "form",
+    "input",
+    "multiselect",
+    "react-component",
+    "select",
+    "ui"
   ]
 }
