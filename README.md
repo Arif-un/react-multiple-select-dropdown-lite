@@ -58,7 +58,6 @@ downArrow |bool | true|  show / hide down icon in dropdown
 | className | string \| object | | specify custom class
 |placeholder | string | Select... | Input Placeholder
 |disableChip | bool | false | disable multiple select chips show value or total selected value only   
-||
 
 ### Sponsor
 
