@@ -50,22 +50,22 @@ export  default App
 
 ## Features and Roadmap
 
-<input type="checkbox" checked /> JSON Value <br>
-<input type="checkbox" checked /> Clearable <br>
-<input type="checkbox" checked /> Disable Chip <br>
-<input type="checkbox" checked /> Custom Down Arrow Icon <br>
-<input type="checkbox" /> Searchable <br>
-<input type="checkbox" /> Disabled <br>
-<input type="checkbox" /> Required <br>
-<input type="checkbox" /> Group <br>
-<input type="checkbox" /> Sublist <br>
-<input type="checkbox" /> Select Limit <br>
-<input type="checkbox" /> Custom Creatable Value <br>
+- [x] JSON Value <br>
+- [x] Clearable <br>
+- [x] Disable Chip <br>
+- [x] Custom Down Arrow Icon <br>
+- [ ] Searchable <br>
+- [ ] Disabled <br>
+- [ ] Required <br>
+- [ ] Group <br>
+- [ ] Sublist <br>
+- [ ] Select Limit <br>
+- [ ] Custom Creatable Value <br>
 
 ## Props Options
 |Props| type | default | description
 |-----|------| ------- | ----------|
-| options| array | ""  | pass options as array of object <br> `label` : (string) Options Label <br> `value` : Option value <br> `style` : (object) custom style <br> `classes` : (string) style classes <br> <br> example: <br> ```[ { label : "Option 1", value : "opt_1", style: {textAlign: 'center'}, classes: "classA classB" } ]```
+| options| array | ""  | pass options as array of object <br> `label` : (string) Options Label <br> `value` : Option value <br> `style` : (object) custom style <br> `classes` : (string) style classes <br> <br> example: <br> `[ { label : "Option 1", value : "opt_1", style: {textAlign: 'center'}, classes: "classA classB" } ]`
 |onChange | function | |Return value on input change
 | width | int | 300 | Specify width in px
 | defaultValue | string \| array of object |  | specify default value
