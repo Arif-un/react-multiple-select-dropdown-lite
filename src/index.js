@@ -38,7 +38,8 @@ function MultiSelect({
   className,
   placeholder,
   disableChip,
-  name
+  name,
+  attr
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -206,6 +207,7 @@ function MultiSelect({
   return (
     <div
       name={name}
+      {...attr}
       value={JSON.stringify(value)}
       onClick={handleClickInput}
       style={{ width }}
