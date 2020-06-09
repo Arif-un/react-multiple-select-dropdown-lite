@@ -24,6 +24,7 @@ const App = () => {
         {value}
       </div>
       <MultiSelect
+        width={400}
         onChange={handleOnchange}
         options={options}
       />
