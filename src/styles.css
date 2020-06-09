@@ -5,7 +5,7 @@
 .msl-vars {
   --menu-max-height: 400px;
   --font-size: 16px;
-  --border-radius: 8px;
+  --border-radius: 7px;
   --transition: 200ms;
   --menu-shadow: 1px 1px 5px 0px gray;
   --option-bg-hover: rgb(233, 233, 233);
@@ -27,10 +27,12 @@
 }
 .msl-active {
   box-shadow: var(--menu-shadow);
+  z-index: 999;
   border-color: transparent;
   border-radius: var(--border-radius) var(--border-radius) 0 0;
 }
 .msl-active ~ .msl-options {
+  z-index: 999;
   box-shadow: var(--menu-shadow);
   clip-path: inset(0px -10px -10px -10px);
   max-height: var(--menu-max-height);
@@ -104,7 +106,7 @@
 .msl-options > .msl-option {
   font-size: var(--font-size);
   border-radius: calc(var(--border-radius) - 3px);
-  padding: 5px;
+  padding: 7px 5px;
   cursor: pointer;
   margin: 4px 6px 4px;
   line-height: 1;
