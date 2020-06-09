@@ -68,7 +68,8 @@ export  default App
 | options| array | ""  | pass options as array of object <br> `label` : (string) Options Label <br> `value` : Option value <br> `style` : (object) custom style <br> `classes` : (string) style classes <br> <br> example: <br> `[ { label : "Option 1", value : "opt_1", style: {textAlign: 'center'}, classes: "classA classB" } ]`
 |onChange | function | |Return value on input change
 | width | int | 300 | Specify width in px
-| defaultValue | string \| array of object |  | specify default value
+|name| string | '' | specify a name
+| defaultValue | string \| array of object \| string array | '' | specify default value
 |jsonValue | bool | false | get value from input as json
 |singleSelect | bool | false | allow one select only
 |downArrowIcon| string \| icon \| component | Icon | Specify custom down arrow icon
