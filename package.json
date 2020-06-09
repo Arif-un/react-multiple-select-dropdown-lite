@@ -1,6 +1,6 @@
 {
   "name": "react-multiple-select-dropdown-lite",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "React Multiple Select Light Weight Dropdown list | Searchable | Addable | Groupable etc",
   "author": "Arif-un",
   "license": "MIT",
@@ -17,6 +17,7 @@
   "scripts": {
     "build": "microbundle-crl --compress --css-modules false",
     "start": "microbundle-crl watch --compress --css-modules false",
+    "example": "cd example && npm start",
     "prepare": "run-s build",
     "test": "run-s test:unit test:lint test:build",
     "test:build": "run-s build",
