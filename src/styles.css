@@ -46,11 +46,13 @@
   vertical-align: top;
   outline: none;
   margin: 5px;
+  line-height: 1;
   padding: 3px;
   font-size: var(--font-size);
 }
 
 .msl-input::before {
+  line-height: 1;
   color: rgb(146, 146, 146);
 }
 .msl-input[data-placeholder]:not([data-placeholder=""]):empty::before {
@@ -140,8 +142,9 @@
 }
 .msl-actions {
   position: absolute;
-  top: 16%;
   right: 5px;
+  top: 50%;
+  transform: translatey(-50%);
 }
 .msl-arrow-btn,
 .msl-clear-btn {
