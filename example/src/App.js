@@ -23,11 +23,14 @@ const App = () => {
         <h4>Values</h4>
         {value}
       </div>
-      <MultiSelect
-        width={400}
-        onChange={handleOnchange}
-        options={options}
-      />
+        <MultiSelect
+          // defaultValue={[{ label: 'Option 3', value: 'option_3' },{ label: 'Option 4', value: 'option_4' }]}
+          // defaultValue={['option_3', 'option_4']}
+          defaultValue={'option_3,option_4'}
+          width={400}
+          onChange={handleOnchange}
+          options={options}
+        />
     </div>
   )
 }
