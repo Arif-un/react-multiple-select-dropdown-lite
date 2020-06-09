@@ -1,6 +1,10 @@
 ## React Multiple Select Dropdown Lite
 A lightweight Multiple/Single Select component for react using React-Hooks
-production minified 4.6 kb , gzipped 1.6 kb [Bundlephobia](https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite@1.0.0)
+
+Production minified 4.6 kb , gzipped 1.6 kb [Bundlephobia](https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite@1.0.0)
+
+### Screenshot
+![react-multiple-select-dropdown-menu](https://github.com/Arif-un/react-multiple-select-dropdown-lite/blob/master/screenshoot/react%20multiple%20select%20dropdown%20menu%20,%20lightweight,%20react%20hooks.gif?raw=true)
 
 ### Install
 
@@ -44,12 +48,26 @@ const App = () => {
 export  default App
 ```
 
-### Options
+## Features and Roadmap
+
+<input type="checkbox" checked /> JSON Value <br>
+<input type="checkbox" checked /> Clearable <br>
+<input type="checkbox" checked /> Disable Chip <br>
+<input type="checkbox" checked /> Custom Down Arrow Icon <br>
+<input type="checkbox" /> Searchable <br>
+<input type="checkbox" /> Disabled <br>
+<input type="checkbox" /> Required <br>
+<input type="checkbox" /> Group <br>
+<input type="checkbox" /> Sublist <br>
+<input type="checkbox" /> Select Limit <br>
+<input type="checkbox" /> Custom Creatable Value <br>
+
+## Props Options
 |Props| type | default | description
 |-----|------| ------- | ----------|
-| width | int | 300 | Specify width in px
-| options| array |  | pass options as array of object <br> example: <br> `[ { label : 'Option 1', value : 'opt_1' } ]`
+| options| array | ""  | pass options as array of object <br> `label` : (string) Options Label <br> `value` : Option value <br> `style` : (object) custom style <br> `classes` : (string) style classes <br> <br> example: <br> ```[ { label : "Option 1", value : "opt_1", style: {textAlign: 'center'}, classes: "classA classB" } ]```
 |onChange | function | |Return value on input change
+| width | int | 300 | Specify width in px
 | defaultValue | string \| array of object |  | specify default value
 |jsonValue | bool | false | get value from input as json
 |singleSelect | bool | false | allow one select only
@@ -59,6 +77,10 @@ downArrow |bool | true|  show / hide down icon in dropdown
 | className | string \| object | | specify custom class
 |placeholder | string | Select... | Input Placeholder
 |disableChip | bool | false | disable multiple select chips show value or total selected value only   
+
+<br>
+<br>
+<br>
 
 ### Sponsor
 
