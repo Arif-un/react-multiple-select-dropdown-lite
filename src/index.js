@@ -11,6 +11,8 @@ MultiSelect.defaultProps = {
   jsonValue: false,
   defaultValue: '',
   disableChip: false,
+  name: '',
+  required: false,
   placeholder: 'Select...',
   onChange: () => {},
   options: [
@@ -35,7 +37,8 @@ function MultiSelect({
   defaultValue,
   className,
   placeholder,
-  disableChip
+  disableChip,
+  name
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -49,9 +52,20 @@ function MultiSelect({
       if (singleSelect && preDefinedValue.length > 1) {
         preDefinedValue = [preDefinedValue[0]]
       }
-    } else if (Array.isArray(preDefinedValue)) {
+    } else if (
+      Array.isArray(defaultValue) &&
+      defaultValue.length > 0 &&
+      typeof defaultValue[0] !== 'string'
+    ) {
       preDefinedValue = options.filter((opt) =>
         defaultValue.some((pval) => opt.value === pval.value)
+      )
+      if (singleSelect && preDefinedValue.length > 1) {
+        preDefinedValue = [preDefinedValue[0]]
+      }
+    } else if (Array.isArray(defaultValue) && defaultValue.length > 0) {
+      preDefinedValue = options.filter((opt) =>
+        defaultValue.some((pval) => opt.value === pval)
       )
       if (singleSelect && preDefinedValue.length > 1) {
         preDefinedValue = [preDefinedValue[0]]
@@ -191,6 +205,8 @@ function MultiSelect({
 
   return (
     <div
+      name={name}
+      value={JSON.stringify(value)}
       onClick={handleClickInput}
       style={{ width }}
       className={`msl-wrp msl-vars ${className}`}
@@ -207,9 +223,11 @@ function MultiSelect({
           {!singleSelect &&
             !disableChip &&
             value.map((val, i) => (
-              <div key={`chip-${i + 11}`} className='msl-chip'>
+              <div key={`msl-chip-${i + 11}`} className='msl-chip'>
                 {val.label}
                 <button
+                  type='button'
+                  aria-label='delete-value'
                   onClick={() => deleteValue(i)}
                   className='msl-btn msl-chip-delete msl-flx'
                 >
@@ -284,6 +302,8 @@ function MultiSelect({
           <div className='msl-actions msl-flx'>
             {clearable && (
               <button
+                type='button'
+                aria-label='close-menu'
                 onClick={clearValue}
                 className='msl-btn msl-clear-btn msl-flx'
               >
@@ -292,6 +312,8 @@ function MultiSelect({
             )}
             {downArrow && (
               <button
+                type='button'
+                aria-label='toggle-menu'
                 onClick={handleMenuBtn}
                 className='msl-btn msl-arrow-btn msl-flx'
                 style={{ ...(menuOpen && { transform: 'rotate(180deg)' }) }}
