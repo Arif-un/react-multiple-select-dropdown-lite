@@ -1,5 +1,5 @@
 ## React Multiple Select Dropdown Lite
-A lightweight Multiple/Single Select component for react using React-Hooks
+A lightweight Multiple/Single Select Pure functional component for react using React-Hooks.
 
 Production minified 4.6 kb , gzipped 1.6 kb [Bundlephobia](https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite@1.0.0)
 
@@ -54,13 +54,13 @@ export  default App
 - [x] Clearable <br>
 - [x] Disable Chip <br>
 - [x] Custom Down Arrow Icon <br>
+- [x] Disabled <br>
+- [x] Select Limit <br>
 - [ ] Searchable <br>
-- [ ] Disabled <br>
-- [ ] Required <br>
 - [ ] Group <br>
 - [ ] Sublist <br>
-- [ ] Select Limit <br>
 - [ ] Custom Creatable Value <br>
+- [ ] Themeable (using css var) <br>
 
 ## Props Options
 |Props| type | default | description
@@ -68,7 +68,8 @@ export  default App
 | options| array | ""  | pass options as array of object <br> `label` : (string) Options Label <br> `value` : Option value <br> `style` : (object) custom style <br> `classes` : (string) style classes <br> <br> example: <br> `[ { label : "Option 1", value : "opt_1", style: {textAlign: 'center'}, classes: "classA classB" } ]`
 |onChange | function | |Return value on input change
 | width | int | 300 | Specify width in px
-|name| string | '' | specify a name
+|name| string | '' | specify a name for form
+|disabled | bool | false | disable input
 | defaultValue | string \| array of object \| string array | '' | specify default value
 |jsonValue | bool | false | get value from input as json
 |singleSelect | bool | false | allow one select only
