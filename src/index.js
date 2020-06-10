@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import CloseIcon from './CloseIcon.jsx'
 import DownIcon from './DownIcon.jsx'
 import './styles.css'
@@ -12,7 +12,8 @@ MultiSelect.defaultProps = {
   defaultValue: '',
   disableChip: false,
   name: '',
-  required: false,
+  disabled: false,
+  limit: null,
   placeholder: 'Select...',
   onChange: () => {},
   options: [
@@ -39,42 +40,47 @@ function MultiSelect({
   placeholder,
   disableChip,
   name,
-  attr
+  attr,
+  disabled,
+  limit
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [value, setValue] = useState([])
+  let stopPropagation = true
 
-  let preDefinedValue = []
-  if (defaultValue !== '' || defaultValue.length > 0) {
-    if (typeof defaultValue === 'string') {
-      const valueArr = defaultValue.split(',')
-      preDefinedValue = options.filter(
-        (itm) => valueArr.indexOf(itm.value) !== -1
-      )
-      if (singleSelect && preDefinedValue.length > 1) {
-        preDefinedValue = [preDefinedValue[0]]
-      }
-    } else if (
-      Array.isArray(defaultValue) &&
-      defaultValue.length > 0 &&
-      typeof defaultValue[0] !== 'string'
-    ) {
-      preDefinedValue = options.filter((opt) =>
-        defaultValue.some((pval) => opt.value === pval.value)
-      )
-      if (singleSelect && preDefinedValue.length > 1) {
-        preDefinedValue = [preDefinedValue[0]]
-      }
-    } else if (Array.isArray(defaultValue) && defaultValue.length > 0) {
-      preDefinedValue = options.filter((opt) =>
-        defaultValue.some((pval) => opt.value === pval)
-      )
-      if (singleSelect && preDefinedValue.length > 1) {
-        preDefinedValue = [preDefinedValue[0]]
+  useEffect(() => {
+    let preDefinedValue = []
+    if (defaultValue !== '' || defaultValue.length > 0) {
+      if (typeof defaultValue === 'string') {
+        const valueArr = defaultValue.split(',')
+        preDefinedValue = options.filter(
+          (itm) => valueArr.indexOf(itm.value) !== -1
+        )
+        if (singleSelect && preDefinedValue.length > 1) {
+          preDefinedValue = [preDefinedValue[0]]
+        }
+      } else if (
+        Array.isArray(defaultValue) &&
+        defaultValue.length > 0 &&
+        typeof defaultValue[0] !== 'string'
+      ) {
+        preDefinedValue = options.filter((opt) =>
+          defaultValue.some((pval) => opt.value === pval.value)
+        )
+        if (singleSelect && preDefinedValue.length > 1) {
+          preDefinedValue = [preDefinedValue[0]]
+        }
+      } else if (Array.isArray(defaultValue) && defaultValue.length > 0) {
+        preDefinedValue = options.filter((opt) =>
+          defaultValue.some((pval) => opt.value === pval)
+        )
+        if (singleSelect && preDefinedValue.length > 1) {
+          preDefinedValue = [preDefinedValue[0]]
+        }
       }
     }
-  }
-  const [value, setValue] = useState(preDefinedValue)
-  let stopPropagation = true
+    setValue(preDefinedValue)
+  }, [defaultValue])
 
   const setNewValue = (val) => {
     setValue(val)
@@ -175,7 +181,11 @@ function MultiSelect({
       tmp = [options[i]]
     } else {
       if (!checkValueExist(options[i], value)) {
-        tmp.push(options[i])
+        if (limit === null) {
+          tmp.push(options[i])
+        } else if (limit > value.length) {
+          tmp.push(options[i])
+        }
       } else {
         tmp = tmp.filter((itm) => itm.value !== options[i].value)
       }
@@ -206,13 +216,14 @@ function MultiSelect({
 
   return (
     <div
-      name={name}
       {...attr}
-      value={JSON.stringify(value)}
       onClick={handleClickInput}
       style={{ width }}
-      className={`msl-wrp msl-vars ${className}`}
+      className={`msl-wrp msl-vars ${className} ${
+        disabled ? 'msl-disabled' : ''
+      }`}
     >
+      <input name={name} type='hidden' value={value.map((itm) => itm.value)} />
       <div data-msl className={`msl ${menuOpen ? 'msl-active' : ''} `}>
         <div
           data-msl
@@ -296,7 +307,7 @@ function MultiSelect({
               data-msl
               data-placeholder={placeholder}
               className='msl-input'
-              contentEditable
+              contentEditable={!disabled}
             />
           )}
         </div>
@@ -337,8 +348,10 @@ function MultiSelect({
             title={opt.label}
             key={opt.value + i + 10}
             className={`msl-option ${
-              checkValueExist(opt, value) && 'msl-option-active'
-            } ${opt.disabled && 'msl-option-disable'} ${opt.classes}`}
+              checkValueExist(opt, value) ? 'msl-option-active' : ''
+            } ${opt.disabled ? 'msl-option-disable' : ''} ${
+              opt.classes !== undefined ? opt.classes : ''
+            }`}
             value={opt.value}
           >
             {opt.label}
