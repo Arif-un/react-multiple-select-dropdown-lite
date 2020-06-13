@@ -73,7 +73,8 @@ export  default App
 | defaultValue | string \| array of object \| string array | '' | specify default value
 |jsonValue | bool | false | get value from input as json
 |singleSelect | bool | false | allow one select only
-|downArrowIcon| string \| icon \| component | Icon | Specify custom down arrow icon
+|downArrowIcon| string \| icon \| component | SVG | Specify custom down arrow icon
+|closeIcon |string \| icon \| component  | SVG | Specify custom close arrow icon
 |clearable | bool | true | show / hide close icon to clear value
 downArrow |bool | true|  show / hide down icon in dropdown
 | className | string \| object | | specify custom class
