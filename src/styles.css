@@ -162,23 +162,24 @@
 .msl-clear-btn .msl-close-icn {
   transform: scale(0.8);
 }
-.msl-clear-btn .msl-close-icn > line {
-  stroke-width: 2;
-}
+
 .msl-clear-btn:hover,
 .msl-arrow-btn:hover {
   background: lightgray;
+}
+
+.msl-close-icn > line,
+.msl-arrow-icn > line {
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke: rgb(75, 75, 75);
+
 }
 
 .msl-arrow-icn {
   height: 20px;
   width: 20px;
   transform: scale(0.8);
-}
-.msl-arrow-icn > line {
-  stroke: rgb(75, 75, 75);
-  stroke-width: 2;
-  stroke-linecap: round;
 }
 
 .msl-chip-delete {
@@ -196,14 +197,11 @@
 .msl-chip-delete .msl-close-icn {
   transform: scale(0.6);
 }
+.msl-chip-delete .msl-close-icn >line{
+  stroke-width: 1;
+}
 
 .msl-close-icn {
   height: 15px;
   width: 15px;
-}
-
-.msl-close-icn > line {
-  stroke: rgb(75, 75, 75);
-  stroke-width: 1.5;
-  stroke-linecap: round;
 }
