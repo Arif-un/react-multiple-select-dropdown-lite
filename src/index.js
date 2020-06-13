@@ -15,7 +15,7 @@ MultiSelect.defaultProps = {
   disabled: false,
   limit: null,
   placeholder: 'Select...',
-  onChange: () => {},
+  onChange: () => { },
   options: [
     {
       label: 'Empty',
@@ -30,6 +30,7 @@ function MultiSelect({
   options,
   width,
   downArrowIcon,
+  closeIcon,
   clearable,
   downArrow,
   onChange,
@@ -93,6 +94,16 @@ function MultiSelect({
     }
   }
 
+  const openMenu = () => {
+    console.log('open menu')
+    setMenuOpen(true)
+  }
+
+  const closeMenu = () => {
+    console.log('close menu')
+    setMenuOpen(false)
+  }
+
   const inputRefFocus = (e, focus) => {
     let parentNode = null
     let inputNode = null
@@ -123,14 +134,15 @@ function MultiSelect({
   }
 
   const handleMenuBtn = (e) => {
+    console.log('from menu btn')
     stopPropagation = false
     if (menuOpen) {
-      inputRefFocus(e, false)
-      setMenuOpen(false)
       document.removeEventListener('click', handleMenu)
+      inputRefFocus(e, false)
+      closeMenu()
     } else {
       inputRefFocus(e, true)
-      setMenuOpen(true)
+      openMenu()
       document.addEventListener('click', handleMenu)
     }
   }
@@ -138,9 +150,10 @@ function MultiSelect({
   const handleMenu = (e) => {
     if (!openable(e)) {
       document.removeEventListener('click', handleMenu)
-      setMenuOpen(false)
+      closeMenu()
+      console.log('from doc event')
     } else {
-      setMenuOpen(true)
+      openMenu()
     }
   }
 
@@ -153,13 +166,15 @@ function MultiSelect({
 
   const handleOutsideClick = (e) => {
     if (openable(e)) {
+      console.log('wwww', document.querySelector('button[aria-label="toggle-menu"]'))
       if (!menuOpen) {
         document.addEventListener('click', handleOutsideClick)
       }
       inputRefFocus(e, true)
-      setMenuOpen(true)
+      openMenu()
     } else {
-      setMenuOpen(false)
+      console.log('outside close')
+      closeMenu()
       document.removeEventListener('click', handleOutsideClick)
     }
   }
@@ -221,7 +236,7 @@ function MultiSelect({
       style={{ width }}
       className={`msl-wrp msl-vars ${className} ${
         disabled ? 'msl-disabled' : ''
-      }`}
+        }`}
     >
       <input name={name} type='hidden' value={value.map((itm) => itm.value)} />
       <div data-msl className={`msl ${menuOpen ? 'msl-active' : ''} `}>
@@ -238,14 +253,14 @@ function MultiSelect({
             value.map((val, i) => (
               <div key={`msl-chip-${i + 11}`} className='msl-chip'>
                 {val.label}
-                <button
+                <div
                   type='button'
                   aria-label='delete-value'
                   onClick={() => deleteValue(i)}
                   className='msl-btn msl-chip-delete msl-flx'
                 >
                   <CloseIcon />
-                </button>
+                </div>
                 <span />
               </div>
             ))}
@@ -259,32 +274,32 @@ function MultiSelect({
                   (clearable && downArrow
                     ? 60
                     : downArrow || clearable
-                    ? 40
-                    : 5)
+                      ? 40
+                      : 5)
               }}
             >
               {value[0].label}d
             </span>
           ) : (
-            disableChip &&
-            value.length > 1 && (
-              <span
-                className='msl-single-value'
-                data-msl
-                style={{
-                  width:
-                    width -
-                    (clearable && downArrow
-                      ? 60
-                      : downArrow || clearable
-                      ? 40
-                      : 5)
-                }}
-              >
-                {value.length} Selected
-              </span>
-            )
-          )}
+              disableChip &&
+              value.length > 1 && (
+                <span
+                  className='msl-single-value'
+                  data-msl
+                  style={{
+                    width:
+                      width -
+                      (clearable && downArrow
+                        ? 60
+                        : downArrow || clearable
+                          ? 40
+                          : 5)
+                  }}
+                >
+                  {value.length} Selected
+                </span>
+              )
+            )}
           {singleSelect && value.length === 1 && (
             <span
               className='msl-single-value'
@@ -295,8 +310,8 @@ function MultiSelect({
                   (clearable && downArrow
                     ? 60
                     : downArrow || clearable
-                    ? 40
-                    : 5)
+                      ? 40
+                      : 5)
               }}
             >
               {value[0].label}
@@ -320,7 +335,7 @@ function MultiSelect({
                 onClick={clearValue}
                 className='msl-btn msl-clear-btn msl-flx'
               >
-                <CloseIcon />
+                {closeIcon || <CloseIcon />}
               </button>
             )}
             {downArrow && (
@@ -349,9 +364,9 @@ function MultiSelect({
             key={opt.value + i + 10}
             className={`msl-option ${
               checkValueExist(opt, value) ? 'msl-option-active' : ''
-            } ${opt.disabled ? 'msl-option-disable' : ''} ${
+              } ${opt.disabled ? 'msl-option-disable' : ''} ${
               opt.classes !== undefined ? opt.classes : ''
-            }`}
+              }`}
             value={opt.value}
           >
             {opt.label}
