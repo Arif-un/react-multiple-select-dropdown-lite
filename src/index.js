@@ -15,7 +15,7 @@ MultiSelect.defaultProps = {
   disabled: false,
   limit: null,
   placeholder: 'Select...',
-  onChange: () => { },
+  onChange: () => {},
   options: [
     {
       label: 'Empty',
@@ -48,6 +48,10 @@ function MultiSelect({
   const [menuOpen, setMenuOpen] = useState(false)
   const [value, setValue] = useState([])
   let stopPropagation = true
+
+  if (options === null || options === '' || options === false) {
+    options = []
+  }
 
   useEffect(() => {
     let preDefinedValue = []
@@ -83,6 +87,46 @@ function MultiSelect({
     setValue(preDefinedValue)
   }, [defaultValue])
 
+  const printOptions = (opts) => {
+    const optsArr = []
+    function addInArr(opts) {
+      for (const [i, opt] of opts.entries()) {
+        if (opt.type === 'group') {
+          optsArr.push(
+            <div data-msl className='msl-grp-title'>
+              {opt.title}
+            </div>
+          )
+          addInArr(opt.childs)
+        } else {
+          optsArr.push(
+            <option
+              {...(!singleSelect && { 'data-msl': true })}
+              style={{
+                ...(opt.style && opt.style)
+              }}
+              onClick={() => {
+                !opt.disabled && addValue(opt)
+              }}
+              title={opt.label}
+              key={opt.value + i + 10}
+              className={`msl-option ${
+                checkValueExist(opt, value) ? 'msl-option-active' : ''
+              } ${opt.disabled ? 'msl-option-disable' : ''} ${
+                opt.classes !== undefined ? opt.classes : ''
+              }`}
+              value={opt.value}
+            >
+              {opt.label}
+            </option>
+          )
+        }
+      }
+    }
+    addInArr(opts)
+    return optsArr
+  }
+
   const setNewValue = (val) => {
     setValue(val)
     if (jsonValue) {
@@ -95,12 +139,10 @@ function MultiSelect({
   }
 
   const openMenu = () => {
-    console.log('open menu')
     setMenuOpen(true)
   }
 
   const closeMenu = () => {
-    console.log('close menu')
     setMenuOpen(false)
   }
 
@@ -134,7 +176,6 @@ function MultiSelect({
   }
 
   const handleMenuBtn = (e) => {
-    console.log('from menu btn')
     stopPropagation = false
     if (menuOpen) {
       document.removeEventListener('click', handleMenu)
@@ -151,7 +192,6 @@ function MultiSelect({
     if (!openable(e)) {
       document.removeEventListener('click', handleMenu)
       closeMenu()
-      console.log('from doc event')
     } else {
       openMenu()
     }
@@ -166,14 +206,16 @@ function MultiSelect({
 
   const handleOutsideClick = (e) => {
     if (openable(e)) {
-      console.log('wwww', document.querySelector('button[aria-label="toggle-menu"]'))
+      /* console.log(
+        'wwww',
+        document.querySelector('div[aria-label="toggle-menu"]')
+      ) */
       if (!menuOpen) {
         document.addEventListener('click', handleOutsideClick)
       }
       inputRefFocus(e, true)
       openMenu()
     } else {
-      console.log('outside close')
       closeMenu()
       document.removeEventListener('click', handleOutsideClick)
     }
@@ -186,23 +228,24 @@ function MultiSelect({
   }
 
   const checkValueExist = (value, arr) => {
+    // console.log('check', value, arr)
     const a = arr.some((itm) => itm.value === value.value)
     return a
   }
 
-  const addValue = (i) => {
+  const addValue = (newValObj) => {
     let tmp = [...value]
     if (singleSelect) {
-      tmp = [options[i]]
+      tmp = [newValObj]
     } else {
-      if (!checkValueExist(options[i], value)) {
+      if (!checkValueExist(newValObj, value)) {
         if (limit === null) {
-          tmp.push(options[i])
+          tmp.push(newValObj)
         } else if (limit > value.length) {
-          tmp.push(options[i])
+          tmp.push(newValObj)
         }
       } else {
-        tmp = tmp.filter((itm) => itm.value !== options[i].value)
+        tmp = tmp.filter((itm) => itm.value !== newValObj.value)
       }
     }
     setNewValue(tmp)
@@ -236,7 +279,7 @@ function MultiSelect({
       style={{ width }}
       className={`msl-wrp msl-vars ${className} ${
         disabled ? 'msl-disabled' : ''
-        }`}
+      }`}
     >
       <input name={name} type='hidden' value={value.map((itm) => itm.value)} />
       <div data-msl className={`msl ${menuOpen ? 'msl-active' : ''} `}>
@@ -254,7 +297,7 @@ function MultiSelect({
               <div key={`msl-chip-${i + 11}`} className='msl-chip'>
                 {val.label}
                 <div
-                  type='button'
+                  role='button'
                   aria-label='delete-value'
                   onClick={() => deleteValue(i)}
                   className='msl-btn msl-chip-delete msl-flx'
@@ -274,32 +317,32 @@ function MultiSelect({
                   (clearable && downArrow
                     ? 60
                     : downArrow || clearable
-                      ? 40
-                      : 5)
+                    ? 40
+                    : 5)
               }}
             >
               {value[0].label}d
             </span>
           ) : (
-              disableChip &&
-              value.length > 1 && (
-                <span
-                  className='msl-single-value'
-                  data-msl
-                  style={{
-                    width:
-                      width -
-                      (clearable && downArrow
-                        ? 60
-                        : downArrow || clearable
-                          ? 40
-                          : 5)
-                  }}
-                >
-                  {value.length} Selected
-                </span>
-              )
-            )}
+            disableChip &&
+            value.length > 1 && (
+              <span
+                className='msl-single-value'
+                data-msl
+                style={{
+                  width:
+                    width -
+                    (clearable && downArrow
+                      ? 60
+                      : downArrow || clearable
+                      ? 40
+                      : 5)
+                }}
+              >
+                {value.length} Selected
+              </span>
+            )
+          )}
           {singleSelect && value.length === 1 && (
             <span
               className='msl-single-value'
@@ -310,8 +353,8 @@ function MultiSelect({
                   (clearable && downArrow
                     ? 60
                     : downArrow || clearable
-                      ? 40
-                      : 5)
+                    ? 40
+                    : 5)
               }}
             >
               {value[0].label}
@@ -328,32 +371,33 @@ function MultiSelect({
         </div>
         {(clearable || downArrow) && (
           <div className='msl-actions msl-flx'>
-            {clearable && (
-              <button
-                type='button'
+            {clearable && value.length > 0 && (
+              <div
+                role='button'
                 aria-label='close-menu'
                 onClick={clearValue}
                 className='msl-btn msl-clear-btn msl-flx'
               >
                 {closeIcon || <CloseIcon />}
-              </button>
+              </div>
             )}
             {downArrow && (
-              <button
-                type='button'
+              <div
+                role='button'
                 aria-label='toggle-menu'
                 onClick={handleMenuBtn}
                 className='msl-btn msl-arrow-btn msl-flx'
                 style={{ ...(menuOpen && { transform: 'rotate(180deg)' }) }}
               >
                 {downArrowIcon || <DownIcon />}
-              </button>
+              </div>
             )}
           </div>
         )}
       </div>
       <div className='msl-options'>
-        {options.map((opt, i) => (
+        {printOptions(options)}
+        {/* {options.map((opt, i) => (
           <option
             {...(!singleSelect && { 'data-msl': true })}
             style={{ ...(opt.style && opt.style) }}
@@ -364,14 +408,14 @@ function MultiSelect({
             key={opt.value + i + 10}
             className={`msl-option ${
               checkValueExist(opt, value) ? 'msl-option-active' : ''
-              } ${opt.disabled ? 'msl-option-disable' : ''} ${
+            } ${opt.disabled ? 'msl-option-disable' : ''} ${
               opt.classes !== undefined ? opt.classes : ''
-              }`}
+            }`}
             value={opt.value}
           >
             {opt.label}
           </option>
-        ))}
+        ))} */}
       </div>
     </div>
   )
