@@ -111,18 +111,26 @@
 .msl-options::-webkit-scrollbar-thumb:hover {
   background: rgb(0, 0, 0, 0.2);
 }
-.msl-options > .msl-option {
+.msl-options > .msl-option,
+.msl-grp-title {
   font-size: var(--font-size);
   border-radius: calc(var(--border-radius) - 3px);
   padding: 7px 5px;
   cursor: pointer;
   margin: 4px 6px 4px;
-  line-height: 1;
   line-break: anywhere;
   line-height: 1.2;
   white-space: break-spaces;
   transition: background 200ms;
 }
+
+.msl-grp-title {
+  font-size: calc(var(--font-size) - 2px);
+  cursor: default;
+  background: #fafafa;
+  opacity: 0.7;
+}
+
 .msl-options > .msl-option:last-child {
   margin-bottom: 5px;
 }
@@ -160,7 +168,7 @@
 }
 
 .msl-clear-btn .msl-close-icn {
-  transform: scale(0.8);
+  transform: scale(0.7);
 }
 
 .msl-clear-btn:hover,
@@ -170,10 +178,9 @@
 
 .msl-close-icn > line,
 .msl-arrow-icn > line {
-  stroke-width: 1.5;
+  stroke-width: 1.2;
   stroke-linecap: round;
-  stroke: rgb(75, 75, 75);
-
+  stroke: rgb(0, 0, 0, 0.6);
 }
 
 .msl-arrow-icn {
@@ -197,7 +204,7 @@
 .msl-chip-delete .msl-close-icn {
   transform: scale(0.6);
 }
-.msl-chip-delete .msl-close-icn >line{
+.msl-chip-delete .msl-close-icn > line {
   stroke-width: 1;
 }
 
