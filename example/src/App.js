@@ -15,6 +15,12 @@ const App = () => {
     { label: 'Option 2', value: 'option_2' },
     { label: 'Option 3', value: 'option_3' },
     { label: 'Option 4', value: 'option_4' },
+    {
+      title: 'group', type: 'group', childs: [
+        { label: 'Option 5', value: 'option_5' },
+        { label: 'Option 6', value: 'option_6' },
+      ]
+    },
   ]
 
   return (
@@ -23,14 +29,14 @@ const App = () => {
         <h4>Values</h4>
         {value}
       </div>
-        <MultiSelect
-          // defaultValue={[{ label: 'Option 3', value: 'option_3' },{ label: 'Option 4', value: 'option_4' }]}
-          // defaultValue={['option_3', 'option_4']}
-          defaultValue={'option_3,option_4'}
-          width={400}
-          onChange={handleOnchange}
-          options={options}
-        />
+      <MultiSelect
+        // defaultValue={[{ label: 'Option 3', value: 'option_3' },{ label: 'Option 4', value: 'option_4' }]}
+        // defaultValue={['option_3', 'option_4']}
+        defaultValue={'option_3,option_4'}
+        width={400}
+        onChange={handleOnchange}
+        options={options}
+      />
     </div>
   )
 }
