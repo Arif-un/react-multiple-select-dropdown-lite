@@ -47,7 +47,6 @@ const App = () => {
 )}
 export  default App
 ```
-
 ## Features and Roadmap
 
 - [x] JSON Value <br>
@@ -56,8 +55,8 @@ export  default App
 - [x] Custom Down Arrow Icon <br>
 - [x] Disabled <br>
 - [x] Select Limit <br>
+- [x] Group <br>
 - [ ] Searchable <br>
-- [ ] Group <br>
 - [ ] Sublist <br>
 - [ ] Custom Creatable Value <br>
 - [ ] Themeable (using css var) <br>
