@@ -1,7 +1,7 @@
 ## React Multiple Select Dropdown Lite
 A lightweight Multiple/Single Select Pure functional component for react using React-Hooks.
 
-Production minified 4.6 kb , gzipped 1.6 kb [Bundlephobia](https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite@1.0.0)
+Production minified 6.3 kb , gzipped 2.3 kb [Bundlephobia](https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite@1.0.9)
 
 ### Screenshot
 ![react-multiple-select-dropdown-menu](https://github.com/Arif-un/react-multiple-select-dropdown-lite/blob/master/screenshoot/react%20multiple%20select%20dropdown%20menu%20,%20lightweight,%20react%20hooks.gif?raw=true)
