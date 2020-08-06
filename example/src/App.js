@@ -7,6 +7,7 @@ const App = () => {
   const [value, setvalue] = useState('')
 
   const handleOnchange = val => {
+    // console.log(val)
     setvalue(val)
   }
 
@@ -30,9 +31,7 @@ const App = () => {
         {value}
       </div>
       <MultiSelect
-        // defaultValue={[{ label: 'Option 3', value: 'option_3' },{ label: 'Option 4', value: 'option_4' }]}
-        // defaultValue={['option_3', 'option_4']}
-        defaultValue={'option_3,option_4'}
+        defaultValue={value}
         width={400}
         onChange={handleOnchange}
         options={options}
