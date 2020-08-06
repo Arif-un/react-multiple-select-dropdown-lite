@@ -7,7 +7,6 @@ const App = () => {
   const [value, setvalue] = useState('')
 
   const handleOnchange = val => {
-    // console.log(val)
     setvalue(val)
   }
 

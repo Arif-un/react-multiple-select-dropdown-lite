@@ -47,11 +47,29 @@ function MultiSelect({
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [value, setValue] = useState([])
-  console.log('init', value)
   let stopPropagation = true
 
   if (options === null || options === '' || options === false) {
     options = []
+  }
+
+  const filterPredefinedVal = (splitedVal, options) => {
+    const filterVal = []
+    options.map((itm) => {
+      if (itm?.type === 'group') {
+        itm.childs.map((child) => {
+          if (splitedVal.find((val) => val === child.value) !== undefined) {
+            filterVal.push(child)
+          }
+        })
+      } else {
+        if (splitedVal.find((val) => val === itm.value) !== undefined) {
+          filterVal.push(itm)
+        }
+      }
+    })
+
+    return filterVal
   }
 
   useEffect(() => {
@@ -59,9 +77,8 @@ function MultiSelect({
     if (defaultValue !== '' || defaultValue.length > 0) {
       if (typeof defaultValue === 'string') {
         const valueArr = defaultValue.split(',')
-        preDefinedValue = options.filter(
-          (itm) => valueArr.indexOf(itm.value) !== -1
-        )
+        preDefinedValue = filterPredefinedVal(valueArr, options)
+
         if (singleSelect && preDefinedValue.length > 1) {
           preDefinedValue = [preDefinedValue[0]]
         }
@@ -86,7 +103,7 @@ function MultiSelect({
       }
     }
     setValue(preDefinedValue)
-  }, [])
+  }, [defaultValue])
 
   const printOptions = (opts) => {
     const optsArr = []
@@ -230,15 +247,12 @@ function MultiSelect({
   }
 
   const addValue = (newValObj) => {
-    console.log(newValObj)
     let tmp = [...value]
     if (singleSelect) {
       tmp = [newValObj]
     } else {
       if (!checkValueExist(newValObj, value)) {
-        console.log('not exists')
         if (limit === null) {
-          console.log('pyushed')
           tmp.push(newValObj)
         } else if (limit > value.length) {
           tmp.push(newValObj)
