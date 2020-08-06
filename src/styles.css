@@ -13,6 +13,7 @@
 
 .msl-wrp {
   position: relative;
+  border-radius: var(--border-radius);
 }
 .msl-disabled {
   pointer-events: none !important;
@@ -32,6 +33,7 @@
   border-color: rgb(80, 80, 80);
 }
 .msl-active {
+  background-color: white;
   box-shadow: var(--menu-shadow);
   z-index: 999;
   border-color: transparent;

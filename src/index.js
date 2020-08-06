@@ -47,6 +47,7 @@ function MultiSelect({
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [value, setValue] = useState([])
+  console.log('init', value)
   let stopPropagation = true
 
   if (options === null || options === '' || options === false) {
@@ -85,7 +86,7 @@ function MultiSelect({
       }
     }
     setValue(preDefinedValue)
-  }, [defaultValue])
+  }, [])
 
   const printOptions = (opts) => {
     const optsArr = []
@@ -93,7 +94,7 @@ function MultiSelect({
       for (const [i, opt] of opts.entries()) {
         if (opt.type === 'group') {
           optsArr.push(
-            <div data-msl className='msl-grp-title'>
+            <div key={opt.title + i} data-msl className='msl-grp-title'>
               {opt.title}
             </div>
           )
@@ -101,6 +102,7 @@ function MultiSelect({
         } else {
           optsArr.push(
             <option
+              key={opt.value + opt.label + i + 10}
               {...(!singleSelect && { 'data-msl': true })}
               style={{
                 ...(opt.style && opt.style)
@@ -109,7 +111,6 @@ function MultiSelect({
                 !opt.disabled && addValue(opt)
               }}
               title={opt.label}
-              key={opt.value + i + 10}
               className={`msl-option ${
                 checkValueExist(opt, value) ? 'msl-option-active' : ''
               } ${opt.disabled ? 'msl-option-disable' : ''} ${
@@ -206,10 +207,6 @@ function MultiSelect({
 
   const handleOutsideClick = (e) => {
     if (openable(e)) {
-      /* console.log(
-        'wwww',
-        document.querySelector('div[aria-label="toggle-menu"]')
-      ) */
       if (!menuOpen) {
         document.addEventListener('click', handleOutsideClick)
       }
@@ -228,18 +225,20 @@ function MultiSelect({
   }
 
   const checkValueExist = (value, arr) => {
-    // console.log('check', value, arr)
     const a = arr.some((itm) => itm.value === value.value)
     return a
   }
 
   const addValue = (newValObj) => {
+    console.log(newValObj)
     let tmp = [...value]
     if (singleSelect) {
       tmp = [newValObj]
     } else {
       if (!checkValueExist(newValObj, value)) {
+        console.log('not exists')
         if (limit === null) {
+          console.log('pyushed')
           tmp.push(newValObj)
         } else if (limit > value.length) {
           tmp.push(newValObj)

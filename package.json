@@ -1,12 +1,12 @@
 {
   "name": "react-multiple-select-dropdown-lite",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "React Multiple Select Light Weight Dropdown list | Searchable | Addable | Groupable etc",
   "author": "Arif-un",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Arif-un/react-multiple-select-dropdown-lite"
+    "url": "git+https://github.com/Arif-un/react-multiple-select-dropdown-lite.git"
   },
   "main": "dist/index.js",
   "module": "dist/index.modern.js",
@@ -72,5 +72,12 @@
     "react-component",
     "select",
     "ui"
-  ]
+  ],
+  "bugs": {
+    "url": "https://github.com/Arif-un/react-multiple-select-dropdown-lite/issues"
+  },
+  "homepage": "https://github.com/Arif-un/react-multiple-select-dropdown-lite#readme",
+  "directories": {
+    "example": "example"
+  }
 }
