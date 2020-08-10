@@ -14,6 +14,7 @@ MultiSelect.defaultProps = {
   name: '',
   disabled: false,
   limit: null,
+  emptyDataLabel: 'No Data Found',
   placeholder: 'Select...',
   onChange: () => {},
   options: [
@@ -43,7 +44,8 @@ function MultiSelect({
   name,
   attr,
   disabled,
-  limit
+  limit,
+  emptyDataLabel
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [value, setValue] = useState([])
@@ -115,7 +117,15 @@ function MultiSelect({
               {opt.title}
             </div>
           )
-          addInArr(opt.childs)
+          if (opt.childs.length > 0) {
+            addInArr(opt.childs)
+          } else {
+            optsArr.push(
+              <option className='msl-option msl-option-disable'>
+                {opt.emptyDataLabel || 'No Data Found'}
+              </option>
+            )
+          }
         } else {
           optsArr.push(
             <option
@@ -409,26 +419,14 @@ function MultiSelect({
         )}
       </div>
       <div className='msl-options'>
-        {printOptions(options)}
-        {/* {options.map((opt, i) => (
-          <option
-            {...(!singleSelect && { 'data-msl': true })}
-            style={{ ...(opt.style && opt.style) }}
-            onClick={() => {
-              !opt.disabled && addValue(i)
-            }}
-            title={opt.label}
-            key={opt.value + i + 10}
-            className={`msl-option ${
-              checkValueExist(opt, value) ? 'msl-option-active' : ''
-            } ${opt.disabled ? 'msl-option-disable' : ''} ${
-              opt.classes !== undefined ? opt.classes : ''
-            }`}
-            value={opt.value}
-          >
-            {opt.label}
+        {console.log(options)}
+        {options.length ? (
+          printOptions(options)
+        ) : (
+          <option className='msl-option msl-option-disable'>
+            {emptyDataLabel}
           </option>
-        ))} */}
+        )}
       </div>
     </div>
   )
