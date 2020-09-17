@@ -1,7 +1,8 @@
 /* eslint-disable no-labels */
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, memo, useMemo, useCallback } from 'react'
 import CloseIcon from './CloseIcon.jsx'
 import DownIcon from './DownIcon.jsx'
+import Options from './Options'
 import './styles.css'
 
 MultiSelect.defaultProps = {
@@ -50,13 +51,9 @@ function MultiSelect({
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [value, setValue] = useState([])
-  const [options, setOptions] = useState(userOptions)
+  const [options, setOptions] = useState(userOptions || [])
 
   let stopPropagation = true
-
-  if (options === null || options === '' || options === false) {
-    options = []
-  }
 
   const filterPredefinedVal = (splitedVal) => {
     const filterVal = []
@@ -93,13 +90,46 @@ function MultiSelect({
     return filterVal
   }
 
+  const preparDefaultValue = (defaultValue) => {
+    let defaultValArr = defaultValue
+    if (typeof defaultValue === 'string') {
+      defaultValArr = defaultValue.split(',')
+    }
+    const optionString = JSON.stringify(options)
+    const extraValues = []
+
+    const setExtraValue = (value) => {
+      extraValues.push({ label: value, value })
+      return { label: value, value }
+    }
+
+    const defaultValueObj = defaultValArr.map(
+      (value) =>
+        JSON.parse(
+          optionString.match(new RegExp(`{+?.[^{]*?${value}"}`, 'g'))
+        ) || setExtraValue(value)
+    )
+
+    setOptions([...options, ...extraValues])
+    return defaultValueObj
+  }
+
+  const filterExtraCustomVal = (valArrObj) => {
+    const optionString = JSON.stringify(options)
+    return valArrObj.filter(
+      (obj) =>
+        !JSON.parse(
+          optionString.match(new RegExp(`{+?.[^{]*?${obj.value}"}`, 'g'))
+        )
+    )
+  }
+
   useEffect(() => {
     let preDefinedValue = []
     if (defaultValue !== '' || defaultValue.length > 0) {
+      // when default value is string and value separated comma
       if (typeof defaultValue === 'string') {
-        const valueArr = defaultValue.split(',')
-        preDefinedValue = filterPredefinedVal(valueArr)
-
+        preDefinedValue = preparDefaultValue(defaultValue)
         if (singleSelect && preDefinedValue.length > 1) {
           preDefinedValue = [preDefinedValue[0]]
         }
@@ -108,16 +138,16 @@ function MultiSelect({
         defaultValue.length > 0 &&
         typeof defaultValue[0] !== 'string'
       ) {
-        preDefinedValue = options.filter((opt) =>
-          defaultValue.some((pval) => opt.value === pval.value)
-        )
+        // when default value is array of object
+        preDefinedValue = defaultValue // set array as default
+        const extraValue = filterExtraCustomVal(defaultValue)
+        setOptions([...options, ...extraValue])
         if (singleSelect && preDefinedValue.length > 1) {
           preDefinedValue = [preDefinedValue[0]]
         }
       } else if (Array.isArray(defaultValue) && defaultValue.length > 0) {
-        preDefinedValue = options.filter((opt) =>
-          defaultValue.some((pval) => opt.value === pval)
-        )
+        // when default value is array of string
+        preDefinedValue = preparDefaultValue(defaultValue)
         if (singleSelect && preDefinedValue.length > 1) {
           preDefinedValue = [preDefinedValue[0]]
         }
@@ -126,7 +156,8 @@ function MultiSelect({
     setValue(preDefinedValue)
   }, [defaultValue])
 
-  const printOptions = (opts) => {
+ /*  const printOptions = (opts) => {
+    console.log('print option')
     const optsArr = []
     function addInArr(opts) {
       for (const [i, opt] of opts.entries()) {
@@ -172,7 +203,7 @@ function MultiSelect({
     }
     addInArr(opts)
     return optsArr
-  }
+  } */
 
   const setNewValue = (val) => {
     setValue(val)
@@ -271,8 +302,8 @@ function MultiSelect({
   }
 
   const checkValueExist = (value, arr) => {
-    const a = arr.some((itm) => itm.value === value.value)
-    return a
+    const bool = arr.some((itm) => itm.value === value.value)
+    return bool
   }
 
   const addValue = (newValObj) => {
@@ -466,8 +497,18 @@ function MultiSelect({
         )}
       </div>
       <div className='msl-options'>
-        {options.length ? (
+        {/* {menuOpen && options.length ? (
           printOptions(options)
+        ) : (
+            <option className='msl-option msl-option-disable'>
+              {emptyDataLabel}
+            </option>
+          )} */}
+        {menuOpen && options.length ? (
+          <Options
+            opts={options}
+            {...{ singleSelect, addValue, checkValueExist, value }}
+          />
         ) : (
           <option className='msl-option msl-option-disable'>
             {emptyDataLabel}
