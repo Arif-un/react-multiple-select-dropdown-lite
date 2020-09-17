@@ -66,9 +66,9 @@ function MultiSelect({
       let pushed = 0
       optionLoop: for (let j = 0; j < options.length; j++) {
         if (options[j]?.type === 'group') {
-          childLoop: for (let k = 0; k < options[j].length; k++) {
-            if (splitedVal[i] === options[j][k].value) {
-              pushed = filterVal.push(options[j][k])
+          childLoop: for (let k = 0; k < options[j].childs.length; k++) {
+            if (splitedVal[i] === options[j].childs[k].value) {
+              pushed = filterVal.push(options[j].childs[k])
               break childLoop
             }
           }
