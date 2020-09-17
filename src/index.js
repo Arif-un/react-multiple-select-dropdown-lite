@@ -1,3 +1,4 @@
+/* eslint-disable no-labels */
 import React, { useState, useEffect } from 'react'
 import CloseIcon from './CloseIcon.jsx'
 import DownIcon from './DownIcon.jsx'
@@ -28,7 +29,7 @@ MultiSelect.defaultProps = {
 }
 
 function MultiSelect({
-  options,
+  options: userOptions,
   width,
   downArrowIcon,
   closeIcon,
@@ -49,27 +50,45 @@ function MultiSelect({
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [value, setValue] = useState([])
+  const [options, setOptions] = useState(userOptions)
+
   let stopPropagation = true
 
   if (options === null || options === '' || options === false) {
     options = []
   }
 
-  const filterPredefinedVal = (splitedVal, options) => {
+  const filterPredefinedVal = (splitedVal) => {
     const filterVal = []
-    options.map((itm) => {
-      if (itm?.type === 'group') {
-        itm.childs.map((child) => {
-          if (splitedVal.find((val) => val === child.value) !== undefined) {
-            filterVal.push(child)
+    const oldOptions = [...options]
+
+    for (let i = 0; i < splitedVal.length; i++) {
+      let pushed = 0
+      optionLoop: for (let j = 0; j < options.length; j++) {
+        if (options[j]?.type === 'group') {
+          childLoop: for (let k = 0; k < options[j].length; k++) {
+            if (splitedVal[i] === options[j][k].value) {
+              pushed = filterVal.push(options[j][k])
+              break childLoop
+            }
           }
-        })
-      } else {
-        if (splitedVal.find((val) => val === itm.value) !== undefined) {
-          filterVal.push(itm)
+        } else {
+          if (splitedVal[i] === options[j].value) {
+            pushed = filterVal.push(options[j])
+            break optionLoop
+          }
         }
       }
-    })
+
+      if (!pushed) {
+        const notFound = { label: splitedVal[i], value: splitedVal[i] }
+        filterVal.push(notFound)
+
+        oldOptions.push(notFound)
+      }
+    }
+
+    setOptions(oldOptions)
 
     return filterVal
   }
@@ -79,7 +98,7 @@ function MultiSelect({
     if (defaultValue !== '' || defaultValue.length > 0) {
       if (typeof defaultValue === 'string') {
         const valueArr = defaultValue.split(',')
-        preDefinedValue = filterPredefinedVal(valueArr, options)
+        preDefinedValue = filterPredefinedVal(valueArr)
 
         if (singleSelect && preDefinedValue.length > 1) {
           preDefinedValue = [preDefinedValue[0]]
@@ -271,6 +290,7 @@ function MultiSelect({
         tmp = tmp.filter((itm) => itm.value !== newValObj.value)
       }
     }
+
     setNewValue(tmp)
   }
 
@@ -293,6 +313,32 @@ function MultiSelect({
       return true
     }
     return false
+  }
+
+  const addCustomValue = (e) => {
+    if (
+      (e.key === ',' || e.key === 'Enter') &&
+      e.target.textContent !== '' &&
+      e.target.textContent !== ','
+    ) {
+      e.preventDefault()
+      const newValue = {
+        label: e.target.textContent,
+        value: e.target.textContent
+      }
+
+      if (!checkValueExist(newValue, value)) {
+        const oldValue = [...value]
+        oldValue.push(newValue)
+        const oldOptions = [...options]
+        oldOptions.push(newValue)
+
+        setOptions(oldOptions)
+        setNewValue(oldValue)
+
+        e.target.textContent = ''
+      }
+    }
   }
 
   return (
@@ -389,6 +435,7 @@ function MultiSelect({
               data-placeholder={placeholder}
               className='msl-input'
               contentEditable={!disabled}
+              onKeyPress={addCustomValue}
             />
           )}
         </div>
