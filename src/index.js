@@ -419,7 +419,6 @@ function MultiSelect({
         )}
       </div>
       <div className='msl-options'>
-        {console.log(options)}
         {options.length ? (
           printOptions(options)
         ) : (
