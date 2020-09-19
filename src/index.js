@@ -27,7 +27,7 @@ MultiSelect.defaultProps = {
       style: { textAlign: 'center' }
     }
   ],
-  addCustomValue: false
+  customValue: false
 }
 
 function MultiSelect({
@@ -49,7 +49,7 @@ function MultiSelect({
   disabled,
   limit,
   emptyDataLabel,
-  addCustomValue
+  customValue
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [value, setValue] = useState([])
@@ -309,7 +309,7 @@ function MultiSelect({
       if (searchedOptions) {
         const searchedOptionsArr = JSON.parse(`[${searchedOptions}]`)
 
-        if (addCustomValue) {
+        if (customValue) {
           const exactOptionValue = optionsString.match(
             new RegExp(
               `{"label":(.[^{]*?)"value":"${textValue.replace(
@@ -324,12 +324,12 @@ function MultiSelect({
         }
         setSearch(searchedOptionsArr)
       } else {
-        addCustomValue ? setSearch([newValue]) : setSearch([])
+        customValue ? setSearch([newValue]) : setSearch([])
       }
 
       if (e.key === 'Enter' || e.key === ',') {
         if (
-          addCustomValue &&
+          customValue &&
           !searchedOptions &&
           !checkValueExist(filterCreateOpt(newValue), value)
         ) {

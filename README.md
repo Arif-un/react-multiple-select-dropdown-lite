@@ -1,12 +1,31 @@
 ## React Multiple Select Dropdown Lite
 A lightweight Multiple/Single Select Pure functional component for react using React-Hooks.
 
-Production minified 8.1 kb , gzipped 3 kb [Bundlephobia](https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite@1.0.16)
+<p align="center">
+	<a href="https://github.com/Arif-un/react-multiple-select-dropdown-lite/blob/master/LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="React Multiple Select Dropdown Lite is released under the MIT license." />
+  </a>
+	<a href="https://www.npmjs.com/package/react-multiple-select-dropdown-lite">
+    <img alt="npm" src="https://img.shields.io/npm/v/react-multiple-select-dropdown-lite">
+  </a>
+	<a href="https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite@1.0.17">
+		<img alt="npm bundle size" src="https://img.shields.io/bundlephobia/min/react-multiple-select-dropdown-lite">
+	</a>
+	<a href="https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite@1.0.17">
+		<img alt="npm bundle size" src="https://img.shields.io/bundlephobia/minzip/react-multiple-select-dropdown-lite">
+	</a>
+	<a href="https://github.com/Arif-un/react-multiple-select-dropdown-lite/pulls">
+		<img alt="npm bundle size" src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg">
+	</a>
+	
+</p>
 
 ### Screenshot
 ![react-multiple-select-dropdown-menu](https://github.com/Arif-un/react-multiple-select-dropdown-lite/blob/master/screenshoot/react%20multiple%20select%20dropdown%20menu%20,%20lightweight,%20react%20hooks.gif?raw=true)
 
 ### Install
+
+[]
 
     npm i react-multiple-select-dropdown-lite
 
@@ -80,7 +99,7 @@ downArrow |bool | true|  show / hide down icon in dropdown
 |placeholder | string | Select... | Input Placeholder
 |disableChip | bool | false | disable multiple select chips show value or total selected value only 
 |attr | object | |set custom attr to element  
-|addCustomValue | bool | false |create custom options by pressing enter or comma (,)
+|customValue | bool | false |create custom options by pressing enter or comma (,)
 
 <br>
 <br>
