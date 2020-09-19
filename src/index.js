@@ -1,5 +1,5 @@
 /* eslint-disable no-labels */
-import React, { useState, useEffect, memo, useMemo, useCallback } from 'react'
+import React, { useState, useEffect } from 'react'
 import CloseIcon from './CloseIcon.jsx'
 import DownIcon from './DownIcon.jsx'
 import Options from './Options'
@@ -47,48 +47,15 @@ function MultiSelect({
   attr,
   disabled,
   limit,
-  emptyDataLabel
+  emptyDataLabel,
+  addCustomValue
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [value, setValue] = useState([])
   const [options, setOptions] = useState(userOptions || [])
+  const [search, setSearch] = useState(null)
 
   let stopPropagation = true
-
-  const filterPredefinedVal = (splitedVal) => {
-    const filterVal = []
-    const oldOptions = [...options]
-
-    for (let i = 0; i < splitedVal.length; i++) {
-      let pushed = 0
-      optionLoop: for (let j = 0; j < options.length; j++) {
-        if (options[j]?.type === 'group') {
-          childLoop: for (let k = 0; k < options[j].childs.length; k++) {
-            if (splitedVal[i] === options[j].childs[k].value) {
-              pushed = filterVal.push(options[j].childs[k])
-              break childLoop
-            }
-          }
-        } else {
-          if (splitedVal[i] === options[j].value) {
-            pushed = filterVal.push(options[j])
-            break optionLoop
-          }
-        }
-      }
-
-      if (!pushed) {
-        const notFound = { label: splitedVal[i], value: splitedVal[i] }
-        filterVal.push(notFound)
-
-        oldOptions.push(notFound)
-      }
-    }
-
-    setOptions(oldOptions)
-
-    return filterVal
-  }
 
   const preparDefaultValue = (defaultValue) => {
     let defaultValArr = defaultValue
@@ -102,11 +69,11 @@ function MultiSelect({
       extraValues.push({ label: value, value })
       return { label: value, value }
     }
-
+    console.log('ddddddddddd', defaultValArr)
     const defaultValueObj = defaultValArr.map(
       (value) =>
         JSON.parse(
-          optionString.match(new RegExp(`{+?.[^{]*?${value}"}`, 'g'))
+          optionString.match(new RegExp(`{+?.[^{]*?${value}"}`, 'g')[0])
         ) || setExtraValue(value)
     )
 
@@ -155,55 +122,6 @@ function MultiSelect({
     }
     setValue(preDefinedValue)
   }, [defaultValue])
-
- /*  const printOptions = (opts) => {
-    console.log('print option')
-    const optsArr = []
-    function addInArr(opts) {
-      for (const [i, opt] of opts.entries()) {
-        if (opt.type === 'group') {
-          optsArr.push(
-            <div key={opt.title + i} data-msl className='msl-grp-title'>
-              {opt.title}
-            </div>
-          )
-          if (opt.childs.length > 0) {
-            addInArr(opt.childs)
-          } else {
-            optsArr.push(
-              <option className='msl-option msl-option-disable'>
-                {opt.emptyDataLabel || 'No Data Found'}
-              </option>
-            )
-          }
-        } else {
-          optsArr.push(
-            <option
-              key={opt.value + opt.label + i + 10}
-              {...(!singleSelect && { 'data-msl': true })}
-              style={{
-                ...(opt.style && opt.style)
-              }}
-              onClick={() => {
-                !opt.disabled && addValue(opt)
-              }}
-              title={opt.label}
-              className={`msl-option ${
-                checkValueExist(opt, value) ? 'msl-option-active' : ''
-              } ${opt.disabled ? 'msl-option-disable' : ''} ${
-                opt.classes !== undefined ? opt.classes : ''
-              }`}
-              value={opt.value}
-            >
-              {opt.label}
-            </option>
-          )
-        }
-      }
-    }
-    addInArr(opts)
-    return optsArr
-  } */
 
   const setNewValue = (val) => {
     setValue(val)
@@ -306,7 +224,15 @@ function MultiSelect({
     return bool
   }
 
+  const filterCreateOpt = ({ label, value }) => {
+    if (label.match(/Create|"|,+/g)) {
+      label = label.replace(/Create|"|,+/g, '')
+    }
+    return { label, value }
+  }
+
   const addValue = (newValObj) => {
+    newValObj = filterCreateOpt(newValObj)
     let tmp = [...value]
     if (singleSelect) {
       tmp = [newValObj]
@@ -323,6 +249,8 @@ function MultiSelect({
     }
 
     setNewValue(tmp)
+    setSearch(null)
+    document.querySelector('.msl-input').textContent = ''
   }
 
   const deleteValue = (i) => {
@@ -334,7 +262,6 @@ function MultiSelect({
   const clearValue = () => {
     setNewValue([])
   }
-
   const showSearchOption = () => {
     if (!singleSelect && !disableChip) {
       return true
@@ -346,29 +273,37 @@ function MultiSelect({
     return false
   }
 
-  const addCustomValue = (e) => {
-    if (
-      (e.key === ',' || e.key === 'Enter') &&
-      e.target.textContent !== '' &&
-      e.target.textContent !== ','
-    ) {
-      e.preventDefault()
+  const searchValue = (e) => {
+    e.preventDefault()
+    const textValue = e.target.textContent.trim()
+    if (textValue && !textValue.match(/[,]/g)) {
       const newValue = {
-        label: e.target.textContent,
-        value: e.target.textContent
+        label: 'Create "' + textValue + '"',
+        value: textValue
       }
 
-      if (!checkValueExist(newValue, value)) {
-        const oldValue = [...value]
-        oldValue.push(newValue)
-        const oldOptions = [...options]
-        oldOptions.push(newValue)
-
-        setOptions(oldOptions)
-        setNewValue(oldValue)
-
-        e.target.textContent = ''
+      const optionString = JSON.stringify(options)
+      console.log(optionString)
+      const searchedObj = optionString.match(
+        new RegExp(`{"label":"(.*?${textValue})+?.[^{]*?}`, 'gi')
+      )
+      console.log(searchedObj)
+      if (searchedObj) {
+        const searchArr = JSON.parse(`[${searchedObj}]`)
+        addCustomValue && searchArr.length !== 1 && searchArr.push(newValue)
+        setSearch(searchArr)
+      } else {
+        addCustomValue ? setSearch([newValue]) : setSearch([])
       }
+
+      if (e.keyCode === 13 && addCustomValue) {
+        if (!checkValueExist(filterCreateOpt(newValue), value)) {
+          setOptions([...options, filterCreateOpt(newValue)])
+          addValue(newValue)
+        }
+      }
+    } else {
+      setSearch(null)
     }
   }
 
@@ -466,7 +401,7 @@ function MultiSelect({
               data-placeholder={placeholder}
               className='msl-input'
               contentEditable={!disabled}
-              onKeyPress={addCustomValue}
+              onKeyUp={searchValue}
             />
           )}
         </div>
@@ -504,15 +439,22 @@ function MultiSelect({
               {emptyDataLabel}
             </option>
           )} */}
-        {menuOpen && options.length ? (
+        {menuOpen && !search && options.length ? (
           <Options
             opts={options}
             {...{ singleSelect, addValue, checkValueExist, value }}
           />
-        ) : (
+        ) : !search?.length ? (
           <option className='msl-option msl-option-disable'>
             {emptyDataLabel}
           </option>
+        ) : (
+          search && (
+            <Options
+              opts={search}
+              {...{ singleSelect, addValue, checkValueExist, value }}
+            />
+          )
         )}
       </div>
     </div>

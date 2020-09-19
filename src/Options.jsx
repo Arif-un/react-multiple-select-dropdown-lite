@@ -1,12 +1,6 @@
 import React from 'react'
-/* 
-<Options
-opts={options}
-{...{ singleSelect, addValue, checkValueExist, value }}
-/> */
 
 function Options({ opts, singleSelect, addValue, checkValueExist, value }) {
-  console.log('print option')
   const optsArr = []
   function addInArr(opts) {
     for (const [i, opt] of opts.entries()) {
@@ -37,8 +31,10 @@ function Options({ opts, singleSelect, addValue, checkValueExist, value }) {
               !opt.disabled && addValue(opt)
             }}
             title={opt.label}
-            className={`msl-option ${checkValueExist(opt, value) ? 'msl-option-active' : ''
-              } ${opt.disabled ? 'msl-option-disable' : ''} ${opt.classes !== undefined ? opt.classes : ''
+            className={`msl-option ${
+              checkValueExist(opt, value) ? 'msl-option-active' : ''
+              } ${opt.disabled ? 'msl-option-disable' : ''} ${
+              opt.classes !== undefined ? opt.classes : ''
               }`}
             value={opt.value}
           >
