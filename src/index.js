@@ -26,7 +26,8 @@ MultiSelect.defaultProps = {
       disabled: true,
       style: { textAlign: 'center' }
     }
-  ]
+  ],
+  addCustomValue: false
 }
 
 function MultiSelect({
