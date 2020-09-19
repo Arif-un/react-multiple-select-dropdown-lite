@@ -80,7 +80,7 @@ downArrow |bool | true|  show / hide down icon in dropdown
 |placeholder | string | Select... | Input Placeholder
 |disableChip | bool | false | disable multiple select chips show value or total selected value only 
 |attr | object | |set custom attr to element  
-|addCustomValue | bool | |create custom options by pressing enter or comma (,)
+|addCustomValue | bool | false |create custom options by pressing enter or comma (,)
 
 <br>
 <br>
