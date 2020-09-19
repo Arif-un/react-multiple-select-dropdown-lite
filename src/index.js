@@ -69,13 +69,24 @@ function MultiSelect({
       extraValues.push({ label: value, value })
       return { label: value, value }
     }
-    console.log('ddddddddddd', defaultValArr)
-    const defaultValueObj = defaultValArr.map(
-      (value) =>
-        JSON.parse(
-          optionString.match(new RegExp(`{+?.[^{]*?${value}"}`, 'g')[0])
-        ) || setExtraValue(value)
-    )
+
+    const defaultValueObj = []
+
+    for (const value of defaultValArr) {
+      const matchedVals = optionString.match(
+        new RegExp(`{+?.[^{]*?"${value}"}`, 'g')
+      )
+      if (matchedVals) {
+        if (matchedVals.length === 1) {
+          defaultValueObj.push(JSON.parse(matchedVals))
+        } else if (matchedVals.length > 1) {
+          defaultValueObj.push(JSON.parse(`[${matchedVals.join(',')}]`))
+        }
+      } else if (value !== '' && value !== null) {
+        setExtraValue(value)
+        defaultValueObj.push({ label: value, value })
+      }
+    }
 
     setOptions([...options, ...extraValues])
     return defaultValueObj
@@ -225,8 +236,8 @@ function MultiSelect({
   }
 
   const filterCreateOpt = ({ label, value }) => {
-    if (label.match(/Create|"|,+/g)) {
-      label = label.replace(/Create|"|,+/g, '')
+    if (label.match(/Create "|"+/g)) {
+      label = label.replace(/Create "|"+/g, '')
     }
     return { label, value }
   }
@@ -274,32 +285,54 @@ function MultiSelect({
   }
 
   const searchValue = (e) => {
-    e.preventDefault()
-    const textValue = e.target.textContent.trim()
-    if (textValue && !textValue.match(/[,]/g)) {
+    const textValue = e.target.textContent.trim().replace(/,+/g, '')
+
+    if (textValue) {
       const newValue = {
-        label: 'Create "' + textValue + '"',
+        label: `Create "${textValue}"`,
         value: textValue
       }
 
-      const optionString = JSON.stringify(options)
-      console.log(optionString)
-      const searchedObj = optionString.match(
-        new RegExp(`{"label":"(.*?${textValue})+?.[^{]*?}`, 'gi')
+      const optionsString = JSON.stringify(options)
+
+      const searchedOptions = optionsString.match(
+        new RegExp(
+          `{"label":+?.[^{]*?(${textValue.replace(
+            /[-[\]{}()*+?.,\\^$|#\s]/g,
+            '\\$&'
+          )})+?.[^{]*?}`,
+          'gi'
+        )
       )
-      console.log(searchedObj)
-      if (searchedObj) {
-        const searchArr = JSON.parse(`[${searchedObj}]`)
-        addCustomValue && searchArr.length !== 1 && searchArr.push(newValue)
-        setSearch(searchArr)
+
+      if (searchedOptions) {
+        const exactOptionValue = optionsString.match(
+          new RegExp(
+            `{"label":(.[^{]*?)"value":"${textValue.replace(
+              /[-[\]{}()*+?.,\\^$|#\s]/g,
+              '\\$&'
+            )}"}`,
+            'gi'
+          )
+        )
+
+        const searchedOptionsArr = JSON.parse(`[${searchedOptions}]`)
+        addCustomValue && !exactOptionValue && searchedOptionsArr.push(newValue)
+        setSearch(searchedOptionsArr)
       } else {
         addCustomValue ? setSearch([newValue]) : setSearch([])
       }
 
-      if (e.keyCode === 13 && addCustomValue) {
-        if (!checkValueExist(filterCreateOpt(newValue), value)) {
+      if (e.key === 'Enter' || e.key === ',') {
+        if (
+          addCustomValue &&
+          !searchedOptions &&
+          !checkValueExist(filterCreateOpt(newValue), value)
+        ) {
           setOptions([...options, filterCreateOpt(newValue)])
           addValue(newValue)
+        } else {
+          search.length > 0 && addValue(search[0])
         }
       }
     } else {
@@ -432,13 +465,6 @@ function MultiSelect({
         )}
       </div>
       <div className='msl-options'>
-        {/* {menuOpen && options.length ? (
-          printOptions(options)
-        ) : (
-            <option className='msl-option msl-option-disable'>
-              {emptyDataLabel}
-            </option>
-          )} */}
         {menuOpen && !search && options.length ? (
           <Options
             opts={options}

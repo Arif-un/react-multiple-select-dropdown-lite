@@ -22,6 +22,7 @@ function Options({ opts, singleSelect, addValue, checkValueExist, value }) {
       } else {
         optsArr.push(
           <option
+            tabIndex='0'
             key={opt.value + opt.label + i + 10}
             {...(!singleSelect && { 'data-msl': true })}
             style={{
@@ -30,10 +31,13 @@ function Options({ opts, singleSelect, addValue, checkValueExist, value }) {
             onClick={() => {
               !opt.disabled && addValue(opt)
             }}
+            onKeyPress={(e) => {
+              e.key === 'Enter' && !opt.disabled && addValue(opt)
+            }}
             title={opt.label}
-            className={`msl-option ${
-              checkValueExist(opt, value) ? 'msl-option-active' : ''
-              } ${opt.disabled ? 'msl-option-disable' : ''} ${
+            className={`msl-option
+             ${checkValueExist(opt, value) ? 'msl-option-active' : ''} 
+              ${opt.disabled ? 'msl-option-disable' : ''} ${
               opt.classes !== undefined ? opt.classes : ''
               }`}
             value={opt.value}

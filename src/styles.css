@@ -136,7 +136,8 @@
 .msl-options > .msl-option:last-child {
   margin-bottom: 5px;
 }
-.msl-options > .msl-option:hover {
+.msl-options > .msl-option:hover,
+.msl-option:focus {
   background: var(--option-bg-hover);
 }
 .msl-option-active {

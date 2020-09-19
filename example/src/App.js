@@ -12,7 +12,7 @@ const App = () => {
 
   const options = [
     { label: 'Option 1', value: 'option_1' },
-    { label: 'Option 2', value: 'option_1' },
+    { label: 'Option 2', value: 'option_2' },
     { label: 'Option 3', value: 'option_3' },
     { label: 'Option 4', value: 'option_4' },
     {
@@ -27,7 +27,7 @@ const App = () => {
     <div className="app">
       <div className="preview-values">
         <h4>Values</h4>
-        {value}
+        {value.toString()}
       </div>
       <MultiSelect
         defaultValue={value}

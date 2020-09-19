@@ -56,9 +56,9 @@ export  default App
 - [x] Disabled <br>
 - [x] Select Limit <br>
 - [x] Group <br>
-- [ ] Searchable <br>
+- [x] Searchable <br>
+- [x] Custom Creatable Value <br>
 - [ ] Sublist <br>
-- [ ] Custom Creatable Value <br>
 - [ ] Themeable (using css var) <br>
 
 ## Props Options
@@ -80,6 +80,7 @@ downArrow |bool | true|  show / hide down icon in dropdown
 |placeholder | string | Select... | Input Placeholder
 |disableChip | bool | false | disable multiple select chips show value or total selected value only 
 |attr | object | |set custom attr to element  
+|addCustomValue | bool | |create custom options by pressing enter or comma (,)
 
 <br>
 <br>
@@ -91,5 +92,5 @@ downArrow |bool | true|  show / hide down icon in dropdown
 
 
 ### License
-MIT © [Arif-Un]([https://github.com/arif-un](https://github.com/arif-un)) | Build for Bit Form
+MIT © [Arif-Un]([https://github.com/arif-un](https://github.com/arif-un)) | Built for Bit Form
 
