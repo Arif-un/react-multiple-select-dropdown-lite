@@ -306,18 +306,21 @@ function MultiSelect({
       )
 
       if (searchedOptions) {
-        const exactOptionValue = optionsString.match(
-          new RegExp(
-            `{"label":(.[^{]*?)"value":"${textValue.replace(
-              /[-[\]{}()*+?.,\\^$|#\s]/g,
-              '\\$&'
-            )}"}`,
-            'gi'
-          )
-        )
-
         const searchedOptionsArr = JSON.parse(`[${searchedOptions}]`)
-        addCustomValue && !exactOptionValue && searchedOptionsArr.push(newValue)
+
+        if (addCustomValue) {
+          const exactOptionValue = optionsString.match(
+            new RegExp(
+              `{"label":(.[^{]*?)"value":"${textValue.replace(
+                /[-[\]{}()*+?.,\\^$|#\s]/g,
+                '\\$&'
+              )}"}`,
+              'gi'
+            )
+          )
+
+          !exactOptionValue && searchedOptionsArr.push(newValue)
+        }
         setSearch(searchedOptionsArr)
       } else {
         addCustomValue ? setSearch([newValue]) : setSearch([])
