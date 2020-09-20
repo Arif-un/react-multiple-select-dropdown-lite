@@ -34,7 +34,7 @@ const App = () => {
         width={400}
         onChange={handleOnchange}
         options={options}
-        addCustomValue
+        customValue
       />
 
     </div>

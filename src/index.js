@@ -262,7 +262,7 @@ function MultiSelect({
 
     setNewValue(tmp)
     setSearch(null)
-    document.querySelector('.msl-input').textContent = ''
+    document.querySelector('.msl-input').innerHTML = ''
   }
 
   const deleteValue = (i) => {
@@ -474,7 +474,7 @@ function MultiSelect({
             opts={options}
             {...{ singleSelect, addValue, checkValueExist, value }}
           />
-        ) : !search?.length ? (
+        ) : (search && !search?.length) || (options && !options.length) ? (
           <option className='msl-option msl-option-disable'>
             {emptyDataLabel}
           </option>

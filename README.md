@@ -25,8 +25,6 @@ A lightweight Multiple/Single Select Pure functional component for react using R
 
 ### Install
 
-[]
-
     npm i react-multiple-select-dropdown-lite
 
 ### Basic Initialization
@@ -111,5 +109,5 @@ downArrow |bool | true|  show / hide down icon in dropdown
 
 
 ### License
-MIT © [Arif-Un](https://github.com/arif-un)) | [Amin](https://github.com/mdrubelamin2) | Built for Bit Form
+MIT © [Arif-Un](https://github.com/arif-un) | [Amin](https://github.com/mdrubelamin2) | Built for Bit Form
 
