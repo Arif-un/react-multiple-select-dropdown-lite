@@ -75,15 +75,21 @@ function MultiSelect({
 
     for (const value of defaultValArr) {
       const matchedVals = optionString.match(
-        new RegExp(`{+?.[^{]*?"${value}"}`, 'g')
+        new RegExp(
+          `{+?.[^{]*?"${value
+            .replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') // escape special chars
+            .replace(/"/g, '\\\\$&')}"}`, // escape " as \\
+          'g'
+        )
       )
+
       if (matchedVals) {
         if (matchedVals.length === 1) {
           defaultValueObj.push(JSON.parse(matchedVals))
         } else if (matchedVals.length > 1) {
           defaultValueObj.push(JSON.parse(`[${matchedVals.join(',')}]`))
         }
-      } else if (value !== '' && value !== null) {
+      } else if (value !== '' && value !== null && customValue) {
         setExtraValue(value)
         defaultValueObj.push({ label: value, value })
       }
@@ -259,7 +265,6 @@ function MultiSelect({
         tmp = tmp.filter((itm) => itm.value !== newValObj.value)
       }
     }
-
     setNewValue(tmp)
     setSearch(null)
     document.querySelector('.msl-input').innerHTML = ''
