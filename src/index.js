@@ -267,7 +267,10 @@ function MultiSelect({
     }
     setNewValue(tmp)
     setSearch(null)
-    document.querySelector('.msl-input').innerHTML = ''
+
+    document
+      .querySelectorAll('.msl-input')
+      .forEach((input) => (input.innerHTML = ''))
   }
 
   const deleteValue = (i) => {
