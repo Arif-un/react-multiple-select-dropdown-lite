@@ -1,6 +1,7 @@
 import React from 'react'
 
-function Options({ opts, singleSelect, addValue, checkValueExist, value }) {
+function Options({ opts, singleSelect, addValue, checkValueExist, value, largeData, menuOpen }) {
+  if (largeData && !menuOpen) return null
   const optsArr = []
   function addInArr(opts) {
     for (const [i, opt] of opts.entries()) {
@@ -37,8 +38,7 @@ function Options({ opts, singleSelect, addValue, checkValueExist, value }) {
             title={opt.label}
             className={`msl-option
              ${checkValueExist(opt, value) ? 'msl-option-active' : ''} 
-              ${opt.disabled ? 'msl-option-disable' : ''} ${
-              opt.classes !== undefined ? opt.classes : ''
+              ${opt.disabled ? 'msl-option-disable' : ''} ${opt.classes !== undefined ? opt.classes : ''
               }`}
             value={opt.value}
           >
