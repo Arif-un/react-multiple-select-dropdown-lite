@@ -482,16 +482,16 @@ function MultiSelect({
             opts={options}
             {...{ singleSelect, addValue, checkValueExist, value }}
           />
-        ) : (search && !search?.length) || (options && !options.length) ? (
-          <option className='msl-option msl-option-disable'>
-            {emptyDataLabel}
-          </option>
+        ) : search && search.length ? (
+          <Options
+            opts={search}
+            {...{ singleSelect, addValue, checkValueExist, value }}
+          />
         ) : (
-          search && (
-            <Options
-              opts={search}
-              {...{ singleSelect, addValue, checkValueExist, value }}
-            />
+          ((search && !search.length) || (options && !options.length)) && (
+            <option className='msl-option msl-option-disable'>
+              {emptyDataLabel}
+            </option>
           )
         )}
       </div>
