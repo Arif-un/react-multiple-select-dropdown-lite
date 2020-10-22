@@ -1,5 +1,5 @@
 /* eslint-disable no-labels */
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import CloseIcon from './CloseIcon.jsx'
 import DownIcon from './DownIcon.jsx'
 import Options from './Options'
@@ -46,6 +46,7 @@ function MultiSelect({
   disableChip,
   name,
   attr,
+  largeData,
   disabled,
   limit,
   emptyDataLabel,
@@ -55,6 +56,7 @@ function MultiSelect({
   const [value, setValue] = useState([])
   const [options, setOptions] = useState(userOptions || [])
   const [search, setSearch] = useState(null)
+  const inputFld = useRef()
 
   let stopPropagation = true
 
@@ -267,10 +269,8 @@ function MultiSelect({
     }
     setNewValue(tmp)
     setSearch(null)
-
-    document
-      .querySelectorAll('.msl-input')
-      .forEach((input) => (input.innerHTML = ''))
+    // clear input
+    inputFld.current.innerHTML = ''
   }
 
   const deleteValue = (i) => {
@@ -447,6 +447,7 @@ function MultiSelect({
               className='msl-input'
               contentEditable={!disabled}
               onKeyUp={searchValue}
+              ref={inputFld}
             />
           )}
         </div>
@@ -477,15 +478,29 @@ function MultiSelect({
         )}
       </div>
       <div className='msl-options'>
-        {menuOpen && !search && options.length ? (
+        {!search && options.length ? (
           <Options
             opts={options}
-            {...{ singleSelect, addValue, checkValueExist, value }}
+            {...{
+              singleSelect,
+              addValue,
+              checkValueExist,
+              value,
+              largeData,
+              menuOpen
+            }}
           />
         ) : search && search.length ? (
           <Options
             opts={search}
-            {...{ singleSelect, addValue, checkValueExist, value }}
+            {...{
+              singleSelect,
+              addValue,
+              checkValueExist,
+              value,
+              largeData,
+              menuOpen
+            }}
           />
         ) : (
           ((search && !search.length) || (options && !options.length)) && (
