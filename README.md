@@ -98,6 +98,7 @@ downArrow |bool | true|  show / hide down icon in dropdown
 |disableChip | bool | false | disable multiple select chips show value or total selected value only 
 |attr | object | |set custom attr to element  
 |customValue | bool | false |create custom options by pressing enter or comma (,)
+|largeData | bool | false |prevent slow down (DOM) for large amount of data
 
 <br>
 <br>
