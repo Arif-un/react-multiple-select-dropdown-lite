@@ -2,22 +2,21 @@
 A lightweight Multiple/Single Select Pure functional component for react using React-Hooks.
 
 <p align="center">
-	<a href="https://github.com/Arif-un/react-multiple-select-dropdown-lite/blob/master/LICENSE">
+  <a href="https://github.com/Arif-un/react-multiple-select-dropdown-lite/blob/master/LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="React Multiple Select Dropdown Lite is released under the MIT license." />
   </a>
-	<a href="https://www.npmjs.com/package/react-multiple-select-dropdown-lite">
+  <a href="https://www.npmjs.com/package/react-multiple-select-dropdown-lite">
     <img alt="npm" src="https://img.shields.io/npm/v/react-multiple-select-dropdown-lite">
   </a>
-	<a href="https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite@1.0.19">
-		<img alt="npm bundle size" src="https://img.shields.io/bundlephobia/min/react-multiple-select-dropdown-lite">
-	</a>
-	<a href="https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite@1.0.19">
-		<img alt="npm bundle size" src="https://img.shields.io/bundlephobia/minzip/react-multiple-select-dropdown-lite">
-	</a>
-	<a href="https://github.com/Arif-un/react-multiple-select-dropdown-lite/pulls">
-		<img alt="npm bundle size" src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg">
-	</a>
-	
+  <a href="https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite@1.0.19">
+    <img alt="npm bundle size" src="https://img.shields.io/bundlephobia/min/react-multiple-select-dropdown-lite">
+  </a>
+  <a href="https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite@1.0.19">
+    <img alt="npm bundle size" src="https://img.shields.io/bundlephobia/minzip/react-multiple-select-dropdown-lite">
+  </a>
+  <a href="https://github.com/Arif-un/react-multiple-select-dropdown-lite/pulls">
+    <img alt="npm bundle size" src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg">
+  </a>
 </p>
 
 ### Screenshot
@@ -35,32 +34,32 @@ import  'react-multiple-select-dropdown-lite/dist/index.css'
 
 const App = () => {
 
-	const [value, setvalue] = useState('')
+  const [value, setvalue] = useState('')
 
-	const  handleOnchange  =  val  => {
-		setvalue(val)
-	}
+  const  handleOnchange  =  val  => {
+    setvalue(val)
+  }
 
-	const  options  = [
-		{ label:  'Option 1', value:  'option_1'  },
-		{ label:  'Option 2', value:  'option_2'  },
-		{ label:  'Option 3', value:  'option_3'  },
-		{ label:  'Option 4', value:  'option_4'  },
-	]
+  const  options  = [
+    { label:  'Option 1', value:  'option_1'  },
+    { label:  'Option 2', value:  'option_2'  },
+    { label:  'Option 3', value:  'option_3'  },
+    { label:  'Option 4', value:  'option_4'  },
+  ]
 
-	return(
-		<div className="app">
-			<div  className="preview-values">
-				<h4>Values</h4>
-				{value}
-			</div>
+  return(
+    <div className="app">
+      <div  className="preview-values">
+        <h4>Values</h4>
+        {value}
+      </div>
 
-		<MultiSelect
-		onChange={handleOnchange}
-		options={options}
-		/>
+    <MultiSelect
+    onChange={handleOnchange}
+    options={options}
+    />
 
-		</div>
+    </div>
 )}
 export  default App
 ```
