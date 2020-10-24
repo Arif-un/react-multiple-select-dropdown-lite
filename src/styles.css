@@ -96,7 +96,6 @@
   background: white;
   max-height: 0;
   overflow: auto;
-  transition: max-height 100ms ease-in;
 }
 .msl-options::-webkit-scrollbar {
   width: 8px;
@@ -113,7 +112,7 @@
 .msl-options::-webkit-scrollbar-thumb:hover {
   background: rgb(0, 0, 0, 0.2);
 }
-.msl-options > .msl-option,
+.msl-options .msl-option,
 .msl-grp-title {
   font-size: var(--font-size);
   border-radius: calc(var(--border-radius) - 3px);
@@ -122,8 +121,12 @@
   margin: 4px 6px 4px;
   line-break: anywhere;
   line-height: 1.2;
+  outline: none;
   white-space: break-spaces;
   transition: background 200ms;
+}
+.msl-option:focus-visible {
+  outline: 2px solid rgb(0, 119, 255);
 }
 
 .msl-grp-title {
@@ -133,10 +136,10 @@
   opacity: 0.7;
 }
 
-.msl-options > .msl-option:last-child {
+.msl-options .msl-option:last-child {
   margin-bottom: 5px;
 }
-.msl-options > .msl-option:hover,
+.msl-options .msl-option:hover,
 .msl-option:focus {
   background: var(--option-bg-hover);
 }

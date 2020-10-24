@@ -1,6 +1,14 @@
 import React from 'react'
 
-function Options({ opts, singleSelect, addValue, checkValueExist, value, largeData, menuOpen }) {
+function Options({
+  opts,
+  singleSelect,
+  addValue,
+  checkValueExist,
+  value,
+  largeData,
+  menuOpen
+}) {
   if (largeData && !menuOpen) return null
   const optsArr = []
   function addInArr(opts) {
@@ -49,7 +57,7 @@ function Options({ opts, singleSelect, addValue, checkValueExist, value, largeDa
     }
   }
   addInArr(opts)
-  return optsArr
+  return <div>{optsArr}</div>
 }
 
 export default Options

@@ -56,8 +56,7 @@ function MultiSelect({
   const [value, setValue] = useState([])
   const [options, setOptions] = useState(userOptions || [])
   const [search, setSearch] = useState(null)
-  const inputFld = useRef()
-
+  const inputFld = useRef(null)
   let stopPropagation = true
 
   const preparDefaultValue = (defaultValue) => {
@@ -110,6 +109,10 @@ function MultiSelect({
         )
     )
   }
+
+  useEffect(() => {
+    setOptions(userOptions)
+  }, [userOptions])
 
   useEffect(() => {
     let preDefinedValue = []
@@ -351,7 +354,6 @@ function MultiSelect({
       setSearch(null)
     }
   }
-
   return (
     <div
       {...attr}
