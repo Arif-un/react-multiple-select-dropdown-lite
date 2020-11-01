@@ -4,6 +4,7 @@ import CloseIcon from './CloseIcon.jsx'
 import DownIcon from './DownIcon.jsx'
 import Options from './Options'
 import './styles.css'
+import useComponentVisible from './useComponentVisible.jsx'
 
 MultiSelect.defaultProps = {
   clearable: true,
@@ -14,6 +15,7 @@ MultiSelect.defaultProps = {
   defaultValue: '',
   disableChip: false,
   name: '',
+  style: {},
   disabled: false,
   limit: null,
   emptyDataLabel: 'No Data Found',
@@ -45,6 +47,7 @@ function MultiSelect({
   placeholder,
   disableChip,
   name,
+  style,
   attr,
   largeData,
   disabled,
@@ -52,12 +55,16 @@ function MultiSelect({
   emptyDataLabel,
   customValue
 }) {
-  const [menuOpen, setMenuOpen] = useState(false)
+  // const [menuOpen, setMenuOpen] = useState(false)
   const [value, setValue] = useState([])
   const [options, setOptions] = useState(userOptions || [])
   const [search, setSearch] = useState(null)
   const inputFld = useRef(null)
-  let stopPropagation = true
+  const {
+    ref,
+    isComponentVisible: menuOpen,
+    setIsComponentVisible: setMenuOpen
+  } = useComponentVisible(false)
 
   const preparDefaultValue = (defaultValue) => {
     let defaultValArr = defaultValue
@@ -154,91 +161,6 @@ function MultiSelect({
       let stringvalue = ''
       stringvalue += val.map((itm) => itm.value)
       onChange(stringvalue)
-    }
-  }
-
-  const openMenu = () => {
-    setMenuOpen(true)
-  }
-
-  const closeMenu = () => {
-    setMenuOpen(false)
-  }
-
-  const inputRefFocus = (e, focus) => {
-    let parentNode = null
-    let inputNode = null
-    if (e.target.hasAttribute('data-msl')) {
-      parentNode = e.target
-    } else if (e.target.parentNode.hasAttribute('data-msl')) {
-      parentNode = e.target.parentNode
-    } else if (e.target.parentNode.parentNode.hasAttribute('data-msl')) {
-      parentNode = e.target.parentNode.parentNode
-    } else if (
-      e.target.parentNode.parentNode.parentNode.hasAttribute('data-msl')
-    ) {
-      parentNode = e.target.parentNode.parentNode.parentNode
-    } else if (
-      e.target.parentNode.parentNode.parentNode.parentNode.hasAttribute(
-        'data-msl'
-      )
-    ) {
-      parentNode = e.target.parentNode.parentNode.parentNode.parentNode
-    }
-    if (parentNode !== null) {
-      inputNode = parentNode.querySelector('.msl-input')
-    }
-
-    if (inputNode !== null) {
-      focus ? inputNode.focus() : inputNode.blur()
-    }
-  }
-
-  const handleMenuBtn = (e) => {
-    stopPropagation = false
-    if (menuOpen) {
-      document.removeEventListener('click', handleMenu)
-      inputRefFocus(e, false)
-      closeMenu()
-    } else {
-      inputRefFocus(e, true)
-      openMenu()
-      document.addEventListener('click', handleMenu)
-    }
-  }
-
-  const handleMenu = (e) => {
-    if (!openable(e)) {
-      document.removeEventListener('click', handleMenu)
-      closeMenu()
-    } else {
-      openMenu()
-    }
-  }
-
-  const openable = (e) => {
-    if (e.target.hasAttribute('data-msl')) {
-      return true
-    }
-    return false
-  }
-
-  const handleOutsideClick = (e) => {
-    if (openable(e)) {
-      if (!menuOpen) {
-        document.addEventListener('click', handleOutsideClick)
-      }
-      inputRefFocus(e, true)
-      openMenu()
-    } else {
-      closeMenu()
-      document.removeEventListener('click', handleOutsideClick)
-    }
-  }
-
-  const handleClickInput = (e) => {
-    if (stopPropagation) {
-      handleOutsideClick(e)
     }
   }
 
@@ -354,11 +276,31 @@ function MultiSelect({
       setSearch(null)
     }
   }
+
+  const checkIsDropdownHandle = (target) => {
+    if (
+      target.hasAttribute('dropdown-handle') ||
+      target.parentNode.hasAttribute('dropdown-handle') ||
+      target.parentNode.parentNode.hasAttribute('dropdown-handle')
+    ) {
+      return true
+    }
+  }
+
+  const openMenu = ({ target }) => {
+    if (checkIsDropdownHandle(target)) {
+      setMenuOpen(!menuOpen)
+    } else {
+      setMenuOpen(true)
+    }
+  }
+
   return (
     <div
+      ref={ref}
       {...attr}
-      onClick={handleClickInput}
-      style={{ width }}
+      onClick={openMenu}
+      style={{ ...style, width }}
       className={`msl-wrp msl-vars ${className} ${
         disabled ? 'msl-disabled' : ''
       }`}
@@ -369,8 +311,13 @@ function MultiSelect({
           data-msl
           className='msl-input-wrp'
           style={{
-            marginRight:
-              clearable && downArrow ? 60 : downArrow || clearable ? 40 : 5
+            width: `calc(100% - ${
+              clearable && downArrow
+                ? '60px'
+                : downArrow || clearable
+                ? '40px'
+                : '5px'
+            }`
           }}
         >
           {!singleSelect &&
@@ -469,7 +416,8 @@ function MultiSelect({
               <div
                 role='button'
                 aria-label='toggle-menu'
-                onClick={handleMenuBtn}
+                dropdown-handle='true'
+                // onClick={() => setMenuOpen(!menuOpen)}
                 className='msl-btn msl-arrow-btn msl-flx'
                 style={{ ...(menuOpen && { transform: 'rotate(180deg)' }) }}
               >
