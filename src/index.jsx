@@ -300,6 +300,8 @@ function MultiSelect({
       ref={ref}
       {...attr}
       onClick={openMenu}
+      tabIndex='0'
+      onKeyPress={openMenu}
       style={{ ...style, width }}
       className={`msl-wrp msl-vars ${className} ${
         disabled ? 'msl-disabled' : ''
@@ -329,6 +331,8 @@ function MultiSelect({
                   role='button'
                   aria-label='delete-value'
                   onClick={() => deleteValue(i)}
+                  onKeyPress={() => deleteValue(i)}
+                  tabIndex='0'
                   className='msl-btn msl-chip-delete msl-flx'
                 >
                   <CloseIcon />
@@ -407,6 +411,8 @@ function MultiSelect({
                 role='button'
                 aria-label='close-menu'
                 onClick={clearValue}
+                onKeyPress={clearValue}
+                tabIndex='0'
                 className='msl-btn msl-clear-btn msl-flx'
               >
                 {closeIcon || <CloseIcon />}
@@ -415,9 +421,8 @@ function MultiSelect({
             {downArrow && (
               <div
                 role='button'
-                aria-label='toggle-menu'
+                tabIndex='0'
                 dropdown-handle='true'
-                // onClick={() => setMenuOpen(!menuOpen)}
                 className='msl-btn msl-arrow-btn msl-flx'
                 style={{ ...(menuOpen && { transform: 'rotate(180deg)' }) }}
               >
