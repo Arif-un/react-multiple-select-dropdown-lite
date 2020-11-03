@@ -16,7 +16,7 @@ const App = () => {
     { label: 'Option 3', value: 'option_3' },
     { label: 'Option 4', value: 'option_4' },
     {
-      title: 'group', type: 'group', emptyDataLabel:'No Group Option Found', childs: [
+      title: 'group', type: 'group', emptyDataLabel: 'No Group Option Found', childs: [
         { label: 'Option 5', value: 'option_5' },
         { label: 'Option 6', value: 'option_6' }
       ]
