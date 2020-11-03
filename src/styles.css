@@ -125,7 +125,8 @@
   white-space: break-spaces;
   transition: background 200ms;
 }
-.msl-option:focus-visible {
+.msl-option:focus-visible,
+.msl-btn:focus-visible {
   outline: 2px solid rgb(0, 119, 255);
 }
 
