@@ -8,10 +8,10 @@ A lightweight Multiple/Single Select Pure functional component for react using R
   <a href="https://www.npmjs.com/package/react-multiple-select-dropdown-lite">
     <img alt="npm" src="https://img.shields.io/npm/v/react-multiple-select-dropdown-lite">
   </a>
-  <a href="https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite@1.0.19">
+  <a href="https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite@1.1.0">
     <img alt="npm bundle size" src="https://img.shields.io/bundlephobia/min/react-multiple-select-dropdown-lite">
   </a>
-  <a href="https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite@1.0.19">
+  <a href="https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite@1.1.0">
     <img alt="npm bundle size" src="https://img.shields.io/bundlephobia/minzip/react-multiple-select-dropdown-lite">
   </a>
   <a href="https://github.com/Arif-un/react-multiple-select-dropdown-lite/pulls">
