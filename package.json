@@ -8,6 +8,7 @@
     "type": "git",
     "url": "git+https://github.com/Arif-un/react-multiple-select-dropdown-lite.git"
   },
+  "publishConfig": { "registry": "https://npm.pkg.github.com/" },
   "main": "dist/index.js",
   "module": "dist/index.modern.js",
   "source": "src/index.jsx",
