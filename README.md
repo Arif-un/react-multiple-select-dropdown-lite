@@ -80,7 +80,7 @@ export  default App
 ## Props Options
 |Props| type | default | description
 |-----|------| ------- | ----------|
-| options| array | ""  | pass options as array of object <br> `label` : (string) Options Label <br> `value` : Option value <br> `style` : (object) custom style <br> `classes` : (string) style classes <br> <br> example: <br> `[ { label : "Option 1", value : "opt_1", style: {textAlign: 'center'}, classes: "classA classB" } ]`
+| options| array | ""  | pass options as array of object <br> `label` : (string or JSX) Options Label <br> `value` : Option value <br> `style` : (object) custom style <br> `classes` : (string) style classes <br>`title` : must be provide for JSX label <br> <br> example: <br> `[ { label : "Option 1", value : "opt_1", style: {textAlign: 'center'}, classes: "classA classB" } ]`
 |onChange | function | |Return value on input change
 | width | int | 300 | Specify width in px
 |name| string | '' | specify a name for form
