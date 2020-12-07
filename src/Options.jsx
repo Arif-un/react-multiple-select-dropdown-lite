@@ -44,9 +44,8 @@ function Options({
               e.key === 'Enter' && !opt.disabled && addValue(opt)
             }}
             title={typeof opt.label === 'object' ? opt?.title : opt.label}
-            className={`msl-option
-             ${checkValueExist(opt, value) ? 'msl-option-active' : ''} 
-              ${opt.disabled ? 'msl-option-disable' : ''} ${opt.classes !== undefined ? opt.classes : ''
+            className={`msl-option ${checkValueExist(opt, value) ? 'msl-option-active' : ''
+              } ${opt.disabled ? 'msl-option-disable' : ''} ${opt.classes !== undefined ? opt.classes : ''
               }`}
             value={opt.value}
           >
