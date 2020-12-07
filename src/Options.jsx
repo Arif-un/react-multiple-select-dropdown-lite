@@ -30,7 +30,7 @@ function Options({
         }
       } else {
         optsArr.push(
-          <option
+          <div
             tabIndex='0'
             key={opt.value + opt.label + i + 10}
             {...(!singleSelect && { 'data-msl': true })}
@@ -43,7 +43,7 @@ function Options({
             onKeyPress={(e) => {
               e.key === 'Enter' && !opt.disabled && addValue(opt)
             }}
-            title={opt.label}
+            title={typeof opt.label === 'object' ? opt?.title : opt.label}
             className={`msl-option
              ${checkValueExist(opt, value) ? 'msl-option-active' : ''} 
               ${opt.disabled ? 'msl-option-disable' : ''} ${opt.classes !== undefined ? opt.classes : ''
@@ -51,7 +51,7 @@ function Options({
             value={opt.value}
           >
             {opt.label}
-          </option>
+          </div>
         )
       }
     }
