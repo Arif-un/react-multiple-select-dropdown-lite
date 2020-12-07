@@ -20,7 +20,7 @@ MultiSelect.defaultProps = {
   limit: null,
   emptyDataLabel: 'No Data Found',
   placeholder: 'Select...',
-  onChange: () => {},
+  onChange: () => { },
   options: [
     {
       label: 'Empty',
@@ -55,7 +55,6 @@ function MultiSelect({
   emptyDataLabel,
   customValue
 }) {
-  // const [menuOpen, setMenuOpen] = useState(false)
   const [value, setValue] = useState([])
   const [options, setOptions] = useState(userOptions || [])
   const [search, setSearch] = useState(null)
@@ -66,90 +65,76 @@ function MultiSelect({
     setIsComponentVisible: setMenuOpen
   } = useComponentVisible(false)
 
-  const preparDefaultValue = (defaultValue) => {
+  const getValueObjFromOptios = (defaultValue, options) => {
+    if (!defaultValue) return []
     let defaultValArr = defaultValue
+    const extraValues = []
+    const searchedOptions = []
+
     if (typeof defaultValue === 'string') {
       defaultValArr = defaultValue.split(',')
     }
-    const optionString = JSON.stringify(options)
-    const extraValues = []
 
     const setExtraValue = (value) => {
-      extraValues.push({ label: value, value })
-      return { label: value, value }
-    }
-
-    const defaultValueObj = []
-
-    for (const value of defaultValArr) {
-      const matchedVals = optionString.match(
-        new RegExp(
-          `{+?.[^{]*?"${value
-            .replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') // escape special chars
-            .replace(/"/g, '\\\\$&')}"}`, // escape " as \\
-          'g'
-        )
-      )
-
-      if (matchedVals) {
-        if (matchedVals.length === 1) {
-          defaultValueObj.push(JSON.parse(matchedVals))
-        } else if (matchedVals.length > 1) {
-          defaultValueObj.push(JSON.parse(`[${matchedVals.join(',')}]`))
+      if (typeof value === 'string') {
+        extraValues.push({ label: value, value })
+      } else if (typeof value === 'object') {
+        const newValueObj = { label: value, value }
+        if ('label' in value && typeof value.label === 'string') {
+          newValueObj.label = value.label
+        } else if ('title' in value) {
+          newValueObj.label = value.title
         }
-      } else if (value !== '' && value !== null && customValue) {
-        setExtraValue(value)
-        defaultValueObj.push({ label: value, value })
+        extraValues.push(newValueObj)
       }
     }
 
-    setOptions([...options, ...extraValues])
-    return defaultValueObj
-  }
-
-  const filterExtraCustomVal = (valArrObj) => {
-    const optionString = JSON.stringify(options)
-    return valArrObj.filter(
-      (obj) =>
-        !JSON.parse(
-          optionString.match(new RegExp(`{+?.[^{]*?${obj.value}"}`, 'g'))
+    for (let i = 0; i < defaultValArr.length; i++) {
+      if (typeof defaultValArr[i] === 'string') {
+        const optObject = searchOptions(
+          defaultValArr[i],
+          options,
+          true,
+          'value'
         )
-    )
-  }
+        if (optObject.length > 0) {
+          searchedOptions.push(optObject[0])
+        } else if (customValue) {
+          setExtraValue(defaultValArr[i])
+        }
+      } else if (typeof defaultValArr[i] === 'object') {
+        const optObject = searchOptions(
+          defaultValArr[i].value,
+          options,
+          true,
+          'value'
+        )
+        if (optObject.length > 0) {
+          searchedOptions.push(optObject[0])
+        } else if (customValue) {
+          setExtraValue(defaultValArr[i])
+        }
+      }
+    }
 
+    let customValuesGroup = []
+    if (extraValues.length) {
+      customValuesGroup = createCustomValueAndOption(extraValues)
+    }
+    setOptions([...options, ...customValuesGroup])
+    return [...searchedOptions, ...extraValues]
+  }
   useEffect(() => {
     setOptions(userOptions)
   }, [userOptions])
 
   useEffect(() => {
-    let preDefinedValue = []
-    if (defaultValue !== '' || defaultValue.length > 0) {
-      // when default value is string and value separated comma
-      if (typeof defaultValue === 'string') {
-        preDefinedValue = preparDefaultValue(defaultValue)
-        if (singleSelect && preDefinedValue.length > 1) {
-          preDefinedValue = [preDefinedValue[0]]
-        }
-      } else if (
-        Array.isArray(defaultValue) &&
-        defaultValue.length > 0 &&
-        typeof defaultValue[0] !== 'string'
-      ) {
-        // when default value is array of object
-        preDefinedValue = defaultValue // set array as default
-        const extraValue = filterExtraCustomVal(defaultValue)
-        setOptions([...options, ...extraValue])
-        if (singleSelect && preDefinedValue.length > 1) {
-          preDefinedValue = [preDefinedValue[0]]
-        }
-      } else if (Array.isArray(defaultValue) && defaultValue.length > 0) {
-        // when default value is array of string
-        preDefinedValue = preparDefaultValue(defaultValue)
-        if (singleSelect && preDefinedValue.length > 1) {
-          preDefinedValue = [preDefinedValue[0]]
-        }
-      }
+    let preDefinedValue = getValueObjFromOptios(defaultValue, options)
+
+    if (singleSelect && preDefinedValue.length > 0) {
+      preDefinedValue = [preDefinedValue[0]]
     }
+
     setValue(preDefinedValue)
   }, [defaultValue])
 
@@ -170,17 +155,20 @@ function MultiSelect({
   }
 
   const filterCreateOpt = ({ label, value }) => {
-    if (label.match(/Create "|"+/g)) {
+    if (typeof label !== 'object' && label.match(/Create "|"+/g)) {
       label = label.replace(/Create "|"+/g, '')
     }
     return { label, value }
   }
 
   const addValue = (newValObj) => {
-    newValObj = filterCreateOpt(newValObj)
     let tmp = [...value]
     if (singleSelect) {
-      tmp = [newValObj]
+      if (checkValueExist(newValObj, value)) {
+        tmp = []
+      } else {
+        tmp = [newValObj]
+      }
     } else {
       if (!checkValueExist(newValObj, value)) {
         if (limit === null) {
@@ -194,8 +182,10 @@ function MultiSelect({
     }
     setNewValue(tmp)
     setSearch(null)
-    // clear input
-    inputFld.current.innerHTML = ''
+    // clear search input
+    if (inputFld.current) {
+      inputFld.current.innerHTML = ''
+    }
   }
 
   const deleteValue = (i) => {
@@ -207,6 +197,7 @@ function MultiSelect({
   const clearValue = () => {
     setNewValue([])
   }
+
   const showSearchOption = () => {
     if (!singleSelect && !disableChip) {
       return true
@@ -218,7 +209,67 @@ function MultiSelect({
     return false
   }
 
-  const searchValue = (e) => {
+  const searchOptions = (str, options, exact, type) => {
+    const searchedOptions = []
+    const searchedOptValues = []
+
+    const searchInOptions = (opt) => {
+      for (let i = 0; i < opt.length; i++) {
+        if (opt[i]?.type === 'group') {
+          searchInOptions(opt[i].childs)
+        } else if (!exact) {
+          if (
+            typeof opt[i].label !== 'object' &&
+            opt[i].label.match(new RegExp(`${str}`, 'gi'))
+          ) {
+            searchedOptions.push(opt[i])
+          } else if (
+            typeof opt[i].label === 'object' &&
+            opt[i]?.title?.match(new RegExp(`${str}`, 'gi'))
+          ) {
+            searchedOptions.push(opt[i])
+          } else if (opt[i].value.match(new RegExp(`${str}`, 'gi'))) {
+            searchedOptValues.push(opt[i])
+          }
+        } else if (exact) {
+          if (opt[i][type] === str) {
+            searchedOptions.push(opt[i])
+          }
+        }
+        if (typeof opt[i].label === 'object' && !('title' in opt[i])) {
+          console.warn(
+            '[multiselect] you must provide a title property as typeof string, if you want to render jsx in option label'
+          )
+        }
+      }
+    }
+    searchInOptions(options)
+    return [...searchedOptions, ...searchedOptValues]
+  }
+
+  const createCustomValueAndOption = (valueObj) => {
+    const customValuesGroup = []
+    const customValuesIndx = options.findIndex(
+      (opt) => opt?.type === 'group' && opt?.title === 'Custom Values'
+    )
+
+    if (customValuesIndx === -1) {
+      customValuesGroup.push({
+        title: 'Custom Values',
+        type: 'group',
+        childs: [...valueObj]
+      })
+    } else if (Array.isArray(valueObj)) {
+      valueObj.map((value) => options[customValuesIndx].childs.push(value))
+    } else if (typeof valueObj === 'object') {
+      options[customValuesIndx].childs.push(valueObj)
+    }
+    setOptions([...options, ...customValuesGroup])
+
+    return customValuesGroup
+  }
+
+  const handleSearchAndCustomValue = (e) => {
     const textValue = e.target.textContent.trim().replace(/,+/g, '')
 
     if (textValue) {
@@ -227,46 +278,34 @@ function MultiSelect({
         value: textValue
       }
 
-      const optionsString = JSON.stringify(options)
+      const searchedOptions = searchOptions(textValue, options)
 
-      const searchedOptions = optionsString.match(
-        new RegExp(
-          `{"label":+?.[^{]*?(${textValue.replace(
-            /[-[\]{}()*+?.,\\^$|#\s]/g,
-            '\\$&'
-          )})+?.[^{]*?}`,
-          'gi'
-        )
-      )
-
-      if (searchedOptions) {
-        const searchedOptionsArr = JSON.parse(`[${searchedOptions}]`)
-
+      if (searchedOptions.length) {
         if (customValue) {
-          const exactOptionValue = optionsString.match(
-            new RegExp(
-              `{"label":(.[^{]*?)"value":"${textValue.replace(
-                /[-[\]{}()*+?.,\\^$|#\s]/g,
-                '\\$&'
-              )}"}`,
-              'gi'
-            )
+          const exactOptionValue = searchOptions(
+            textValue,
+            options,
+            true,
+            'value'
           )
 
-          !exactOptionValue && searchedOptionsArr.push(newValue)
+          !exactOptionValue.length && searchedOptions.push(newValue)
         }
-        setSearch(searchedOptionsArr)
+        setSearch(searchedOptions)
       } else {
         customValue ? setSearch([newValue]) : setSearch([])
       }
 
+      const filteredNewValue = filterCreateOpt(newValue)
+
       if (e.key === 'Enter' || e.key === ',') {
         if (
           customValue &&
-          !searchedOptions &&
-          !checkValueExist(filterCreateOpt(newValue), value)
+          !searchedOptions.length &&
+          !checkValueExist(filteredNewValue, value)
         ) {
-          setOptions([...options, filterCreateOpt(newValue)])
+          createCustomValueAndOption(filteredNewValue)
+
           addValue(newValue)
         } else {
           search.length > 0 && addValue(search[0])
@@ -295,6 +334,14 @@ function MultiSelect({
     }
   }
 
+  const showChipText = (opt) => {
+    if (typeof opt.label === 'object') {
+      return opt?.title || opt.value
+    } else {
+      return opt.label
+    }
+  }
+
   return (
     <div
       ref={ref}
@@ -303,30 +350,28 @@ function MultiSelect({
       tabIndex='0'
       onKeyPress={openMenu}
       style={{ ...style, width }}
-      className={`msl-wrp msl-vars ${className} ${
-        disabled ? 'msl-disabled' : ''
-      }`}
+      className={`msl-wrp msl-vars ${className} ${disabled ? 'msl-disabled' : ''
+        }`}
     >
-      <input name={name} type='hidden' value={value.map((itm) => itm.value)} />
+      <input name={name} type='hidden' value={value?.map((itm) => itm.value)} />
       <div data-msl className={`msl ${menuOpen ? 'msl-active' : ''} `}>
         <div
           data-msl
           className='msl-input-wrp'
           style={{
-            width: `calc(100% - ${
-              clearable && downArrow
+            width: `calc(100% - ${clearable && downArrow
                 ? '60px'
                 : downArrow || clearable
-                ? '40px'
-                : '5px'
-            }`
+                  ? '40px'
+                  : '5px'
+              }`
           }}
         >
           {!singleSelect &&
             !disableChip &&
             value.map((val, i) => (
               <div key={`msl-chip-${i + 11}`} className='msl-chip'>
-                {val.label}
+                {showChipText(val)}
                 <div
                   role='button'
                   aria-label='delete-value'
@@ -350,32 +395,32 @@ function MultiSelect({
                   (clearable && downArrow
                     ? 60
                     : downArrow || clearable
-                    ? 40
-                    : 5)
+                      ? 40
+                      : 5)
               }}
             >
               {value[0].label}d
             </span>
           ) : (
-            disableChip &&
-            value.length > 1 && (
-              <span
-                className='msl-single-value'
-                data-msl
-                style={{
-                  width:
-                    width -
-                    (clearable && downArrow
-                      ? 60
-                      : downArrow || clearable
-                      ? 40
-                      : 5)
-                }}
-              >
-                {value.length} Selected
-              </span>
-            )
-          )}
+              disableChip &&
+              value.length > 1 && (
+                <span
+                  className='msl-single-value'
+                  data-msl
+                  style={{
+                    width:
+                      width -
+                      (clearable && downArrow
+                        ? 60
+                        : downArrow || clearable
+                          ? 40
+                          : 5)
+                  }}
+                >
+                  {value.length} Selected
+                </span>
+              )
+            )}
           {singleSelect && value.length === 1 && (
             <span
               className='msl-single-value'
@@ -386,8 +431,8 @@ function MultiSelect({
                   (clearable && downArrow
                     ? 60
                     : downArrow || clearable
-                    ? 40
-                    : 5)
+                      ? 40
+                      : 5)
               }}
             >
               {value[0].label}
@@ -399,7 +444,7 @@ function MultiSelect({
               data-placeholder={placeholder}
               className='msl-input'
               contentEditable={!disabled}
-              onKeyUp={searchValue}
+              onKeyUp={handleSearchAndCustomValue}
               ref={inputFld}
             />
           )}
@@ -458,12 +503,12 @@ function MultiSelect({
             }}
           />
         ) : (
-          ((search && !search.length) || (options && !options.length)) && (
-            <option className='msl-option msl-option-disable'>
-              {emptyDataLabel}
-            </option>
-          )
-        )}
+              ((search && !search.length) || (options && !options.length)) && (
+                <option className='msl-option msl-option-disable'>
+                  {emptyDataLabel}
+                </option>
+              )
+            )}
       </div>
     </div>
   )
