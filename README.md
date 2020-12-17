@@ -8,10 +8,10 @@ A lightweight Multiple/Single Select Pure functional component for react using R
   <a href="https://www.npmjs.com/package/react-multiple-select-dropdown-lite">
     <img alt="npm" src="https://img.shields.io/npm/v/react-multiple-select-dropdown-lite">
   </a>
-  <a href="https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite@1.1.0">
+  <a href="https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite@2.0.1">
     <img alt="npm bundle size" src="https://img.shields.io/bundlephobia/min/react-multiple-select-dropdown-lite">
   </a>
-  <a href="https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite@1.1.0">
+  <a href="https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite@2.0.1">
     <img alt="npm bundle size" src="https://img.shields.io/bundlephobia/minzip/react-multiple-select-dropdown-lite">
   </a>
   <a href="https://github.com/Arif-un/react-multiple-select-dropdown-lite/pulls">
@@ -55,8 +55,8 @@ const App = () => {
       </div>
 
     <MultiSelect
-    onChange={handleOnchange}
-    options={options}
+      onChange={handleOnchange}
+      options={options}
     />
 
     </div>
@@ -81,8 +81,7 @@ export  default App
 |Props| type | default | description
 |-----|------| ------- | ----------|
 | options| array | ""  | pass options as array of object <br> `label` : (string or JSX) Options Label <br> `value` : Option value <br> `style` : (object) custom style <br> `classes` : (string) style classes <br>`title` : must be provide for JSX label <br> <br> example: <br> `[ { label : "Option 1", value : "opt_1", style: {textAlign: 'center'}, classes: "classA classB" } ]`
-|onChange | function | |Return value on input change
-| width | int | 300 | Specify width in px
+| width |  |  | move in css var (version 2.0.1)
 |name| string | '' | specify a name for form
 |disabled | bool | false | disable input
 | defaultValue | string \| array of object \| string array | '' | specify default value
@@ -98,6 +97,29 @@ downArrow |bool | true|  show / hide down icon in dropdown
 |attr | object | |set custom attr to element  
 |customValue | bool | false |create custom options by pressing enter or comma (,)
 |largeData | bool | false |prevent slow down (DOM) for large amount of data
+|chipAlternateText| string| (number) Item Selected | Show text when chip disabled.
+
+<br>
+
+### Events
+
+|Props|Params|Description
+|-----|------|------------
+|onChange|values| Trigger on change any value
+|onMenuOpen|null| Trigger when menu open
+|onMenuClose|null| Trigger when menu close
+
+<br>
+
+### Change Log
+###### v-2.0.1
+- Provide component width in css vars intead of props
+- Menu rise up at page bottom
+###### v-2.0.0
+- React component support as label
+- Search feature improved
+- Custom values grouped
+- Single Select Bug fixed
 
 <br>
 <br>
