@@ -1,6 +1,9 @@
 import { useRef, useState, useEffect } from 'react'
 
-export default function useComponentVisible(initialIsVisible) {
+export default function useComponentVisible({
+  initialIsVisible,
+  onClickOutside
+}) {
   const [isComponentVisible, setIsComponentVisible] = useState(initialIsVisible)
   const ref = useRef(null)
 
@@ -15,6 +18,7 @@ export default function useComponentVisible(initialIsVisible) {
       document.removeEventListener('keydown', handleHideDropdown, true)
       document.removeEventListener('click', handleClickOutside, true)
       setIsComponentVisible(false)
+      onClickOutside()
     }
   }
 
