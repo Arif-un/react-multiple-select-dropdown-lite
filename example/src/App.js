@@ -15,9 +15,9 @@ const App = () => {
   }
 
   const options = [
-    { label: <div style={customStyle}><h1>Title</h1><span>🔥</span></div>, value: 'option_1', title: 'option_1' },
+    { label: <div style={customStyle}><h1>Title</h1><span role="img" aria-label="agun">🔥</span></div>, value: 'option_1', title: 'option_1' },
     { label: 'Option 2', value: '{id: 1}' },
-    { label: 'Option 3', value: 'option_3' },
+    { label: 'Select...', value: 'option_3' },
     { label: 'Rf', value: 'option_4' },
     {
       title: 'group 1', type: 'group', emptyDataLabel: 'No Group Option Found', childs: [
@@ -51,6 +51,11 @@ const App = () => {
         onChange={handleOnchange}
         options={options}
         customValue
+        // singleSelect
+        // clearable={false}
+        // disableChip
+        onMenuOpen={() => { console.log('menu open') }}
+        onMenuClose={() => { console.log('menu Close') }}
       />
     </div>
   )
