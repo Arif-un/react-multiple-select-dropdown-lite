@@ -1,5 +1,5 @@
 /* eslint-disable no-labels */
-import React, { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Chip from './Chip.jsx'
 import CloseIcon from './CloseIcon.jsx'
 import DownIcon from './DownIcon.jsx'
@@ -21,6 +21,8 @@ MultiSelect.defaultProps = {
   emptyDataLabel: 'No Data Found',
   placeholder: 'Select...',
   onChange: () => {},
+  onMenuOpen: () => {},
+  onMenuClose: () => {},
   options: [
     {
       label: 'Empty',
@@ -375,7 +377,6 @@ function MultiSelect({
   }
 
   const showLabel = (optionObj) => {
-    console.log(optionObj)
     if (typeof optionObj.label === 'object') {
       return optionObj?.title || optionObj.value
     } else {
