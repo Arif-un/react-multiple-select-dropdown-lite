@@ -1,5 +1,5 @@
 /* eslint-disable no-labels */
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Chip from './Chip.jsx'
 import CloseIcon from './CloseIcon.jsx'
 import DownIcon from './DownIcon.jsx'
@@ -20,9 +20,9 @@ MultiSelect.defaultProps = {
   limit: null,
   emptyDataLabel: 'No Data Found',
   placeholder: 'Select...',
-  onChange: () => {},
-  onMenuOpen: () => {},
-  onMenuClose: () => {},
+  onChange: () => { },
+  onMenuOpen: () => { },
+  onMenuClose: () => { },
   options: [
     {
       label: 'Empty',
@@ -73,9 +73,8 @@ function MultiSelect({
     onClickOutside: onMenuClose
   })
 
-  const calculatedWidth = `calc(100% - ${
-    clearable && downArrow ? 60 : downArrow || clearable ? 40 : 5
-  }px)`
+  const calculatedWidth = `calc(100% - ${clearable && downArrow ? 60 : downArrow || clearable ? 40 : 5
+    }px)`
 
   const getValueObjFromOptios = (defaultValue, options) => {
     if (!defaultValue) return []
@@ -401,9 +400,8 @@ function MultiSelect({
       tabIndex='0'
       onKeyPress={openMenu}
       style={{ ...style }}
-      className={`msl-wrp msl-vars ${className} ${
-        disabled ? 'msl-disabled' : ''
-      }`}
+      className={`msl-wrp msl-vars ${className} ${disabled ? 'msl-disabled' : ''
+        }`}
     >
       <input name={name} type='hidden' value={value?.map((itm) => itm.value)} />
       <div data-msl className={`msl ${menuOpen && getActiveClass()} `}>
@@ -507,12 +505,12 @@ function MultiSelect({
             }}
           />
         ) : (
-          ((search && !search.length) || (options && !options.length)) && (
-            <option className='msl-option msl-option-disable'>
-              {emptyDataLabel}
-            </option>
-          )
-        )}
+              ((search && !search.length) || (options && !options.length)) && (
+                <option className='msl-option msl-option-disable'>
+                  {emptyDataLabel}
+                </option>
+              )
+            )}
       </div>
     </div>
   )
