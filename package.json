@@ -1,6 +1,6 @@
 {
   "name": "react-multiple-select-dropdown-lite",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "React Multiple Select Light Weight Dropdown list | Searchable | Addable | Groupable etc",
   "author": "arif-un",
   "license": "MIT",
@@ -13,7 +13,7 @@
   },
   "main": "dist/index.js",
   "module": "dist/index.modern.js",
-  "source": "src/index.jsx",
+  "source": "src/MultiSelect.jsx",
   "engines": {
     "node": ">=10"
   },
