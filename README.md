@@ -54,11 +54,10 @@ const App = () => {
         {value}
       </div>
 
-    <MultiSelect
-      onChange={handleOnchange}
-      options={options}
-    />
-
+      <MultiSelect
+        onChange={handleOnchange}
+        options={options}
+      />
     </div>
 )}
 export  default App
