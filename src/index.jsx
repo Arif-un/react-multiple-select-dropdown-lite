@@ -1,5 +1,6 @@
 /* eslint-disable no-labels */
 import React, { useState, useEffect, useRef } from 'react'
+import Chip from './Chip.jsx'
 import CloseIcon from './CloseIcon.jsx'
 import DownIcon from './DownIcon.jsx'
 import Options from './Options'
@@ -9,7 +10,6 @@ import useComponentVisible from './useComponentVisible.jsx'
 MultiSelect.defaultProps = {
   clearable: true,
   downArrow: true,
-  width: 300,
   singleSelect: false,
   jsonValue: false,
   defaultValue: '',
@@ -20,7 +20,7 @@ MultiSelect.defaultProps = {
   limit: null,
   emptyDataLabel: 'No Data Found',
   placeholder: 'Select...',
-  onChange: () => { },
+  onChange: () => {},
   options: [
     {
       label: 'Empty',
@@ -29,12 +29,12 @@ MultiSelect.defaultProps = {
       style: { textAlign: 'center' }
     }
   ],
-  customValue: false
+  customValue: false,
+  chipAlternateText: 'Item Selected'
 }
 
 function MultiSelect({
   options: userOptions,
-  width,
   downArrowIcon,
   closeIcon,
   clearable,
@@ -53,17 +53,27 @@ function MultiSelect({
   disabled,
   limit,
   emptyDataLabel,
-  customValue
+  customValue,
+  onMenuOpen,
+  onMenuClose,
+  chipAlternateText
 }) {
   const [value, setValue] = useState([])
   const [options, setOptions] = useState(userOptions || [])
   const [search, setSearch] = useState(null)
   const inputFld = useRef(null)
   const {
-    ref,
+    ref: componentRef,
     isComponentVisible: menuOpen,
     setIsComponentVisible: setMenuOpen
-  } = useComponentVisible(false)
+  } = useComponentVisible({
+    initialIsVisible: false,
+    onClickOutside: onMenuClose
+  })
+
+  const calculatedWidth = `calc(100% - ${
+    clearable && downArrow ? 60 : downArrow || clearable ? 40 : 5
+  }px)`
 
   const getValueObjFromOptios = (defaultValue, options) => {
     if (!defaultValue) return []
@@ -124,6 +134,7 @@ function MultiSelect({
     setOptions([...options, ...customValuesGroup])
     return [...searchedOptions, ...extraValues]
   }
+
   useEffect(() => {
     setOptions(userOptions)
   }, [userOptions])
@@ -316,6 +327,18 @@ function MultiSelect({
     }
   }
 
+  const notClickableItem = (target) => {
+    if (
+      target.hasAttribute('clickable') ||
+      target.parentNode.hasAttribute('clickable') ||
+      target.parentNode.parentNode.hasAttribute('clickable') ||
+      target.parentNode.parentNode.parentNode.hasAttribute('clickable')
+    ) {
+      return false
+    }
+    return true
+  }
+
   const checkIsDropdownHandle = (target) => {
     if (
       target.hasAttribute('dropdown-handle') ||
@@ -326,116 +349,95 @@ function MultiSelect({
     }
   }
 
-  const openMenu = ({ target }) => {
-    if (checkIsDropdownHandle(target)) {
-      setMenuOpen(!menuOpen)
-    } else {
-      setMenuOpen(true)
+  const focusSearchInput = () => {
+    if (inputFld.current) {
+      inputFld.current.focus()
     }
   }
 
-  const showChipText = (opt) => {
-    if (typeof opt.label === 'object') {
-      return opt?.title || opt.value
-    } else {
-      return opt.label
+  const openMenu = ({ target }) => {
+    if (notClickableItem(target)) {
+      if (checkIsDropdownHandle(target)) {
+        if (!menuOpen) {
+          setMenuOpen(true)
+          onMenuOpen()
+          focusSearchInput()
+        } else {
+          setMenuOpen(false)
+          onMenuClose()
+        }
+      } else {
+        setMenuOpen(true)
+        onMenuOpen()
+        focusSearchInput()
+      }
     }
+  }
+
+  const showLabel = (optionObj) => {
+    console.log(optionObj)
+    if (typeof optionObj.label === 'object') {
+      return optionObj?.title || optionObj.value
+    } else {
+      return optionObj.label
+    }
+  }
+
+  const getActiveClass = () => {
+    const el = componentRef.current
+    var rect = el.getBoundingClientRect()
+    if (window.innerHeight - (rect.top + el.clientHeight) < 200) {
+      return 'msl-active-up'
+    }
+    return 'msl-active'
   }
 
   return (
     <div
-      ref={ref}
+      ref={componentRef}
       {...attr}
       onClick={openMenu}
       tabIndex='0'
       onKeyPress={openMenu}
-      style={{ ...style, width }}
-      className={`msl-wrp msl-vars ${className} ${disabled ? 'msl-disabled' : ''
-        }`}
+      style={{ ...style }}
+      className={`msl-wrp msl-vars ${className} ${
+        disabled ? 'msl-disabled' : ''
+      }`}
     >
       <input name={name} type='hidden' value={value?.map((itm) => itm.value)} />
-      <div data-msl className={`msl ${menuOpen ? 'msl-active' : ''} `}>
+      <div data-msl className={`msl ${menuOpen && getActiveClass()} `}>
         <div
           data-msl
           className='msl-input-wrp'
-          style={{
-            width: `calc(100% - ${clearable && downArrow
-                ? '60px'
-                : downArrow || clearable
-                  ? '40px'
-                  : '5px'
-              }`
-          }}
+          style={{ width: calculatedWidth }}
         >
           {!singleSelect &&
             !disableChip &&
             value.map((val, i) => (
-              <div key={`msl-chip-${i + 11}`} className='msl-chip'>
-                {showChipText(val)}
-                <div
-                  role='button'
-                  aria-label='delete-value'
-                  onClick={() => deleteValue(i)}
-                  onKeyPress={() => deleteValue(i)}
-                  tabIndex='0'
-                  className='msl-btn msl-chip-delete msl-flx'
-                >
-                  <CloseIcon />
-                </div>
-                <span />
-              </div>
+              <Chip
+                key={`msl-chip-${i + 11}`}
+                value={val}
+                deleteAction={() => deleteValue(i)}
+              />
             ))}
-          {!singleSelect && disableChip && value.length === 1 ? (
+          {!singleSelect && disableChip && value.length > 0 && (
             <span
               className='msl-single-value'
               data-msl
-              style={{
-                width:
-                  width -
-                  (clearable && downArrow
-                    ? 60
-                    : downArrow || clearable
-                      ? 40
-                      : 5)
-              }}
+              style={{ width: calculatedWidth }}
             >
-              {value[0].label}d
+              {value.length === 1
+                ? showLabel(value[0])
+                : `${value.length} ${chipAlternateText}`}
             </span>
-          ) : (
-              disableChip &&
-              value.length > 1 && (
-                <span
-                  className='msl-single-value'
-                  data-msl
-                  style={{
-                    width:
-                      width -
-                      (clearable && downArrow
-                        ? 60
-                        : downArrow || clearable
-                          ? 40
-                          : 5)
-                  }}
-                >
-                  {value.length} Selected
-                </span>
-              )
-            )}
+          )}
           {singleSelect && value.length === 1 && (
             <span
               className='msl-single-value'
               data-msl
-              style={{
-                width:
-                  width -
-                  (clearable && downArrow
-                    ? 60
-                    : downArrow || clearable
-                      ? 40
-                      : 5)
-              }}
+              style={{ width: calculatedWidth }}
             >
-              {value[0].label}
+              {showLabel(value[0])}
             </span>
           )}
           {showSearchOption() && (
@@ -454,6 +456,7 @@ function MultiSelect({
             {clearable && value.length > 0 && (
               <div
                 role='button'
+                clickable='true'
                 aria-label='close-menu'
                 onClick={clearValue}
                 onKeyPress={clearValue}
@@ -503,12 +506,12 @@ function MultiSelect({
             }}
           />
         ) : (
-              ((search && !search.length) || (options && !options.length)) && (
-                <option className='msl-option msl-option-disable'>
-                  {emptyDataLabel}
-                </option>
-              )
-            )}
+          ((search && !search.length) || (options && !options.length)) && (
+            <option className='msl-option msl-option-disable'>
+              {emptyDataLabel}
+            </option>
+          )
+        )}
       </div>
     </div>
   )
