@@ -114,6 +114,7 @@ downArrow |bool | true|  show / hide down icon in dropdown
 ###### v-2.0.1
 - Provide component width in css vars intead of props
 - Menu rise up at page bottom
+- events added on menu open/close
 ###### v-2.0.0
 - React component support as label
 - Search feature improved
