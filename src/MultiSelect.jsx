@@ -32,7 +32,8 @@ MultiSelect.defaultProps = {
     }
   ],
   customValue: false,
-  chipAlternateText: 'Item Selected'
+  chipAlternateText: 'Item Selected',
+  closeOnSelect: true
 }
 
 function MultiSelect({
@@ -58,7 +59,8 @@ function MultiSelect({
   customValue,
   onMenuOpen,
   onMenuClose,
-  chipAlternateText
+  chipAlternateText,
+  closeOnSelect
 }) {
   const [value, setValue] = useState([])
   const [options, setOptions] = useState(userOptions || [])
@@ -148,6 +150,8 @@ function MultiSelect({
     }
 
     setValue(preDefinedValue)
+    // close on option select
+    closeOnSelect && setMenuOpen(false)
   }, [defaultValue])
 
   const setNewValue = (val) => {
@@ -172,7 +176,6 @@ function MultiSelect({
     }
     return { label, value }
   }
-
   const addValue = (newValObj) => {
     let tmp = [...value]
     if (singleSelect) {
@@ -328,7 +331,7 @@ function MultiSelect({
     }
   }
 
-  const notClickableItem = (target) => {
+  const nonClickableItem = (target) => {
     if (
       target.hasAttribute('clickable') ||
       target.parentNode.hasAttribute('clickable') ||
@@ -357,7 +360,7 @@ function MultiSelect({
   }
 
   const openMenu = ({ target }) => {
-    if (notClickableItem(target)) {
+    if (nonClickableItem(target)) {
       if (checkIsDropdownHandle(target)) {
         if (!menuOpen) {
           setMenuOpen(true)
@@ -420,22 +423,14 @@ function MultiSelect({
               />
             ))}
           {!singleSelect && disableChip && value.length > 0 && (
-            <span
-              className='msl-single-value'
-              data-msl
-              style={{ width: calculatedWidth }}
-            >
+            <span className='msl-single-value' data-msl>
               {value.length === 1
                 ? showLabel(value[0])
                 : `${value.length} ${chipAlternateText}`}
             </span>
           )}
           {singleSelect && value.length === 1 && (
-            <span
-              className='msl-single-value'
-              data-msl
-              style={{ width: calculatedWidth }}
-            >
+            <span className='msl-single-value' data-msl>
               {showLabel(value[0])}
             </span>
           )}
