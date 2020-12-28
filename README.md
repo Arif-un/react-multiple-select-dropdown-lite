@@ -97,6 +97,7 @@ downArrow |bool | true|  show / hide down icon in dropdown
 |customValue | bool | false |create custom options by pressing enter or comma (,)
 |largeData | bool | false |prevent slow down (DOM) for large amount of data
 |chipAlternateText| string| (number) Item Selected | Show text when chip disabled.
+|closeOnSelect| bool | true | close option-menu on select option
 
 <br>
 
