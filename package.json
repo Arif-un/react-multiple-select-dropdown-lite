@@ -1,6 +1,6 @@
 {
-  "name": "react-multiple-select-dropdown-lite",
-  "version": "2.0.3",
+  "name": "@arif-un/react-multiple-select-dropdown-lite",
+  "version": "2.0.4",
   "description": "React Multiple Select Light Weight Dropdown list | Searchable | Addable | Groupable etc",
   "author": "arif-un",
   "license": "MIT",
@@ -8,7 +8,9 @@
     "type": "git",
     "url": "https://github.com/Arif-un/react-multiple-select-dropdown-lite.git"
   },
-  
+  "publishConfig": {
+    "registry":"https://npm.pkg.github.com"
+  },
   "main": "dist/index.js",
   "module": "dist/index.modern.js",
   "source": "src/MultiSelect.jsx",
