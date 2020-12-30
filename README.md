@@ -8,10 +8,10 @@ A lightweight Multiple/Single Select Pure functional component for react using R
   <a href="https://www.npmjs.com/package/react-multiple-select-dropdown-lite">
     <img alt="npm" src="https://img.shields.io/npm/v/react-multiple-select-dropdown-lite">
   </a>
-  <a href="https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite@2.0.1">
+  <a href="https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite@2.0.4">
     <img alt="npm bundle size" src="https://img.shields.io/bundlephobia/min/react-multiple-select-dropdown-lite">
   </a>
-  <a href="https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite@2.0.1">
+  <a href="https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite@2.0.4">
     <img alt="npm bundle size" src="https://img.shields.io/bundlephobia/minzip/react-multiple-select-dropdown-lite">
   </a>
   <a href="https://github.com/Arif-un/react-multiple-select-dropdown-lite/pulls">
@@ -73,8 +73,8 @@ export  default App
 - [x] Group <br>
 - [x] Searchable <br>
 - [x] Custom Creatable Value <br>
-- [ ] Sublist <br>
-- [ ] Themeable (using css var) <br>
+- [x] Themeable (using css var) <br>
+<!-- - [ ] Sublist <br> -->
 
 ## Props Options
 |Props| type | default | description
@@ -109,9 +109,25 @@ downArrow |bool | true|  show / hide down icon in dropdown
 |onMenuOpen|null| Trigger when menu open
 |onMenuClose|null| Trigger when menu close
 
+### CSS Variables
+CSS variable applied in `.msl-vars` class name.
+|Variable|Default  Value| Details
+|----------|--------------|-----------
+|--menu-max-height| 400px| Dropdown menu <br> maximum height.
+|--input-width| 300px| Dropdown input width.
+|--font-size| 16px| Dropdown font size.
+|--border-radius| 8px 8px 8px 8px| Dropdown Border Radius.
+|--active-menu-shadow| 1px 1px 5px 0px gray| Menu Shadow <br>  when active.
+|--line-height| 1.4| fonts line height.
+|--active-menu-background| white| Dropdown menu <br>  background color when active.
+|--active-menu-radius| var(--border-radius)| Dropdown menu border <br>  radius when active.
+
 <br>
 
 ### Change Log
+###### v-2.0.4
+- CSS variables updated
+
 ###### v-2.0.1
 - Provide component width in css vars intead of props
 - Menu rise up at page bottom
