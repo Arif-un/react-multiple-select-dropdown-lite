@@ -151,7 +151,7 @@ function MultiSelect({
 
     setValue(preDefinedValue)
     // close on option select
-    closeOnSelect && setMenuOpen(false)
+    closeOnSelect && singleSelect && setMenuOpen(false)
   }, [defaultValue])
 
   const setNewValue = (val) => {
@@ -176,6 +176,7 @@ function MultiSelect({
     }
     return { label, value }
   }
+
   const addValue = (newValObj) => {
     let tmp = [...value]
     if (singleSelect) {

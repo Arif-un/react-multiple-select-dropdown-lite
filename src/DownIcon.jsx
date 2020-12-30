@@ -2,9 +2,23 @@ import React from 'react'
 
 export default function DownIcon() {
   return (
-    <svg className='msl-arrow-icn'>
-      <line x1='10' y1='15' x2='2' y2='7' />
-      <line x1='18' y1='7' x2='10' y2='15' />
+    <svg viewBox='0 0 20 20' className='msl-arrow-icn'>
+      <line
+        stroke='currentColor'
+        strokeLinecap='round'
+        x1='10'
+        y1='14'
+        x2='4'
+        y2='8'
+      />
+      <line
+        stroke='currentColor'
+        strokeLinecap='round'
+        x1='16'
+        y1='8'
+        x2='10'
+        y2='14'
+      />
     </svg>
   )
 }
