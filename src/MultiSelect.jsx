@@ -9,6 +9,7 @@ import useComponentVisible from './useComponentVisible.jsx'
 
 MultiSelect.defaultProps = {
   clearable: true,
+  clearAll: false,
   downArrow: true,
   singleSelect: false,
   jsonValue: false,
@@ -41,6 +42,7 @@ function MultiSelect({
   downArrowIcon,
   closeIcon,
   clearable,
+  clearAll,
   downArrow,
   onChange,
   singleSelect,
@@ -75,8 +77,9 @@ function MultiSelect({
     onClickOutside: onMenuClose
   })
 
-  const calculatedWidth = `calc(100% - ${clearable && downArrow ? 60 : downArrow || clearable ? 40 : 5
-    }px)`
+  const calculatedWidth = `calc(100% - ${
+    clearable && downArrow ? 60 : downArrow || clearable ? 40 : 5
+  }px)`
 
   const getValueObjFromOptios = (defaultValue, options) => {
     if (!defaultValue) return []
@@ -137,6 +140,12 @@ function MultiSelect({
     setOptions([...options, ...customValuesGroup])
     return [...searchedOptions, ...extraValues]
   }
+
+  useEffect(() => {
+    if (clearAll && value.length > 0) {
+      clearValue()
+    }
+  }, [clearAll])
 
   useEffect(() => {
     setOptions(userOptions)
@@ -501,12 +510,12 @@ function MultiSelect({
             }}
           />
         ) : (
-              ((search && !search.length) || (options && !options.length)) && (
-                <option className='msl-option msl-option-disable'>
-                  {emptyDataLabel}
-                </option>
-              )
-            )}
+          ((search && !search.length) || (options && !options.length)) && (
+            <option className='msl-option msl-option-disable'>
+              {emptyDataLabel}
+            </option>
+          )
+        )}
       </div>
     </div>
   )
