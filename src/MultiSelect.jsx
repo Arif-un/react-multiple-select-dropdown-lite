@@ -35,7 +35,7 @@ MultiSelect.defaultProps = {
   customValue: false,
   chipAlternateText: 'Item Selected',
   closeOnSelect: true,
-  disableSearch: false,
+  disableSearch: false
 }
 
 function MultiSelect({
@@ -231,6 +231,7 @@ function MultiSelect({
     if (disableSearch) {
       return false
     }
+
     if (!singleSelect && !disableChip) {
       return true
     } else if (singleSelect && !value.length) {
@@ -238,6 +239,7 @@ function MultiSelect({
     } else if (!singleSelect && disableChip && !value.length) {
       return true
     }
+
     return false
   }
 
@@ -459,6 +461,13 @@ function MultiSelect({
               contentEditable={!disabled}
               onKeyUp={handleSearchAndCustomValue}
               ref={inputFld}
+            />
+          )}
+          {!showSearchOption() && value.length < 1 && (
+            <div
+              data-msl
+              data-placeholder={placeholder}
+              className='msl-input'
             />
           )}
         </div>
