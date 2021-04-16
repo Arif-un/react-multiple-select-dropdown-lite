@@ -56,8 +56,6 @@ const App = () => {
         // disableChip
         onMenuOpen={() => { console.log('menu open') }}
         onMenuClose={() => { console.log('menu Close') }}
-        disableSearch
-        placeholder="somee"
       />
     </div>
   )
