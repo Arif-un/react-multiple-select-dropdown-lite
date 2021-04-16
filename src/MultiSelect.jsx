@@ -34,7 +34,8 @@ MultiSelect.defaultProps = {
   ],
   customValue: false,
   chipAlternateText: 'Item Selected',
-  closeOnSelect: true
+  closeOnSelect: true,
+  disableSearch: false,
 }
 
 function MultiSelect({
@@ -62,7 +63,8 @@ function MultiSelect({
   onMenuOpen,
   onMenuClose,
   chipAlternateText,
-  closeOnSelect
+  closeOnSelect,
+  disableSearch
 }) {
   const [value, setValue] = useState([])
   const [options, setOptions] = useState(userOptions || [])
@@ -160,7 +162,9 @@ function MultiSelect({
 
     setValue(preDefinedValue)
     // close on option select
-    closeOnSelect && singleSelect && setMenuOpen(false)
+    if (closeOnSelect && singleSelect) {
+      setMenuOpen(false)
+    }
   }, [defaultValue])
 
   const setNewValue = (val) => {
@@ -224,6 +228,9 @@ function MultiSelect({
   }
 
   const showSearchOption = () => {
+    if (disableSearch) {
+      return false
+    }
     if (!singleSelect && !disableChip) {
       return true
     } else if (singleSelect && !value.length) {
