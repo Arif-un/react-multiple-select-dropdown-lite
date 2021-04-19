@@ -9,6 +9,7 @@ import useComponentVisible from './useComponentVisible.jsx'
 
 MultiSelect.defaultProps = {
   clearable: true,
+  clearAll: false,
   downArrow: true,
   singleSelect: false,
   jsonValue: false,
@@ -33,7 +34,8 @@ MultiSelect.defaultProps = {
   ],
   customValue: false,
   chipAlternateText: 'Item Selected',
-  closeOnSelect: true
+  closeOnSelect: true,
+  disableSearch: false
 }
 
 function MultiSelect({
@@ -41,6 +43,7 @@ function MultiSelect({
   downArrowIcon,
   closeIcon,
   clearable,
+  clearAll,
   downArrow,
   onChange,
   singleSelect,
@@ -60,7 +63,8 @@ function MultiSelect({
   onMenuOpen,
   onMenuClose,
   chipAlternateText,
-  closeOnSelect
+  closeOnSelect,
+  disableSearch
 }) {
   const [value, setValue] = useState([])
   const [options, setOptions] = useState(userOptions || [])
@@ -75,8 +79,9 @@ function MultiSelect({
     onClickOutside: onMenuClose
   })
 
-  const calculatedWidth = `calc(100% - ${clearable && downArrow ? 60 : downArrow || clearable ? 40 : 5
-    }px)`
+  const calculatedWidth = `calc(100% - ${
+    clearable && downArrow ? 60 : downArrow || clearable ? 40 : 5
+  }px)`
 
   const getValueObjFromOptios = (defaultValue, options) => {
     if (!defaultValue) return []
@@ -139,6 +144,12 @@ function MultiSelect({
   }
 
   useEffect(() => {
+    if (clearAll && value.length > 0) {
+      clearValue()
+    }
+  }, [clearAll])
+
+  useEffect(() => {
     setOptions(userOptions)
   }, [userOptions])
 
@@ -151,7 +162,9 @@ function MultiSelect({
 
     setValue(preDefinedValue)
     // close on option select
-    closeOnSelect && singleSelect && setMenuOpen(false)
+    if (closeOnSelect && singleSelect) {
+      setMenuOpen(false)
+    }
   }, [defaultValue])
 
   const setNewValue = (val) => {
@@ -215,6 +228,10 @@ function MultiSelect({
   }
 
   const showSearchOption = () => {
+    if (disableSearch) {
+      return false
+    }
+
     if (!singleSelect && !disableChip) {
       return true
     } else if (singleSelect && !value.length) {
@@ -222,6 +239,7 @@ function MultiSelect({
     } else if (!singleSelect && disableChip && !value.length) {
       return true
     }
+
     return false
   }
 
@@ -445,6 +463,13 @@ function MultiSelect({
               ref={inputFld}
             />
           )}
+          {!showSearchOption() && value.length < 1 && (
+            <div
+              data-msl
+              data-placeholder={placeholder}
+              className='msl-input'
+            />
+          )}
         </div>
         {(clearable || downArrow) && (
           <div className='msl-actions msl-flx'>
@@ -501,12 +526,12 @@ function MultiSelect({
             }}
           />
         ) : (
-              ((search && !search.length) || (options && !options.length)) && (
-                <option className='msl-option msl-option-disable'>
-                  {emptyDataLabel}
-                </option>
-              )
-            )}
+          ((search && !search.length) || (options && !options.length)) && (
+            <option className='msl-option msl-option-disable'>
+              {emptyDataLabel}
+            </option>
+          )
+        )}
       </div>
     </div>
   )
