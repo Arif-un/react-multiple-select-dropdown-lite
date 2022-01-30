@@ -79,9 +79,8 @@ function MultiSelect({
     onClickOutside: onMenuClose
   })
 
-  const calculatedWidth = `calc(100% - ${
-    clearable && downArrow ? 60 : downArrow || clearable ? 40 : 5
-  }px)`
+  const calculatedWidth = `calc(100% - ${clearable && downArrow ? 60 : downArrow || clearable ? 40 : 5
+    }px)`
 
   const getValueObjFromOptios = (defaultValue, options) => {
     if (!defaultValue) return []
