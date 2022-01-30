@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 
-import MultiSelect from 'react-multiple-select-dropdown-lite'
-import 'react-multiple-select-dropdown-lite/dist/index.css'
+import MultiSelect from '@arif-un/react-multiple-select-dropdown-lite'
+import '@arif-un/react-multiple-select-dropdown-lite/dist/index.css'
 
 const App = () => {
   const [value, setvalue] = useState('rf,test,new')
