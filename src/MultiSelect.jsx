@@ -38,7 +38,7 @@ MultiSelect.defaultProps = {
   disableSearch: false
 }
 
-function MultiSelect({
+export default function MultiSelect({
   options: userOptions,
   downArrowIcon,
   closeIcon,
@@ -82,7 +82,7 @@ function MultiSelect({
   const calculatedWidth = `calc(100% - ${clearable && downArrow ? 60 : downArrow || clearable ? 40 : 5
     }px)`
 
-  const getValueObjFromOptios = (defaultValue, options) => {
+  const getValueObjFromOptions = (defaultValue, options) => {
     if (!defaultValue) return []
     let defaultValArr = defaultValue
     const extraValues = []
@@ -138,12 +138,12 @@ function MultiSelect({
     if (extraValues.length) {
       customValuesGroup = createCustomValueAndOption(extraValues)
     }
-    setOptions([...options, ...customValuesGroup])
+    setOptions([...userOptions, ...customValuesGroup])
     return [...searchedOptions, ...extraValues]
   }
 
   useEffect(() => {
-    if (clearAll && value.length > 0) {
+    if (clearAll && value.length) {
       clearValue()
     }
   }, [clearAll])
@@ -153,9 +153,9 @@ function MultiSelect({
   }, [userOptions])
 
   useEffect(() => {
-    let preDefinedValue = getValueObjFromOptios(defaultValue, options)
+    let preDefinedValue = getValueObjFromOptions(defaultValue, options)
 
-    if (singleSelect && preDefinedValue.length > 0) {
+    if (singleSelect && preDefinedValue.length) {
       preDefinedValue = [preDefinedValue[0]]
     }
 
@@ -535,5 +535,3 @@ function MultiSelect({
     </div>
   )
 }
-
-export default MultiSelect
