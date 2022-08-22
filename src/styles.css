@@ -7,7 +7,7 @@
   --input-width: 300px;
   --font-size: 16px;
   --border-radius: 8px 8px 8px 8px;
-  --active-menu-shadow: 1px 1px 5px 0px gray;
+  --active-menu-shadow: 0 2px 8px 0px #b1b1b1;
   --line-height: 1.4;
   --active-menu-background: white;
   --active-menu-radius: var(--border-radius);
