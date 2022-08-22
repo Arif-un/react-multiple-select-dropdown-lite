@@ -1,21 +1,24 @@
 {
-  "name": "@arif-un/react-multiple-select-dropdown-lite",
-  "version": "2.0.4",
+  "name": "react-multiple-select-dropdown-lite",
+  "version": "2.0.6",
   "description": "React Multiple Select Light Weight Dropdown list | Searchable | Addable | Groupable etc",
   "author": "arif-un",
   "license": "MIT",
+  "workspaces": [
+    "test/*"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/Arif-un/react-multiple-select-dropdown-lite.git"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "registry": "https://registry.npmjs.org"
   },
   "main": "dist/index.js",
   "module": "dist/index.modern.js",
   "source": "src/MultiSelect.jsx",
   "engines": {
-    "node": ">=10"
+    "node": ">=12"
   },
   "scripts": {
     "build": "microbundle-crl --compress --css-modules false",
@@ -31,7 +34,8 @@
     "deploy": "gh-pages -d example/build"
   },
   "peerDependencies": {
-    "react": ">= 16.13.1"
+    "react": "^16.9.0 || ^17 || ^18",
+    "react-dom": "^16.9.0 || ^17 || ^18"
   },
   "devDependencies": {
     "babel-eslint": "^10.1.0",
