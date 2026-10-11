@@ -485,11 +485,32 @@ describe('singleSelect', () => {
     expect(onChange.mock.calls).toEqual([['apple'], ['banana'], ['']])
   })
 
-  it('current behavior: menu stays open after select when uncontrolled', () => {
-    const { root, option, isOpen } = setup({ singleSelect: true })
+  it.each([
+    [{ singleSelect: true }, false],
+    [{ singleSelect: true, closeOnSelect: false }, true],
+    [{}, true],
+    [{ closeOnSelect: true }, false]
+  ])('picking with %o leaves the menu open: %s', (props, open) => {
+    const { root, option, isOpen, onMenuOpen, onMenuClose } = setup(props)
     fireEvent.click(root)
     fireEvent.click(option('Apple'))
-    expect(isOpen()).toBe(true)
+    expect(isOpen()).toBe(open)
+    expect(onMenuOpen).toHaveBeenCalledTimes(1)
+    expect(onMenuClose).toHaveBeenCalledTimes(open ? 0 : 1)
+  })
+
+  it('closeOnSelect also closes after Enter on an option or in the search', () => {
+    const { root, option, input, chips, isOpen } = setup({
+      closeOnSelect: true
+    })
+    fireEvent.click(root)
+    press(option('Apple'))
+    expect(isOpen()).toBe(false)
+    fireEvent.click(root)
+    type(input(), 'ch')
+    type(input(), 'ch', 'Enter')
+    expect(chips()).toEqual(['Apple', 'Cherry'])
+    expect(isOpen()).toBe(false)
   })
 
   function Controlled(props: { closeOnSelect: boolean }) {
@@ -767,12 +788,12 @@ describe('menu open / close', () => {
     expect(q('.msl').getAttribute('class')).toBe('msl msl-active-up ')
   })
 
-  it('current behavior: every click and keypress inside fires onMenuOpen again', () => {
+  it('clicks and keypresses inside an open menu do not fire onMenuOpen again', () => {
     const { root, option, input, onMenuOpen } = setup()
     fireEvent.click(root)
     fireEvent.click(option('Apple'))
     press(input(), 'a', 97)
-    expect(onMenuOpen).toHaveBeenCalledTimes(3)
+    expect(onMenuOpen).toHaveBeenCalledTimes(1)
   })
 
   it.each([

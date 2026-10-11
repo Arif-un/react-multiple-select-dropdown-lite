@@ -68,7 +68,7 @@ function MultiSelect({
   onMenuOpen = noop,
   onMenuClose = noop,
   chipAlternateText = 'Item Selected',
-  closeOnSelect = true,
+  closeOnSelect,
   disableSearch = false
 }: Props) {
   const [value, setValue] = useState<MultiSelectOption[]>([])
@@ -173,10 +173,6 @@ function MultiSelect({
     }
 
     setValue(preDefinedValue)
-    // close on option select
-    if (closeOnSelect && singleSelect) {
-      setMenuOpen(false)
-    }
   }, [defaultValue])
 
   const setNewValue = (val: MultiSelectOption[]) => {
@@ -230,6 +226,11 @@ function MultiSelect({
     // clear search input
     if (inputFld.current) {
       inputFld.current.innerHTML = ''
+    }
+    // unset closeOnSelect: single select closes, multi select stays open
+    if (menuOpen && (closeOnSelect ?? singleSelect)) {
+      setMenuOpen(false)
+      onMenuClose()
     }
   }
 
@@ -427,8 +428,11 @@ function MultiSelect({
           onMenuClose()
         }
       } else {
-        setMenuOpen(true)
-        onMenuOpen()
+        // only when closed: an option click bubbles here and must not undo closeOnSelect
+        if (!menuOpen) {
+          setMenuOpen(true)
+          onMenuOpen()
+        }
         focusSearchInput()
       }
     }

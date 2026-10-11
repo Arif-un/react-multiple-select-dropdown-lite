@@ -74,6 +74,7 @@ declare namespace MultiSelect {
     emptyDataLabel?: string
     /** create options by typing and pressing Enter or comma */
     customValue?: boolean
+    /** close the menu after picking an option. Unset: closes with `singleSelect`, stays open otherwise */
     closeOnSelect?: boolean
     disableSearch?: boolean
     onMenuOpen?: () => void
