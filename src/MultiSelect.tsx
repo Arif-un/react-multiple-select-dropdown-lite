@@ -1,10 +1,41 @@
 import React, { useState, useEffect, useRef } from 'react'
-import Chip from './Chip.jsx'
-import CloseIcon from './CloseIcon.jsx'
-import DownIcon from './DownIcon.jsx'
+import Chip from './Chip'
+import CloseIcon from './CloseIcon'
+import DownIcon from './DownIcon'
+import type PublicMultiSelect from './index'
+import type {
+  MultiSelectBaseProps,
+  MultiSelectGroup,
+  MultiSelectOption
+} from './index'
 import Options from './Options'
 import './styles.css'
-import useComponentVisible from './useComponentVisible.jsx'
+import useComponentVisible from './useComponentVisible'
+
+type Item = MultiSelectOption | MultiSelectGroup
+type DefaultValueItem = Exclude<
+  MultiSelectBaseProps['defaultValue'],
+  string | undefined
+>[number]
+
+// the props as MultiSelect sees them, after defaultProps filled the gaps
+type Props = Omit<
+  MultiSelectBaseProps,
+  'options' | 'limit' | 'onMenuOpen' | 'onMenuClose'
+> & {
+  options: readonly Item[]
+  limit: number | null
+  onMenuOpen: () => void
+  onMenuClose: () => void
+  jsonValue?: boolean
+  onChange: (value: string | MultiSelectOption[]) => void
+}
+
+// climbed without null checks below, as in v2.0.6
+interface Climbable {
+  hasAttribute(name: string): boolean
+  parentNode: Climbable
+}
 
 MultiSelect.defaultProps = {
   clearable: true,
@@ -37,7 +68,7 @@ MultiSelect.defaultProps = {
   disableSearch: false
 }
 
-export default function MultiSelect({
+function MultiSelect({
   options: userOptions,
   downArrowIcon,
   closeIcon,
@@ -64,11 +95,11 @@ export default function MultiSelect({
   chipAlternateText,
   closeOnSelect,
   disableSearch
-}) {
-  const [value, setValue] = useState([])
-  const [options, setOptions] = useState(userOptions || [])
-  const [search, setSearch] = useState(null)
-  const inputFld = useRef(null)
+}: Props) {
+  const [value, setValue] = useState<MultiSelectOption[]>([])
+  const [options, setOptions] = useState<readonly Item[]>(userOptions || [])
+  const [search, setSearch] = useState<MultiSelectOption[] | null>(null)
+  const inputFld = useRef<HTMLDivElement>(null)
   const {
     ref: componentRef,
     isComponentVisible: menuOpen,
@@ -82,34 +113,41 @@ export default function MultiSelect({
     clearable && downArrow ? 60 : downArrow || clearable ? 40 : 5
   }px)`
 
-  const getValueObjFromOptions = (defaultValue, options) => {
+  const getValueObjFromOptions = (
+    defaultValue: Props['defaultValue'],
+    options: readonly Item[]
+  ): MultiSelectOption[] => {
     if (!defaultValue) return []
-    let defaultValArr = defaultValue
-    const extraValues = []
-    const searchedOptions = []
+    let defaultValArr = defaultValue as DefaultValueItem[]
+    const extraValues: MultiSelectOption[] = []
+    const searchedOptions: MultiSelectOption[] = []
 
     if (typeof defaultValue === 'string') {
       defaultValArr = defaultValue.split(',')
     }
 
-    const setExtraValue = (value) => {
+    const setExtraValue = (value: DefaultValueItem) => {
       if (typeof value === 'string') {
         extraValues.push({ label: value, value })
       } else {
-        const newValueObj = { label: value, value }
+        // current behavior: value stays the whole object
+        const newValueObj = { label: value, value } as unknown as {
+          label: unknown
+          value: string
+        }
         if ('label' in value && typeof value.label === 'string') {
           newValueObj.label = value.label
         } else if ('title' in value) {
           newValueObj.label = value.title
         }
-        extraValues.push(newValueObj)
+        extraValues.push(newValueObj as MultiSelectOption)
       }
     }
 
     for (let i = 0; i < defaultValArr.length; i++) {
       if (typeof defaultValArr[i] === 'string') {
         const optObject = searchOptions(
-          defaultValArr[i],
+          defaultValArr[i] as string,
           options,
           true,
           'value'
@@ -121,7 +159,7 @@ export default function MultiSelect({
         }
       } else if (typeof defaultValArr[i] === 'object') {
         const optObject = searchOptions(
-          defaultValArr[i].value,
+          (defaultValArr[i] as Exclude<DefaultValueItem, string>).value,
           options,
           true,
           'value'
@@ -134,7 +172,7 @@ export default function MultiSelect({
       }
     }
 
-    let customValuesGroup = []
+    let customValuesGroup: MultiSelectGroup[] = []
     if (extraValues.length) {
       customValuesGroup = createCustomValueAndOption(extraValues)
     }
@@ -166,7 +204,7 @@ export default function MultiSelect({
     }
   }, [defaultValue])
 
-  const setNewValue = (val) => {
+  const setNewValue = (val: MultiSelectOption[]) => {
     setValue(val)
     if (jsonValue) {
       onChange(val)
@@ -177,12 +215,15 @@ export default function MultiSelect({
     }
   }
 
-  const checkValueExist = (value, arr) => {
+  const checkValueExist = (
+    value: MultiSelectOption,
+    arr: MultiSelectOption[]
+  ) => {
     const bool = arr.some((itm) => itm.value === value.value)
     return bool
   }
 
-  const filterCreateOpt = ({ label, value }) => {
+  const filterCreateOpt = ({ label, value }: MultiSelectOption) => {
     /* v8 ignore else -- label is always 'Create "..."' */
     if (typeof label !== 'object' && label.match(/Create "|"+/g)) {
       label = label.replace(/Create "|"+/g, '')
@@ -190,7 +231,7 @@ export default function MultiSelect({
     return { label, value }
   }
 
-  const addValue = (newValObj) => {
+  const addValue = (newValObj: MultiSelectOption) => {
     let tmp = [...value]
     if (singleSelect) {
       if (checkValueExist(newValObj, value)) {
@@ -217,7 +258,7 @@ export default function MultiSelect({
     }
   }
 
-  const deleteValue = (i) => {
+  const deleteValue = (i: number) => {
     const tmp = [...value]
     tmp.splice(i, 1)
     setNewValue(tmp)
@@ -243,18 +284,24 @@ export default function MultiSelect({
     return false
   }
 
-  const searchOptions = (str, options, exact, type) => {
-    const searchedOptions = []
-    const searchedOptValues = []
+  const searchOptions = (
+    str: string,
+    options: readonly Item[],
+    exact?: boolean,
+    type?: 'value'
+  ) => {
+    const searchedOptions: MultiSelectOption[] = []
+    const searchedOptValues: MultiSelectOption[] = []
 
-    const searchInOptions = (opt) => {
+    // groups recurse first, so the rest of the loop only sees options
+    const searchInOptions = (opt: MultiSelectOption[]) => {
       for (let i = 0; i < opt.length; i++) {
         if (opt[i]?.type === 'group') {
-          searchInOptions(opt[i].childs)
+          searchInOptions(opt[i].childs as MultiSelectOption[])
         } else if (!exact) {
           if (
             typeof opt[i].label !== 'object' &&
-            opt[i].label.match(new RegExp(`${str}`, 'gi'))
+            (opt[i].label as string).match(new RegExp(`${str}`, 'gi'))
           ) {
             searchedOptions.push(opt[i])
           } else if (
@@ -266,7 +313,7 @@ export default function MultiSelect({
             searchedOptValues.push(opt[i])
           }
         } else {
-          if (opt[i][type] === str) {
+          if (opt[i][type!] === str) {
             searchedOptions.push(opt[i])
           }
         }
@@ -277,12 +324,14 @@ export default function MultiSelect({
         }
       }
     }
-    searchInOptions(options)
+    searchInOptions(options as MultiSelectOption[])
     return [...searchedOptions, ...searchedOptValues]
   }
 
-  const createCustomValueAndOption = (valueObj) => {
-    const customValuesGroup = []
+  const createCustomValueAndOption = (
+    valueObj: MultiSelectOption | MultiSelectOption[]
+  ) => {
+    const customValuesGroup: MultiSelectGroup[] = []
     const customValuesIndx = options.findIndex(
       (opt) => opt?.type === 'group' && opt?.title === 'Custom Values'
     )
@@ -292,20 +341,28 @@ export default function MultiSelect({
         title: 'Custom Values',
         type: 'group',
         // published bundles compiled `[...valueObj]` loosely to concat, which also accepts a single object
-        childs: [].concat(valueObj)
+        childs: ([] as MultiSelectOption[]).concat(valueObj)
       })
     } else if (Array.isArray(valueObj)) {
-      valueObj.map((value) => options[customValuesIndx].childs.push(value))
+      valueObj.map((value) =>
+        ((options[customValuesIndx] as MultiSelectGroup).childs as Item[]).push(
+          value
+        )
+      )
     } else {
-      options[customValuesIndx].childs.push(valueObj)
+      ;((options[customValuesIndx] as MultiSelectGroup).childs as Item[]).push(
+        valueObj
+      )
     }
     setOptions([...options, ...customValuesGroup])
 
     return customValuesGroup
   }
 
-  const handleSearchAndCustomValue = (e) => {
-    const textValue = e.target.textContent.trim().replace(/,+/g, '')
+  const handleSearchAndCustomValue = (e: React.KeyboardEvent) => {
+    const textValue = (e.target as HTMLElement)
+      .textContent!.trim()
+      .replace(/,+/g, '')
 
     if (textValue) {
       const newValue = {
@@ -343,7 +400,7 @@ export default function MultiSelect({
 
           addValue(newValue)
         } else {
-          search.length > 0 && addValue(search[0])
+          search!.length > 0 && addValue(search![0])
         }
       }
     } else {
@@ -351,7 +408,7 @@ export default function MultiSelect({
     }
   }
 
-  const nonClickableItem = (target) => {
+  const nonClickableItem = (target: Climbable) => {
     if (
       target.hasAttribute('clickable') ||
       target.parentNode.hasAttribute('clickable') ||
@@ -363,7 +420,7 @@ export default function MultiSelect({
     return true
   }
 
-  const checkIsDropdownHandle = (target) => {
+  const checkIsDropdownHandle = (target: Climbable) => {
     if (
       target.hasAttribute('dropdown-handle') ||
       target.parentNode.hasAttribute('dropdown-handle') ||
@@ -379,9 +436,9 @@ export default function MultiSelect({
     }
   }
 
-  const openMenu = ({ target }) => {
-    if (nonClickableItem(target)) {
-      if (checkIsDropdownHandle(target)) {
+  const openMenu = ({ target }: React.SyntheticEvent) => {
+    if (nonClickableItem(target as unknown as Climbable)) {
+      if (checkIsDropdownHandle(target as unknown as Climbable)) {
         if (!menuOpen) {
           setMenuOpen(true)
           onMenuOpen()
@@ -398,7 +455,7 @@ export default function MultiSelect({
     }
   }
 
-  const showLabel = (optionObj) => {
+  const showLabel = (optionObj: MultiSelectOption) => {
     if (typeof optionObj.label === 'object') {
       return optionObj?.title || optionObj.value
     } else {
@@ -407,8 +464,8 @@ export default function MultiSelect({
   }
 
   const getActiveClass = () => {
-    const el = componentRef.current
-    var rect = el.getBoundingClientRect()
+    const el = componentRef.current!
+    const rect = el.getBoundingClientRect()
     if (window.innerHeight - (rect.top + el.clientHeight) < 200) {
       return 'msl-active-up'
     }
@@ -420,7 +477,7 @@ export default function MultiSelect({
       ref={componentRef}
       {...attr}
       onClick={openMenu}
-      tabIndex='0'
+      tabIndex={0}
       onKeyPress={openMenu}
       style={{ ...style }}
       className={`msl-wrp msl-vars ${className} ${
@@ -478,11 +535,12 @@ export default function MultiSelect({
             {clearable && value.length > 0 && (
               <div
                 role='button'
+                // @ts-expect-error clickable is a custom attribute (it stops the menu from opening)
                 clickable='true'
                 aria-label='close-menu'
                 onClick={clearValue}
                 onKeyPress={clearValue}
-                tabIndex='0'
+                tabIndex={0}
                 className='msl-btn msl-clear-btn msl-flx'
               >
                 {closeIcon || <CloseIcon />}
@@ -491,7 +549,7 @@ export default function MultiSelect({
             {downArrow && (
               <div
                 role='button'
-                tabIndex='0'
+                tabIndex={0}
                 dropdown-handle='true'
                 className='msl-btn msl-arrow-btn msl-flx'
                 style={{ ...(menuOpen && { transform: 'rotate(180deg)' }) }}
@@ -538,3 +596,5 @@ export default function MultiSelect({
     </div>
   )
 }
+
+export default MultiSelect as typeof PublicMultiSelect

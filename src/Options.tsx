@@ -1,4 +1,8 @@
 import React from 'react'
+import type { MultiSelectGroup, MultiSelectOption } from './index'
+
+// options and groups share one loop, told apart by `type` at runtime
+type Item = MultiSelectOption & MultiSelectGroup
 
 function Options({
   opts,
@@ -8,10 +12,18 @@ function Options({
   value,
   largeData,
   menuOpen
+}: {
+  opts: ReadonlyArray<MultiSelectOption | MultiSelectGroup>
+  singleSelect?: boolean
+  addValue: (opt: MultiSelectOption) => void
+  checkValueExist: (opt: MultiSelectOption, arr: MultiSelectOption[]) => boolean
+  value: MultiSelectOption[]
+  largeData?: boolean
+  menuOpen: boolean
 }) {
   if (largeData && !menuOpen) return null
-  const optsArr = []
-  function addInArr(opts) {
+  const optsArr: React.ReactElement[] = []
+  function addInArr(opts: Item[]) {
     for (const [i, opt] of opts.entries()) {
       if (opt.type === 'group') {
         optsArr.push(
@@ -20,7 +32,7 @@ function Options({
           </div>
         )
         if (opt.childs.length > 0) {
-          addInArr(opt.childs)
+          addInArr(opt.childs as Item[])
         } else {
           optsArr.push(
             <option className='msl-option msl-option-disable'>
@@ -31,7 +43,7 @@ function Options({
       } else {
         optsArr.push(
           <div
-            tabIndex='0'
+            tabIndex={0}
             key={opt.value + opt.label + i + 10}
             {...(!singleSelect && { 'data-msl': true })}
             style={{
@@ -49,6 +61,7 @@ function Options({
             } ${opt.disabled ? 'msl-option-disable' : ''} ${
               opt.classes !== undefined ? opt.classes : ''
             }`}
+            // @ts-expect-error value is not a div attribute; kept, users and tests read it
             value={opt.value}
           >
             {opt.label}
@@ -57,7 +70,7 @@ function Options({
       }
     }
   }
-  addInArr(opts)
+  addInArr(opts as Item[])
   return <div>{optsArr}</div>
 }
 
