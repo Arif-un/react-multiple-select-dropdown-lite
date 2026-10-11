@@ -24,6 +24,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm fmt:check
       - run: pnpm lint
+      - run: pnpm typecheck
       # builds dist; jsdom suite on src (100% coverage gate) + every bundle; then real-Chromium suite
       - run: pnpm test
