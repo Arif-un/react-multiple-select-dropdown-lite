@@ -275,6 +275,57 @@ describe('defaultValue', () => {
     expect(onChange).not.toHaveBeenCalled()
   })
 
+  it('resolves once options arrive after mount (#12)', () => {
+    const { rerender, chips, single, onChange } = setup({
+      options: [],
+      defaultValue: 'banana'
+    })
+    expect(chips()).toEqual([])
+    rerender(
+      <MultiSelect options={opts} onChange={onChange} defaultValue='banana' />
+    )
+    expect(chips()).toEqual(['Banana'])
+    rerender(
+      <MultiSelect options={[]} defaultValue='apple,cherry' singleSelect />
+    )
+    rerender(
+      <MultiSelect options={opts} defaultValue='apple,cherry' singleSelect />
+    )
+    expect(single()).toBe('Apple')
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('keeps user changes when options get a new array, until defaultValue changes', () => {
+    const { rerender, option, chips, onChange } = setup({
+      defaultValue: 'apple'
+    })
+    fireEvent.click(option('Banana'))
+    rerender(
+      <MultiSelect
+        options={[...opts]}
+        onChange={onChange}
+        defaultValue='apple'
+      />
+    )
+    expect(chips()).toEqual(['Apple', 'Banana'])
+    rerender(
+      <MultiSelect
+        options={[...opts]}
+        onChange={onChange}
+        defaultValue='cherry'
+      />
+    )
+    expect(chips()).toEqual(['Cherry'])
+    rerender(
+      <MultiSelect
+        options={[...opts]}
+        onChange={onChange}
+        defaultValue='cherry'
+      />
+    )
+    expect(chips()).toEqual(['Cherry'])
+  })
+
   it('current behavior: adding a custom value via prop drops the Custom Values group', () => {
     const { rerender, chips, groupTitles } = setup({
       defaultValue: 'zzz',

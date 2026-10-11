@@ -75,6 +75,8 @@ function MultiSelect({
   const [options, setOptions] = useState<readonly Item[]>(userOptions || [])
   const [search, setSearch] = useState<MultiSelectOption[] | null>(null)
   const inputFld = useRef<HTMLDivElement>(null)
+  // the user changed the value since defaultValue last changed
+  const userChanged = useRef(false)
   const {
     ref: componentRef,
     isComponentVisible: menuOpen,
@@ -166,16 +168,24 @@ function MultiSelect({
   }, [userOptions])
 
   useEffect(() => {
-    let preDefinedValue = getValueObjFromOptions(defaultValue, options)
+    userChanged.current = false
+  }, [defaultValue])
+
+  // options too, as they may arrive after mount (#12). Not after a user change:
+  // parents often pass a new options array on every render
+  useEffect(() => {
+    if (userChanged.current) return
+    let preDefinedValue = getValueObjFromOptions(defaultValue, userOptions)
 
     if (singleSelect && preDefinedValue.length) {
       preDefinedValue = [preDefinedValue[0]]
     }
 
     setValue(preDefinedValue)
-  }, [defaultValue])
+  }, [defaultValue, userOptions])
 
   const setNewValue = (val: MultiSelectOption[]) => {
+    userChanged.current = true
     setValue(val)
     if (jsonValue) {
       onChange(val)
