@@ -274,17 +274,19 @@ function MultiSelect({
         if (opt[i]?.type === 'group') {
           searchInOptions(opt[i].childs as MultiSelectOption[])
         } else if (!exact) {
+          // plain substring match: typed text is not a regex
+          const needle = str.toLowerCase()
           if (
             typeof opt[i].label !== 'object' &&
-            (opt[i].label as string).match(new RegExp(`${str}`, 'gi'))
+            (opt[i].label as string).toLowerCase().includes(needle)
           ) {
             searchedOptions.push(opt[i])
           } else if (
             typeof opt[i].label === 'object' &&
-            opt[i]?.title?.match(new RegExp(`${str}`, 'gi'))
+            opt[i]?.title?.toLowerCase().includes(needle)
           ) {
             searchedOptions.push(opt[i])
-          } else if (opt[i].value.match(new RegExp(`${str}`, 'gi'))) {
+          } else if (opt[i].value.toLowerCase().includes(needle)) {
             searchedOptValues.push(opt[i])
           }
         } else {

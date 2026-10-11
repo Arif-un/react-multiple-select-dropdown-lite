@@ -643,11 +643,16 @@ describe('search', () => {
     expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry'])
   })
 
-  it('current behavior: regex characters are not escaped', () => {
-    const { input, optionTexts } = setup()
-    type(input(), '.')
-    expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry'])
-  })
+  it.each(['(', '[', '*', '+', '?', '\\', '.'])(
+    'matches %s literally instead of as a regex',
+    (ch) => {
+      const { input, optionTexts } = setup({
+        options: [...opts, { label: `a${ch}b`, value: 'special' }]
+      })
+      type(input(), ch)
+      expect(optionTexts()).toEqual([`a${ch}b`])
+    }
+  )
 
   it.each(['Enter', ','])(
     '%s picks the first result and resets the search',
