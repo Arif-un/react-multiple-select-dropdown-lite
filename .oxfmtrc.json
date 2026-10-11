@@ -1,14 +1,17 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 80,
+  "tabWidth": 2,
+  "useTabs": false,
+  "endOfLine": "lf",
+  "insertFinalNewline": true,
+  "semi": false,
   "singleQuote": true,
   "jsxSingleQuote": true,
-  "semi": false,
-  "tabWidth": 2,
+  "trailingComma": "none",
   "bracketSpacing": true,
   "bracketSameLine": false,
   "arrowParens": "always",
-  "trailingComma": "none",
-  "printWidth": 80,
   "sortPackageJson": false,
-  "ignorePatterns": ["dist", "pnpm-lock.yaml", "test/example"]
+  "ignorePatterns": ["dist", "coverage", "pnpm-lock.yaml", "test/example"]
 }
