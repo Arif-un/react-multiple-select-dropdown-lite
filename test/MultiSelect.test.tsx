@@ -87,9 +87,9 @@ describe('render', () => {
     const q = <E extends Element = HTMLElement>(s: string) =>
       container.querySelector<E>(s)!
     const root = container.firstChild as HTMLElement
-    expect(root.getAttribute('class')).toBe('msl-wrp msl-vars undefined ')
+    expect([...root.classList]).toEqual(['msl-wrp', 'msl-vars'])
     expect(root.getAttribute('tabindex')).toBe('0')
-    expect(q('.msl').getAttribute('class')).toBe('msl false ')
+    expect([...q('.msl').classList]).toEqual(['msl'])
     const hidden = q<HTMLInputElement>('input[type="hidden"]')
     expect(hidden.name).toBe('')
     expect(hidden.value).toBe('')
@@ -275,6 +275,57 @@ describe('defaultValue', () => {
     expect(onChange).not.toHaveBeenCalled()
   })
 
+  it('resolves once options arrive after mount (#12)', () => {
+    const { rerender, chips, single, onChange } = setup({
+      options: [],
+      defaultValue: 'banana'
+    })
+    expect(chips()).toEqual([])
+    rerender(
+      <MultiSelect options={opts} onChange={onChange} defaultValue='banana' />
+    )
+    expect(chips()).toEqual(['Banana'])
+    rerender(
+      <MultiSelect options={[]} defaultValue='apple,cherry' singleSelect />
+    )
+    rerender(
+      <MultiSelect options={opts} defaultValue='apple,cherry' singleSelect />
+    )
+    expect(single()).toBe('Apple')
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('keeps user changes when options get a new array, until defaultValue changes', () => {
+    const { rerender, option, chips, onChange } = setup({
+      defaultValue: 'apple'
+    })
+    fireEvent.click(option('Banana'))
+    rerender(
+      <MultiSelect
+        options={[...opts]}
+        onChange={onChange}
+        defaultValue='apple'
+      />
+    )
+    expect(chips()).toEqual(['Apple', 'Banana'])
+    rerender(
+      <MultiSelect
+        options={[...opts]}
+        onChange={onChange}
+        defaultValue='cherry'
+      />
+    )
+    expect(chips()).toEqual(['Cherry'])
+    rerender(
+      <MultiSelect
+        options={[...opts]}
+        onChange={onChange}
+        defaultValue='cherry'
+      />
+    )
+    expect(chips()).toEqual(['Cherry'])
+  })
+
   it('current behavior: adding a custom value via prop drops the Custom Values group', () => {
     const { rerender, chips, groupTitles } = setup({
       defaultValue: 'zzz',
@@ -327,6 +378,8 @@ describe('options', () => {
   })
 
   it('renders groups, nested groups and empty groups', () => {
+    // React warns about a missing key once per file, so this must be the first test with an empty group
+    const error = vi.spyOn(console, 'error')
     const { groupTitles, optionTexts, qa } = setup({
       options: [
         ...grouped,
@@ -345,6 +398,7 @@ describe('options', () => {
     expect(qa('option.msl-option-disable').map((el) => el.textContent)).toEqual(
       ['No Data Found', 'Nada']
     )
+    expect(error).not.toHaveBeenCalled()
   })
 
   it('applies option style, classes, title and value attributes', () => {
@@ -482,11 +536,32 @@ describe('singleSelect', () => {
     expect(onChange.mock.calls).toEqual([['apple'], ['banana'], ['']])
   })
 
-  it('current behavior: menu stays open after select when uncontrolled', () => {
-    const { root, option, isOpen } = setup({ singleSelect: true })
+  it.each([
+    [{ singleSelect: true }, false],
+    [{ singleSelect: true, closeOnSelect: false }, true],
+    [{}, true],
+    [{ closeOnSelect: true }, false]
+  ])('picking with %o leaves the menu open: %s', (props, open) => {
+    const { root, option, isOpen, onMenuOpen, onMenuClose } = setup(props)
     fireEvent.click(root)
     fireEvent.click(option('Apple'))
-    expect(isOpen()).toBe(true)
+    expect(isOpen()).toBe(open)
+    expect(onMenuOpen).toHaveBeenCalledTimes(1)
+    expect(onMenuClose).toHaveBeenCalledTimes(open ? 0 : 1)
+  })
+
+  it('closeOnSelect also closes after Enter on an option or in the search', () => {
+    const { root, option, input, chips, isOpen } = setup({
+      closeOnSelect: true
+    })
+    fireEvent.click(root)
+    press(option('Apple'))
+    expect(isOpen()).toBe(false)
+    fireEvent.click(root)
+    type(input(), 'ch')
+    type(input(), 'ch', 'Enter')
+    expect(chips()).toEqual(['Apple', 'Cherry'])
+    expect(isOpen()).toBe(false)
   })
 
   function Controlled(props: { closeOnSelect: boolean }) {
@@ -643,11 +718,16 @@ describe('search', () => {
     expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry'])
   })
 
-  it('current behavior: regex characters are not escaped', () => {
-    const { input, optionTexts } = setup()
-    type(input(), '.')
-    expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry'])
-  })
+  it.each(['(', '[', '*', '+', '?', '\\', '.'])(
+    'matches %s literally instead of as a regex',
+    (ch) => {
+      const { input, optionTexts } = setup({
+        options: [...opts, { label: `a${ch}b`, value: 'special' }]
+      })
+      type(input(), ch)
+      expect(optionTexts()).toEqual([`a${ch}b`])
+    }
+  )
 
   it.each(['Enter', ','])(
     '%s picks the first result and resets the search',
@@ -660,6 +740,12 @@ describe('search', () => {
       expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry'])
     }
   )
+
+  it('Enter picks a match even without a keyup for the text (paste, IME)', () => {
+    const { input, chips } = setup()
+    type(input(), 'ch', 'Enter')
+    expect(chips()).toEqual(['Cherry'])
+  })
 
   it('Enter does nothing without results', () => {
     const { input, chips, onChange } = setup()
@@ -753,12 +839,12 @@ describe('menu open / close', () => {
     expect(q('.msl').getAttribute('class')).toBe('msl msl-active-up ')
   })
 
-  it('current behavior: every click and keypress inside fires onMenuOpen again', () => {
+  it('clicks and keypresses inside an open menu do not fire onMenuOpen again', () => {
     const { root, option, input, onMenuOpen } = setup()
     fireEvent.click(root)
     fireEvent.click(option('Apple'))
     press(input(), 'a', 97)
-    expect(onMenuOpen).toHaveBeenCalledTimes(3)
+    expect(onMenuOpen).toHaveBeenCalledTimes(1)
   })
 
   it.each([
@@ -797,7 +883,7 @@ describe('menu open / close', () => {
     expect(isOpen()).toBe(false)
   })
 
-  it('closes on outside click and Escape', () => {
+  it('closes on outside click and Escape, firing onMenuClose', () => {
     const { root, isOpen, onMenuClose } = setup()
     fireEvent.click(root)
     fireEvent.click(document.body)
@@ -809,25 +895,27 @@ describe('menu open / close', () => {
     expect(isOpen()).toBe(true)
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(isOpen()).toBe(false)
-    expect(onMenuClose).toHaveBeenCalledTimes(1) // current behavior: Escape skips onMenuClose
-  })
-
-  it('current behavior: outside click fires onMenuClose once even if never opened, then unbinds until re-render', () => {
-    const { onMenuClose, rerender } = setup()
-    fireEvent.click(document.body)
-    fireEvent.click(document.body)
-    expect(onMenuClose).toHaveBeenCalledTimes(1)
-    rerender(
-      <MultiSelect options={opts} onMenuClose={onMenuClose} placeholder='x' />
-    )
-    fireEvent.click(document.body)
     expect(onMenuClose).toHaveBeenCalledTimes(2)
   })
 
+  it('fires onMenuClose only when an open menu closes', () => {
+    const { root, onMenuClose } = setup()
+    fireEvent.click(document.body)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onMenuClose).not.toHaveBeenCalled()
+    fireEvent.click(root)
+    fireEvent.click(document.body)
+    fireEvent.click(document.body)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onMenuClose).toHaveBeenCalledTimes(1)
+  })
+
   it('stops listening after unmount', () => {
-    const { unmount, onMenuClose } = setup()
+    const { root, unmount, onMenuClose } = setup()
+    fireEvent.click(root)
     unmount()
     fireEvent.click(document.body)
+    fireEvent.keyDown(document, { key: 'Escape' })
     expect(onMenuClose).not.toHaveBeenCalled()
   })
 })

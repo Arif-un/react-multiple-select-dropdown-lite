@@ -35,7 +35,10 @@ function Options({
           addInArr(opt.childs as Item[])
         } else {
           optsArr.push(
-            <option className='msl-option msl-option-disable'>
+            <option
+              key={opt.title + i + '-empty'}
+              className='msl-option msl-option-disable'
+            >
               {opt.emptyDataLabel || 'No Data Found'}
             </option>
           )

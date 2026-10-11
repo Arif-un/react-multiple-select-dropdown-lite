@@ -68,20 +68,22 @@ function MultiSelect({
   onMenuOpen = noop,
   onMenuClose = noop,
   chipAlternateText = 'Item Selected',
-  closeOnSelect = true,
+  closeOnSelect,
   disableSearch = false
 }: Props) {
   const [value, setValue] = useState<MultiSelectOption[]>([])
   const [options, setOptions] = useState<readonly Item[]>(userOptions || [])
   const [search, setSearch] = useState<MultiSelectOption[] | null>(null)
   const inputFld = useRef<HTMLDivElement>(null)
+  // the user changed the value since defaultValue last changed
+  const userChanged = useRef(false)
   const {
     ref: componentRef,
     isComponentVisible: menuOpen,
     setIsComponentVisible: setMenuOpen
   } = useComponentVisible({
     initialIsVisible: false,
-    onClickOutside: onMenuClose
+    onClose: onMenuClose
   })
 
   const calculatedWidth = `calc(100% - ${
@@ -166,20 +168,24 @@ function MultiSelect({
   }, [userOptions])
 
   useEffect(() => {
-    let preDefinedValue = getValueObjFromOptions(defaultValue, options)
+    userChanged.current = false
+  }, [defaultValue])
+
+  // options too, as they may arrive after mount (#12). Not after a user change:
+  // parents often pass a new options array on every render
+  useEffect(() => {
+    if (userChanged.current) return
+    let preDefinedValue = getValueObjFromOptions(defaultValue, userOptions)
 
     if (singleSelect && preDefinedValue.length) {
       preDefinedValue = [preDefinedValue[0]]
     }
 
     setValue(preDefinedValue)
-    // close on option select
-    if (closeOnSelect && singleSelect) {
-      setMenuOpen(false)
-    }
-  }, [defaultValue])
+  }, [defaultValue, userOptions])
 
   const setNewValue = (val: MultiSelectOption[]) => {
+    userChanged.current = true
     setValue(val)
     if (jsonValue) {
       onChange(val)
@@ -231,6 +237,11 @@ function MultiSelect({
     if (inputFld.current) {
       inputFld.current.innerHTML = ''
     }
+    // unset closeOnSelect: single select closes, multi select stays open
+    if (menuOpen && (closeOnSelect ?? singleSelect)) {
+      setMenuOpen(false)
+      onMenuClose()
+    }
   }
 
   const deleteValue = (i: number) => {
@@ -274,17 +285,19 @@ function MultiSelect({
         if (opt[i]?.type === 'group') {
           searchInOptions(opt[i].childs as MultiSelectOption[])
         } else if (!exact) {
+          // plain substring match: typed text is not a regex
+          const needle = str.toLowerCase()
           if (
             typeof opt[i].label !== 'object' &&
-            (opt[i].label as string).match(new RegExp(`${str}`, 'gi'))
+            (opt[i].label as string).toLowerCase().includes(needle)
           ) {
             searchedOptions.push(opt[i])
           } else if (
             typeof opt[i].label === 'object' &&
-            opt[i]?.title?.match(new RegExp(`${str}`, 'gi'))
+            opt[i]?.title?.toLowerCase().includes(needle)
           ) {
             searchedOptions.push(opt[i])
-          } else if (opt[i].value.match(new RegExp(`${str}`, 'gi'))) {
+          } else if (opt[i].value.toLowerCase().includes(needle)) {
             searchedOptValues.push(opt[i])
           }
         } else {
@@ -346,6 +359,8 @@ function MultiSelect({
       }
 
       const searchedOptions = searchOptions(textValue, options)
+      // Enter reads this, not `search`: that is null when text arrived without a keyup (paste, IME)
+      let results = searchedOptions
 
       if (searchedOptions.length) {
         if (customValue) {
@@ -358,10 +373,10 @@ function MultiSelect({
 
           !exactOptionValue.length && searchedOptions.push(newValue)
         }
-        setSearch(searchedOptions)
-      } else {
-        customValue ? setSearch([newValue]) : setSearch([])
+      } else if (customValue) {
+        results = [newValue]
       }
+      setSearch(results)
 
       const filteredNewValue = filterCreateOpt(newValue)
 
@@ -375,7 +390,7 @@ function MultiSelect({
 
           addValue(newValue)
         } else {
-          search!.length > 0 && addValue(search![0])
+          results.length > 0 && addValue(results[0])
         }
       }
     } else {
@@ -423,8 +438,11 @@ function MultiSelect({
           onMenuClose()
         }
       } else {
-        setMenuOpen(true)
-        onMenuOpen()
+        // only when closed: an option click bubbles here and must not undo closeOnSelect
+        if (!menuOpen) {
+          setMenuOpen(true)
+          onMenuOpen()
+        }
         focusSearchInput()
       }
     }
@@ -455,12 +473,12 @@ function MultiSelect({
       tabIndex={0}
       onKeyPress={openMenu}
       style={{ ...style }}
-      className={`msl-wrp msl-vars ${className} ${
+      className={`msl-wrp msl-vars ${className || ''} ${
         disabled ? 'msl-disabled' : ''
       }`}
     >
       <input name={name} type='hidden' value={value?.map((itm) => itm.value)} />
-      <div data-msl className={`msl ${menuOpen && getActiveClass()} `}>
+      <div data-msl className={`msl ${menuOpen ? getActiveClass() : ''} `}>
         <div
           data-msl
           className='msl-input-wrp'

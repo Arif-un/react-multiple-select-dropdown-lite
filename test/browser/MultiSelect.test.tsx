@@ -162,10 +162,30 @@ it('current behavior: disabled blocks the mouse but opens from the keyboard', as
   await expect.poll(menuHeight).toBeGreaterThan(0)
 })
 
-it('current behavior: singleSelect stays open after picking when uncontrolled', async () => {
+it('singleSelect closes after picking, even when uncontrolled', async () => {
   const { root, option, q, menuHeight } = await setup({ singleSelect: true })
   await userEvent.click(root)
+  await expect.poll(menuHeight).toBeGreaterThan(0)
   await userEvent.click(option('Apple'))
   await expect.poll(() => q('.msl-single-value')?.textContent).toBe('Apple')
+  await expect.poll(menuHeight).toBe(0)
+})
+
+it('multi select stays open after picking unless closeOnSelect', async () => {
+  const { root, option, chips, menuHeight } = await setup()
+  await userEvent.click(root)
+  await userEvent.click(option('Apple'))
+  await expect.poll(chips).toEqual(['Apple'])
   expect(menuHeight()).toBeGreaterThan(0)
+})
+
+it('closeOnSelect closes multi select after picking', async () => {
+  const { root, option, chips, menuHeight } = await setup({
+    closeOnSelect: true
+  })
+  await userEvent.click(root)
+  await expect.poll(menuHeight).toBeGreaterThan(0)
+  await userEvent.click(option('Apple'))
+  await expect.poll(chips).toEqual(['Apple'])
+  await expect.poll(menuHeight).toBe(0)
 })
