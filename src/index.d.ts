@@ -5,8 +5,6 @@ import * as React from 'react'
 
 declare const MultiSelect: {
   (props: MultiSelect.MultiSelectProps): React.ReactElement
-  /** React fills missing props from here */
-  defaultProps: MultiSelect.MultiSelectBaseProps
 }
 
 declare namespace MultiSelect {

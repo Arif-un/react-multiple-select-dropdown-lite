@@ -11,6 +11,9 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        react: [18, 19]
     steps:
       - uses: actions/checkout@v5
         with:
@@ -26,6 +29,9 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm fmt:check
       - run: pnpm lint
+      # the lockfile pins React 19
+      - if: matrix.react == 18
+        run: pnpm add -D react@18 react-dom@18 @types/react@18 @types/react-dom@18
       - run: pnpm typecheck
       # builds dist; jsdom suite on src (100% coverage gate) + every bundle; then real-Chromium suite
       - run: pnpm test
