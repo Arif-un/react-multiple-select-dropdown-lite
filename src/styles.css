@@ -66,6 +66,7 @@
   background: var(--active-menu-background);
   z-index: 9999;
   box-shadow: var(--active-menu-shadow);
+  -webkit-clip-path: inset(0px -10px -10px -10px);
   clip-path: inset(0px -10px -10px -10px);
   max-height: var(--menu-max-height);
   border-radius: var(--active-menu-radius);
@@ -78,6 +79,7 @@
   z-index: 9999;
   bottom: 99%;
   box-shadow: var(--active-menu-shadow);
+  -webkit-clip-path: inset(-10px -10px 0 -10px);
   clip-path: inset(-10px -10px 0 -10px);
   max-height: var(--menu-max-height);
   border-radius: var(--active-menu-radius);
@@ -92,7 +94,7 @@
   background: white;
   max-height: 0;
   overflow: auto;
-  scrollbar-color: rgb(0, 0, 0, 0.1) transparent;
+  scrollbar-color: rgba(0, 0, 0, 0.1) transparent;
   scrollbar-width: thin;
   border-radius: var(--border-radius);
 }
@@ -147,12 +149,12 @@
 }
 
 .msl-options::-webkit-scrollbar-thumb {
-  background: rgb(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.1);
   border-radius: 20px;
 }
 
 .msl-options::-webkit-scrollbar-thumb:hover {
-  background: rgb(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.2);
 }
 .msl-options .msl-option,
 .msl-grp-title {
@@ -239,7 +241,7 @@
   min-height: 20px;
   margin-left: 3px;
   background: rgb(218, 218, 218);
-  color: rgb(0, 0, 0, 0.6);
+  color: rgba(0, 0, 0, 0.6);
 }
 .msl-chip-delete:hover {
   background: lightgray;

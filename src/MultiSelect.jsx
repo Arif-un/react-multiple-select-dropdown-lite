@@ -95,7 +95,7 @@ export default function MultiSelect({
     const setExtraValue = (value) => {
       if (typeof value === 'string') {
         extraValues.push({ label: value, value })
-      } else if (typeof value === 'object') {
+      } else {
         const newValueObj = { label: value, value }
         if ('label' in value && typeof value.label === 'string') {
           newValueObj.label = value.label
@@ -183,6 +183,7 @@ export default function MultiSelect({
   }
 
   const filterCreateOpt = ({ label, value }) => {
+    /* v8 ignore else -- label is always 'Create "..."' */
     if (typeof label !== 'object' && label.match(/Create "|"+/g)) {
       label = label.replace(/Create "|"+/g, '')
     }
@@ -264,7 +265,7 @@ export default function MultiSelect({
           } else if (opt[i].value.match(new RegExp(`${str}`, 'gi'))) {
             searchedOptValues.push(opt[i])
           }
-        } else if (exact) {
+        } else {
           if (opt[i][type] === str) {
             searchedOptions.push(opt[i])
           }
@@ -290,11 +291,12 @@ export default function MultiSelect({
       customValuesGroup.push({
         title: 'Custom Values',
         type: 'group',
-        childs: [...valueObj]
+        // published bundles compiled `[...valueObj]` loosely to concat, which also accepts a single object
+        childs: [].concat(valueObj)
       })
     } else if (Array.isArray(valueObj)) {
       valueObj.map((value) => options[customValuesIndx].childs.push(value))
-    } else if (typeof valueObj === 'object') {
+    } else {
       options[customValuesIndx].childs.push(valueObj)
     }
     setOptions([...options, ...customValuesGroup])
