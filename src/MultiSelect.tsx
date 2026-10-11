@@ -43,6 +43,18 @@ const emptyOptions: readonly Item[] = [
   }
 ]
 
+// aria ids: a counter, as useId needs React 18 (so ids can differ between SSR and hydration)
+let lastId = 0
+
+// options in render order, groups unwrapped, the way Options.tsx walks them
+function flatten(items: readonly Item[], out: MultiSelectOption[] = []) {
+  for (const opt of items) {
+    if (opt.type === 'group') flatten((opt as MultiSelectGroup).childs, out)
+    else out.push(opt as MultiSelectOption)
+  }
+  return out
+}
+
 function MultiSelect({
   options: userOptions = emptyOptions,
   downArrowIcon,
@@ -75,6 +87,9 @@ function MultiSelect({
   const [options, setOptions] = useState<readonly Item[]>(userOptions || [])
   const [search, setSearch] = useState<MultiSelectOption[] | null>(null)
   const inputFld = useRef<HTMLDivElement>(null)
+  const [listId] = useState(() => `msl-listbox-${++lastId}`)
+  // value of the keyboard highlighted option
+  const [active, setActive] = useState<string | null>(null)
   // the user changed the value since defaultValue last changed
   const userChanged = useRef(false)
   const {
@@ -85,6 +100,20 @@ function MultiSelect({
     initialIsVisible: false,
     onClose: onMenuClose
   })
+
+  const shown = flatten(search || options || [])
+  const activeIdx = shown.findIndex((opt) => opt.value === active)
+
+  useEffect(() => {
+    !menuOpen && setActive(null)
+  }, [menuOpen])
+
+  useEffect(() => {
+    // scrollIntoView is missing in jsdom
+    componentRef
+      .current!.querySelector('.msl-option-focused')
+      ?.scrollIntoView?.({ block: 'nearest' })
+  }, [activeIdx])
 
   const calculatedWidth = `calc(100% - ${
     clearable && downArrow ? 60 : downArrow || clearable ? 40 : 5
@@ -448,6 +477,61 @@ function MultiSelect({
     }
   }
 
+  // moves the highlight over enabled options, staying put at either end
+  const highlight = (key: string) => {
+    const dir = key === 'ArrowDown' || key === 'Home' ? 1 : -1
+    let i =
+      key === 'Home'
+        ? -1
+        : key === 'End' || (activeIdx < 0 && dir < 0)
+          ? shown.length
+          : activeIdx
+    for (i += dir; i >= 0 && i < shown.length; i += dir) {
+      if (!shown[i].disabled) return setActive(shown[i].value)
+    }
+  }
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    attr?.onKeyDown?.(e)
+    const { key, target } = e
+    // chips and the clear button handle their own keys
+    if (disabled || !nonClickableItem(target as unknown as Climbable)) return
+    if (key === 'Enter' && activeIdx >= 0) {
+      e.preventDefault()
+      addValue(shown[activeIdx])
+      // the search field gives way to the single value: keep focus in the widget
+      ;(singleSelect || disableChip) && componentRef.current!.focus()
+    } else if (
+      key === 'Backspace' &&
+      target === inputFld.current &&
+      !inputFld.current.textContent
+    ) {
+      // a value next to the search field means chips mode
+      value.length && deleteValue(value.length - 1)
+    } else if (/^(Arrow(Down|Up)|Home|End)$/.test(key)) {
+      e.preventDefault()
+      highlight(key)
+      openMenu(e)
+    } else if (
+      key === 'Enter' ||
+      (key.length === 1 && !e.ctrlKey && !e.metaKey)
+    ) {
+      // Space on the wrapper would scroll the page
+      key === ' ' && target === e.currentTarget && e.preventDefault()
+      openMenu(e)
+    }
+  }
+
+  const combobox = {
+    role: 'combobox',
+    'aria-expanded': menuOpen,
+    'aria-haspopup': 'listbox',
+    'aria-controls': listId,
+    'aria-activedescendant':
+      activeIdx < 0 ? undefined : `${listId}-${activeIdx}`,
+    'aria-disabled': disabled
+  } as const
+
   const showLabel = (optionObj: MultiSelectOption) => {
     if (typeof optionObj.label === 'object') {
       return optionObj?.title || optionObj.value
@@ -469,9 +553,10 @@ function MultiSelect({
     <div
       ref={componentRef}
       {...attr}
+      {...(!showSearchOption() && combobox)}
       onClick={openMenu}
-      tabIndex={0}
-      onKeyPress={openMenu}
+      tabIndex={disabled ? -1 : 0}
+      onKeyDown={onKeyDown}
       style={{ ...style }}
       className={`msl-wrp msl-vars ${className || ''} ${
         disabled ? 'msl-disabled' : ''
@@ -490,6 +575,7 @@ function MultiSelect({
               <Chip
                 key={`msl-chip-${i + 11}`}
                 value={val}
+                disabled={disabled}
                 deleteAction={() => deleteValue(i)}
               />
             ))}
@@ -512,7 +598,9 @@ function MultiSelect({
               className='msl-input'
               contentEditable={!disabled}
               onKeyUp={handleSearchAndCustomValue}
+              onInput={() => setActive(null)}
               ref={inputFld}
+              {...combobox}
             />
           )}
           {!showSearchOption() && value.length < 1 && (
@@ -532,17 +620,22 @@ function MultiSelect({
                 clickable='true'
                 aria-label='close-menu'
                 onClick={clearValue}
-                onKeyPress={clearValue}
-                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    clearValue()
+                  }
+                }}
+                tabIndex={disabled ? -1 : 0}
                 className='msl-btn msl-clear-btn msl-flx'
               >
                 {closeIcon || <CloseIcon />}
               </div>
             )}
             {downArrow && (
+              // decorative: the combobox handles the keyboard
               <div
-                role='button'
-                tabIndex={0}
+                aria-hidden='true'
                 dropdown-handle='true'
                 className='msl-btn msl-arrow-btn msl-flx'
                 style={{ ...(menuOpen && { transform: 'rotate(180deg)' }) }}
@@ -553,7 +646,14 @@ function MultiSelect({
           </div>
         )}
       </div>
-      <div className='msl-options'>
+      <div
+        className='msl-options'
+        id={listId}
+        role='listbox'
+        aria-multiselectable={!singleSelect}
+        // else Chrome makes this scroller a tab stop, as no option is tabbable
+        tabIndex={-1}
+      >
         {!search && options.length ? (
           <Options
             opts={options}
@@ -563,7 +663,9 @@ function MultiSelect({
               checkValueExist,
               value,
               largeData,
-              menuOpen
+              menuOpen,
+              listId,
+              activeIdx
             }}
           />
         ) : search && search.length ? (
@@ -575,7 +677,9 @@ function MultiSelect({
               checkValueExist,
               value,
               largeData,
-              menuOpen
+              menuOpen,
+              listId,
+              activeIdx
             }}
           />
         ) : (

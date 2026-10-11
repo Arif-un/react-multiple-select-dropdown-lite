@@ -11,7 +11,9 @@ function Options({
   checkValueExist,
   value,
   largeData,
-  menuOpen
+  menuOpen,
+  listId,
+  activeIdx
 }: {
   opts: ReadonlyArray<MultiSelectOption | MultiSelectGroup>
   singleSelect?: boolean
@@ -20,14 +22,23 @@ function Options({
   value: MultiSelectOption[]
   largeData?: boolean
   menuOpen: boolean
+  listId: string
+  activeIdx: number
 }) {
   if (largeData && !menuOpen) return null
   const optsArr: React.ReactElement[] = []
+  // counts options only, like MultiSelect's flattened list
+  let n = 0
   function addInArr(opts: Item[]) {
     for (const [i, opt] of opts.entries()) {
       if (opt.type === 'group') {
         optsArr.push(
-          <div key={opt.title + i} data-msl className='msl-grp-title'>
+          <div
+            key={opt.title + i}
+            data-msl
+            role='presentation'
+            className='msl-grp-title'
+          >
             {opt.title}
           </div>
         )
@@ -44,9 +55,14 @@ function Options({
           )
         }
       } else {
+        const idx = n++
         optsArr.push(
           <div
-            tabIndex={0}
+            id={`${listId}-${idx}`}
+            role='option'
+            aria-selected={checkValueExist(opt, value)}
+            aria-disabled={!!opt.disabled}
+            tabIndex={-1}
             key={opt.value + opt.label + i + 10}
             {...(!singleSelect && { 'data-msl': true })}
             style={{
@@ -55,15 +71,19 @@ function Options({
             onClick={() => {
               !opt.disabled && addValue(opt)
             }}
-            onKeyPress={(e) => {
-              e.key === 'Enter' && !opt.disabled && addValue(opt)
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                // else the wrapper picks the highlighted option too
+                e.stopPropagation()
+                !opt.disabled && addValue(opt)
+              }
             }}
             title={typeof opt.label === 'object' ? opt?.title : opt.label}
             className={`msl-option ${
               checkValueExist(opt, value) ? 'msl-option-active' : ''
             } ${opt.disabled ? 'msl-option-disable' : ''} ${
               opt.classes !== undefined ? opt.classes : ''
-            }`}
+            }${idx === activeIdx ? ' msl-option-focused' : ''}`}
             // @ts-expect-error value is not a div attribute; kept, users and tests read it
             value={opt.value}
           >

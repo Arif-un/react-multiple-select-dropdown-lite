@@ -63,7 +63,10 @@ declare namespace MultiSelect {
     /** name of the hidden input, for forms */
     name?: string
     style?: React.CSSProperties
-    /** spread onto the wrapper div, which then sets its own onClick, onKeyPress, tabIndex, style and className */
+    /**
+     * spread onto the wrapper div, which then sets its own onClick, onKeyDown (after calling yours), tabIndex, style and className,
+     * plus the combobox role and aria attributes when there is no search field
+     */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     attr?: React.HTMLAttributes<HTMLDivElement> & { [key: string]: any }
     /** render options only while the menu is open */

@@ -128,38 +128,45 @@ it('closes on Escape and on outside click', async () => {
   await expect.poll(menuHeight).toBe(0)
 })
 
-it('current behavior: Tab walks into options while the menu is closed', async () => {
-  const { outside, menuHeight, focused } = await setup()
+it('Tab skips the arrow and the options', async () => {
+  const { root, outside, menuHeight, focused } = await setup({
+    defaultValue: 'apple'
+  })
   outside.focus()
   const order = []
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 5; i++) {
     await userEvent.tab()
-    order.push(focused())
+    order.push(root.contains(document.activeElement) ? focused() : 'out')
   }
-  expect(order).toEqual([
-    'wrapper',
-    'search',
-    'arrow',
-    'Apple',
-    'Banana',
-    'Cherry'
-  ])
+  expect(order).toEqual(['wrapper', 'chip-delete', 'search', 'clear', 'out'])
   expect(menuHeight()).toBe(0)
 })
 
-it('current behavior: chip delete fires on any key', async () => {
-  const { q, chips } = await setup({ defaultValue: 'apple,banana' })
+it('chip delete acts on Enter and Space only', async () => {
+  const { q, chips } = await setup({ defaultValue: 'apple,banana,cherry' })
   q('.msl-chip-delete').focus()
   await userEvent.keyboard('x')
-  await expect.poll(chips).toEqual(['Banana'])
+  expect(chips()).toEqual(['Apple', 'Banana', 'Cherry'])
+  await userEvent.keyboard('{Enter}')
+  await expect.poll(chips).toEqual(['Banana', 'Cherry'])
+  q('.msl-chip-delete').focus()
+  await userEvent.keyboard(' ')
+  await expect.poll(chips).toEqual(['Cherry'])
 })
 
-it('current behavior: disabled blocks the mouse but opens from the keyboard', async () => {
-  const { root, menuHeight } = await setup({ disabled: true })
+it('disabled blocks the mouse, leaves the tab order and ignores the keyboard', async () => {
+  const { root, outside, menuHeight, chips } = await setup({
+    disabled: true,
+    defaultValue: 'apple'
+  })
   expect(getComputedStyle(root).pointerEvents).toBe('none')
+  outside.focus()
+  await userEvent.tab()
+  expect(root.contains(document.activeElement)).toBe(false)
   root.focus()
-  await userEvent.keyboard('{Enter}')
-  await expect.poll(menuHeight).toBeGreaterThan(0)
+  await userEvent.keyboard('{Enter}{ArrowDown} a{Backspace}')
+  expect(menuHeight()).toBe(0)
+  expect(chips()).toEqual(['Apple'])
 })
 
 it('singleSelect closes after picking, even when uncontrolled', async () => {
@@ -188,4 +195,99 @@ it('closeOnSelect closes multi select after picking', async () => {
   await userEvent.click(option('Apple'))
   await expect.poll(chips).toEqual(['Apple'])
   await expect.poll(menuHeight).toBe(0)
+})
+
+const withDisabled = [
+  { label: 'Off A', value: 'offa', disabled: true },
+  { label: 'Apple', value: 'apple' },
+  { label: 'Banana', value: 'banana', disabled: true },
+  { label: 'Cherry', value: 'cherry' },
+  { label: 'Off C', value: 'offc', disabled: true }
+]
+const highlighted = () => document.querySelector('.msl-option-focused')
+
+it('arrows move the highlight over enabled options and Enter picks it', async () => {
+  const { outside, input, option, chips, menuHeight, focused } = await setup({
+    options: withDisabled
+  })
+  outside.focus()
+  await userEvent.tab()
+  await userEvent.keyboard('{ArrowDown}')
+  await expect.poll(menuHeight).toBeGreaterThan(0)
+  expect(focused()).toBe('search')
+  expect(highlighted()?.textContent).toBe('Apple')
+  await userEvent.keyboard('{ArrowDown}')
+  expect(highlighted()?.textContent).toBe('Cherry')
+  await userEvent.keyboard('{ArrowDown}')
+  expect(highlighted()?.textContent).toBe('Cherry')
+  expect(input().getAttribute('aria-activedescendant')).toBe(
+    option('Cherry').id
+  )
+  await userEvent.keyboard('{Enter}')
+  await expect.poll(chips).toEqual(['Cherry'])
+  expect(focused()).toBe('search')
+  expect(input().innerHTML).toBe('')
+  expect(menuHeight()).toBeGreaterThan(0)
+})
+
+it('Home and End jump to the first and last enabled option', async () => {
+  const { input } = await setup({ options: withDisabled })
+  input().focus()
+  await userEvent.keyboard('{End}')
+  expect(highlighted()?.textContent).toBe('Cherry')
+  await userEvent.keyboard('{Home}')
+  expect(highlighted()?.textContent).toBe('Apple')
+})
+
+it('picks a highlighted search result with Enter', async () => {
+  const { input, chips, visibleOptions } = await setup()
+  await userEvent.type(input(), 'an')
+  await expect.poll(visibleOptions).toEqual(['Banana'])
+  await userEvent.keyboard('{ArrowDown}{Enter}')
+  await expect.poll(chips).toEqual(['Banana'])
+  expect(input().innerHTML).toBe('')
+  expect(highlighted()?.textContent).toBe('Banana')
+})
+
+it('Backspace in an empty search field removes the last chip', async () => {
+  const { input, chips } = await setup({ defaultValue: 'apple,banana' })
+  await userEvent.type(input(), 'c')
+  await userEvent.keyboard('{Backspace}')
+  expect(input().textContent).toBe('')
+  expect(chips()).toEqual(['Apple', 'Banana'])
+  await userEvent.keyboard('{Backspace}')
+  await expect.poll(chips).toEqual(['Apple'])
+  await userEvent.keyboard('{Backspace}')
+  await expect.poll(chips).toEqual([])
+})
+
+it('singleSelect: Enter picks, closes, and focus stays on the widget', async () => {
+  const { root, input, q, menuHeight, focused } = await setup({
+    singleSelect: true
+  })
+  input().focus()
+  await userEvent.keyboard('{ArrowDown}{ArrowDown}{Enter}')
+  await expect.poll(() => q('.msl-single-value')?.textContent).toBe('Banana')
+  await expect.poll(menuHeight).toBe(0)
+  expect(focused()).toBe('wrapper')
+  expect(root.getAttribute('role')).toBe('combobox')
+  await userEvent.keyboard('{ArrowDown}')
+  await expect.poll(menuHeight).toBeGreaterThan(0)
+  expect(root.getAttribute('aria-activedescendant')).toBe(highlighted()!.id)
+})
+
+it('keeps the highlighted option scrolled into view', async () => {
+  const options = Array.from({ length: 40 }, (_, i) => ({
+    label: `Item ${i}`,
+    value: `${i}`
+  }))
+  const { input, q } = await setup({ options })
+  input().focus()
+  await userEvent.keyboard('{End}')
+  const menu = q('.msl-options')
+  await expect.poll(() => menu.scrollTop).toBeGreaterThan(0)
+  const box = menu.getBoundingClientRect()
+  const item = highlighted()!.getBoundingClientRect()
+  expect(item.bottom).toBeLessThanOrEqual(box.bottom + 1)
+  expect(item.top).toBeGreaterThanOrEqual(box.top - 1)
 })
