@@ -459,12 +459,12 @@ function MultiSelect({
       tabIndex={0}
       onKeyPress={openMenu}
       style={{ ...style }}
-      className={`msl-wrp msl-vars ${className} ${
+      className={`msl-wrp msl-vars ${className || ''} ${
         disabled ? 'msl-disabled' : ''
       }`}
     >
       <input name={name} type='hidden' value={value?.map((itm) => itm.value)} />
-      <div data-msl className={`msl ${menuOpen && getActiveClass()} `}>
+      <div data-msl className={`msl ${menuOpen ? getActiveClass() : ''} `}>
         <div
           data-msl
           className='msl-input-wrp'

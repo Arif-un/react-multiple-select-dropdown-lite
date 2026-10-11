@@ -87,9 +87,9 @@ describe('render', () => {
     const q = <E extends Element = HTMLElement>(s: string) =>
       container.querySelector<E>(s)!
     const root = container.firstChild as HTMLElement
-    expect(root.getAttribute('class')).toBe('msl-wrp msl-vars undefined ')
+    expect([...root.classList]).toEqual(['msl-wrp', 'msl-vars'])
     expect(root.getAttribute('tabindex')).toBe('0')
-    expect(q('.msl').getAttribute('class')).toBe('msl false ')
+    expect([...q('.msl').classList]).toEqual(['msl'])
     const hidden = q<HTMLInputElement>('input[type="hidden"]')
     expect(hidden.name).toBe('')
     expect(hidden.value).toBe('')
@@ -327,6 +327,8 @@ describe('options', () => {
   })
 
   it('renders groups, nested groups and empty groups', () => {
+    // React warns about a missing key once per file, so this must be the first test with an empty group
+    const error = vi.spyOn(console, 'error')
     const { groupTitles, optionTexts, qa } = setup({
       options: [
         ...grouped,
@@ -345,6 +347,7 @@ describe('options', () => {
     expect(qa('option.msl-option-disable').map((el) => el.textContent)).toEqual(
       ['No Data Found', 'Nada']
     )
+    expect(error).not.toHaveBeenCalled()
   })
 
   it('applies option style, classes, title and value attributes', () => {
