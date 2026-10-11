@@ -811,7 +811,7 @@ describe('menu open / close', () => {
     expect(isOpen()).toBe(false)
   })
 
-  it('closes on outside click and Escape', () => {
+  it('closes on outside click and Escape, firing onMenuClose', () => {
     const { root, isOpen, onMenuClose } = setup()
     fireEvent.click(root)
     fireEvent.click(document.body)
@@ -823,25 +823,27 @@ describe('menu open / close', () => {
     expect(isOpen()).toBe(true)
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(isOpen()).toBe(false)
-    expect(onMenuClose).toHaveBeenCalledTimes(1) // current behavior: Escape skips onMenuClose
-  })
-
-  it('current behavior: outside click fires onMenuClose once even if never opened, then unbinds until re-render', () => {
-    const { onMenuClose, rerender } = setup()
-    fireEvent.click(document.body)
-    fireEvent.click(document.body)
-    expect(onMenuClose).toHaveBeenCalledTimes(1)
-    rerender(
-      <MultiSelect options={opts} onMenuClose={onMenuClose} placeholder='x' />
-    )
-    fireEvent.click(document.body)
     expect(onMenuClose).toHaveBeenCalledTimes(2)
   })
 
+  it('fires onMenuClose only when an open menu closes', () => {
+    const { root, onMenuClose } = setup()
+    fireEvent.click(document.body)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onMenuClose).not.toHaveBeenCalled()
+    fireEvent.click(root)
+    fireEvent.click(document.body)
+    fireEvent.click(document.body)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onMenuClose).toHaveBeenCalledTimes(1)
+  })
+
   it('stops listening after unmount', () => {
-    const { unmount, onMenuClose } = setup()
+    const { root, unmount, onMenuClose } = setup()
+    fireEvent.click(root)
     unmount()
     fireEvent.click(document.body)
+    fireEvent.keyDown(document, { key: 'Escape' })
     expect(onMenuClose).not.toHaveBeenCalled()
   })
 })

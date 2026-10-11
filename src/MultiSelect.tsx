@@ -81,7 +81,7 @@ function MultiSelect({
     setIsComponentVisible: setMenuOpen
   } = useComponentVisible({
     initialIsVisible: false,
-    onClickOutside: onMenuClose
+    onClose: onMenuClose
   })
 
   const calculatedWidth = `calc(100% - ${
