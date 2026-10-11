@@ -18,17 +18,10 @@ type DefaultValueItem = Exclude<
   string | undefined
 >[number]
 
-// the props as MultiSelect sees them, after defaultProps filled the gaps
-type Props = Omit<
-  MultiSelectBaseProps,
-  'options' | 'limit' | 'onMenuOpen' | 'onMenuClose'
-> & {
-  options: readonly Item[]
-  limit: number | null
-  onMenuOpen: () => void
-  onMenuClose: () => void
+// both onChange modes in one; the parameter defaults below fill the gaps
+type Props = MultiSelectBaseProps & {
   jsonValue?: boolean
-  onChange: (value: string | MultiSelectOption[]) => void
+  onChange?: (value: string | MultiSelectOption[]) => void
 }
 
 // climbed without null checks below, as in v2.0.6
@@ -37,64 +30,46 @@ interface Climbable {
   parentNode: Climbable
 }
 
-MultiSelect.defaultProps = {
-  clearable: true,
-  clearAll: false,
-  downArrow: true,
-  singleSelect: false,
-  jsonValue: false,
-  defaultValue: '',
-  disableChip: false,
-  name: '',
-  style: {},
-  disabled: false,
-  limit: null,
-  emptyDataLabel: 'No Data Found',
-  placeholder: 'Select...',
-  onChange: () => {},
-  onMenuOpen: () => {},
-  onMenuClose: () => {},
-  options: [
-    {
-      label: 'Empty',
-      value: '',
-      disabled: true,
-      style: { textAlign: 'center' }
-    }
-  ],
-  customValue: false,
-  chipAlternateText: 'Item Selected',
-  closeOnSelect: true,
-  disableSearch: false
-}
+// Defaults as parameter defaults: React 19's jsx runtime ignores defaultProps on function components.
+// Objects live here so their identity is stable (a new options array per render would loop the options effect).
+const noop = () => {}
+const noStyle = {}
+const emptyOptions: readonly Item[] = [
+  {
+    label: 'Empty',
+    value: '',
+    disabled: true,
+    style: { textAlign: 'center' }
+  }
+]
 
 function MultiSelect({
-  options: userOptions,
+  options: userOptions = emptyOptions,
   downArrowIcon,
   closeIcon,
-  clearable,
-  clearAll,
-  downArrow,
-  onChange,
-  singleSelect,
-  jsonValue,
-  defaultValue,
+  clearable = true,
+  clearAll = false,
+  downArrow = true,
+  onChange = noop,
+  singleSelect = false,
+  jsonValue = false,
+  defaultValue = '',
   className,
-  placeholder,
-  disableChip,
-  name,
-  style,
+  placeholder = 'Select...',
+  disableChip = false,
+  name = '',
+  style = noStyle,
   attr,
   largeData,
-  disabled,
-  limit,
-  emptyDataLabel,
-  customValue,
-  onMenuOpen,
-  onMenuClose,
-  chipAlternateText,
-  closeOnSelect,
-  disableSearch
+  disabled = false,
+  limit = null,
+  emptyDataLabel = 'No Data Found',
+  customValue = false,
+  onMenuOpen = noop,
+  onMenuClose = noop,
+  chipAlternateText = 'Item Selected',
+  closeOnSelect = true,
+  disableSearch = false
 }: Props) {
   const [value, setValue] = useState<MultiSelectOption[]>([])
   const [options, setOptions] = useState<readonly Item[]>(userOptions || [])

@@ -1,6 +1,7 @@
 // Characterization tests: they pin the CURRENT behavior of v2.0.6, quirks included.
 // Tests named "current behavior: ..." document known bugs; a fix should update them on purpose.
 import React, { useState } from 'react'
+import { jsx } from 'react/jsx-runtime'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import type { MultiSelectProps } from '../src/index'
@@ -109,6 +110,27 @@ describe('render', () => {
     fireEvent.click(container.firstChild!)
     fireEvent.click(q('.msl-option'))
     expect(q('.msl-chip').textContent).toBe('Apple')
+    fireEvent.click(q('.msl-arrow-btn'))
+    fireEvent.click(document.body)
+  })
+
+  it('defaults need no defaultProps, which the React 19 jsx runtime ignores', () => {
+    expect(
+      (MultiSelect as { defaultProps?: object }).defaultProps
+    ).toBeUndefined()
+    // jsx(), not the classic createElement this file compiles to (that one still applies defaultProps)
+    const { container, rerender } = render(jsx(MultiSelect, {}))
+    const q = (s: string) => container.querySelector(s)!
+    expect(q('.msl-input').getAttribute('data-placeholder')).toBe('Select...')
+    expect(q('.msl-option').textContent).toBe('Empty')
+    rerender(jsx(MultiSelect, { options: opts }))
+    fireEvent.click(container.firstChild!)
+    container.querySelectorAll('.msl-option').forEach((el) => {
+      fireEvent.click(el)
+    })
+    expect(q('input[type="hidden"]').getAttribute('value')).toBe(
+      'apple,banana,cherry'
+    )
     fireEvent.click(q('.msl-arrow-btn'))
     fireEvent.click(document.body)
   })
