@@ -9,10 +9,10 @@ A lightweight Multiple/Single Select Pure functional component for react using R
   <a href="https://www.npmjs.com/package/react-multiple-select-dropdown-lite">
     <img alt="npm" src="https://img.shields.io/npm/v/react-multiple-select-dropdown-lite">
   </a>
-  <a href="https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite@2.0.4">
+  <a href="https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite">
     <img alt="npm bundle size" src="https://img.shields.io/bundlephobia/min/react-multiple-select-dropdown-lite">
   </a>
-  <a href="https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite@2.0.4">
+  <a href="https://bundlephobia.com/result?p=react-multiple-select-dropdown-lite">
     <img alt="npm bundle size" src="https://img.shields.io/bundlephobia/minzip/react-multiple-select-dropdown-lite">
   </a>
   <a href="https://github.com/Arif-un/react-multiple-select-dropdown-lite/pulls">
@@ -22,7 +22,7 @@ A lightweight Multiple/Single Select Pure functional component for react using R
 
 ### Screenshot
 
-![react-multiple-select-dropdown-menu](https://github.com/Arif-un/react-multiple-select-dropdown-lite/blob/master/screenshoot/react%20multiple%20select%20dropdown%20menu%20,%20lightweight,%20react%20hooks.gif?raw=true)
+![react-multiple-select-dropdown-menu](https://github.com/Arif-un/react-multiple-select-dropdown-lite/blob/master/screenshot/react%20multiple%20select%20dropdown%20menu%20,%20lightweight,%20react%20hooks.gif?raw=true)
 
 ### Install
 
@@ -104,6 +104,41 @@ export  default App
 | largeData         | bool                                      | false                  | prevent slow down (DOM) for large amount of data                                                                                                                                                                                                                                                                                                                |
 | chipAlternateText | string                                    | (number) Item Selected | Show text when chip disabled.                                                                                                                                                                                                                                                                                                                                   |
 | closeOnSelect     | bool                                      | true                   | close option-menu on select option                                                                                                                                                                                                                                                                                                                              |
+| limit             | number \| null                            | null                   | max number of selected values, `null` for no limit                                                                                                                                                                                                                                                                                                              |
+| clearAll          | bool                                      | false                  | clears the value when it turns `true`                                                                                                                                                                                                                                                                                                                           |
+| emptyDataLabel    | string                                    | No Data Found          | text shown when there are no options or no search results                                                                                                                                                                                                                                                                                                       |
+| disableSearch     | bool                                      | false                  | hide the search input                                                                                                                                                                                                                                                                                                                                           |
+| style             | object                                    | {}                     | inline style for the wrapper                                                                                                                                                                                                                                                                                                                                    |
+
+### Groups
+
+Put options in a group with `type: 'group'`. Groups can nest.
+
+```
+const options = [
+  { label: 'Option 1', value: 'option_1' },
+  {
+    type: 'group',
+    title: 'Group A',
+    emptyDataLabel: 'Nothing here', // shown when childs is empty
+    childs: [
+      { label: 'Option 2', value: 'option_2' },
+      { label: 'Option 3', value: 'option_3' }
+    ]
+  }
+]
+```
+
+### TypeScript
+
+Types ship with the package. `onChange` gets a `string` by default, or `MultiSelectOption[]` with `jsonValue`.
+
+```
+import MultiSelect from 'react-multiple-select-dropdown-lite'
+
+const onChange = (value: string) => console.log(value)
+<MultiSelect options={options} onChange={onChange} />
+```
 
 <br>
 
