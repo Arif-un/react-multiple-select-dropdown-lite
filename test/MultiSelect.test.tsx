@@ -1,6 +1,7 @@
 // Characterization tests: they pin the CURRENT behavior of v2.0.6, quirks included.
 // Tests named "current behavior: ..." document known bugs; a fix should update them on purpose.
 import React, { useState } from 'react'
+import { renderToString } from 'react-dom/server'
 import { jsx } from 'react/jsx-runtime'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
@@ -971,12 +972,22 @@ describe('clearAll', () => {
 })
 
 describe('aria', () => {
+  it('ids survive SSR hydration', () => {
+    const ui = <MultiSelect options={opts} />
+    const container = document.createElement('div')
+    container.innerHTML = renderToString(<MultiSelect options={opts} />)
+    document.body.appendChild(container)
+    const error = vi.spyOn(console, 'error')
+    render(ui, { container, hydrate: true })
+    expect(error).not.toHaveBeenCalled()
+  })
+
   it('the search field is a combobox wired to the listbox', () => {
     const { root, input, q, isOpen } = setup()
     const list = q('.msl-options')
     expect(list.getAttribute('role')).toBe('listbox')
     expect(list.getAttribute('aria-multiselectable')).toBe('true')
-    expect(list.id).toMatch(/^msl-listbox-\d+$/)
+    expect(list.id).toMatch(/^msl-listbox\S+$/)
     const combo = input()
     expect(combo.getAttribute('role')).toBe('combobox')
     expect(combo.getAttribute('aria-haspopup')).toBe('listbox')

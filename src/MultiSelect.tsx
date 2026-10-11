@@ -43,8 +43,12 @@ const emptyOptions: readonly Item[] = [
   }
 ]
 
-// aria ids: a counter, as useId needs React 18 (so ids can differ between SSR and hydration)
+// aria ids: useId (React 18+) keeps SSR and hydration in sync; older React gets a counter
 let lastId = 0
+/* v8 ignore next -- the counter is for React < 18 */
+const useListId = React.useId
+  ? () => `msl-listbox${React.useId()}`
+  : () => useState(() => `msl-listbox-${++lastId}`)[0]
 
 // options in render order, groups unwrapped, the way Options.tsx walks them
 function flatten(items: readonly Item[], out: MultiSelectOption[] = []) {
@@ -87,7 +91,7 @@ function MultiSelect({
   const [options, setOptions] = useState<readonly Item[]>(userOptions || [])
   const [search, setSearch] = useState<MultiSelectOption[] | null>(null)
   const inputFld = useRef<HTMLDivElement>(null)
-  const [listId] = useState(() => `msl-listbox-${++lastId}`)
+  const listId = useListId()
   // value of the keyboard highlighted option
   const [active, setActive] = useState<string | null>(null)
   // the user changed the value since defaultValue last changed
