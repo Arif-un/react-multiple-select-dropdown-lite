@@ -3,7 +3,8 @@
 import React, { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
-import MultiSelect from '../src/MultiSelect.jsx'
+import type { MultiSelectProps } from '../src/index'
+import MultiSelect from '../src/MultiSelect'
 
 afterEach(() => {
   cleanup()
@@ -32,7 +33,7 @@ const grouped = [
   }
 ]
 
-function setup(props = {}) {
+function setup(props: MultiSelectProps = {}) {
   const onChange = vi.fn()
   const onMenuOpen = vi.fn()
   const onMenuClose = vi.fn()
@@ -46,8 +47,9 @@ function setup(props = {}) {
     />
   )
   const c = utils.container
-  const q = (s) => c.querySelector(s)
-  const qa = (s) => [...c.querySelectorAll(s)]
+  const q = <E extends Element = HTMLElement>(s: string) =>
+    c.querySelector<E>(s)!
+  const qa = (s: string) => [...c.querySelectorAll<HTMLElement>(s)]
   return {
     ...utils,
     onChange,
@@ -55,42 +57,45 @@ function setup(props = {}) {
     onMenuClose,
     q,
     qa,
-    root: c.firstChild,
+    root: c.firstChild as HTMLElement,
     input: () => q('.msl-input[contenteditable="true"]'),
     chips: () => qa('.msl-chip').map((el) => el.textContent),
     single: () => q('.msl-single-value')?.textContent,
     optionTexts: () =>
       qa('.msl-options .msl-option').map((el) => el.textContent),
     groupTitles: () => qa('.msl-grp-title').map((el) => el.textContent),
-    option: (text) => qa('.msl-option').find((el) => el.textContent === text),
+    option: (text: string) =>
+      qa('.msl-option').find((el) => el.textContent === text)!,
     isOpen: () => /msl-active/.test(q('.msl').className),
-    hidden: () => q('input[type="hidden"]')
+    hidden: () => q<HTMLInputElement>('input[type="hidden"]')
   }
 }
 
-const type = (el, text, key = text.slice(-1)) => {
+type Q = ReturnType<typeof setup>['q']
+
+const type = (el: HTMLElement, text: string, key = text.slice(-1)) => {
   el.textContent = text
   fireEvent.keyUp(el, { key })
 }
-const press = (el, key = 'Enter', charCode = 13) =>
+const press = (el: Element, key = 'Enter', charCode = 13) =>
   fireEvent.keyPress(el, { key, charCode })
 
 describe('render', () => {
   it('renders with no props at all', () => {
     const { container } = render(<MultiSelect />)
-    const root = container.firstChild
+    const q = <E extends Element = HTMLElement>(s: string) =>
+      container.querySelector<E>(s)!
+    const root = container.firstChild as HTMLElement
     expect(root.getAttribute('class')).toBe('msl-wrp msl-vars undefined ')
     expect(root.getAttribute('tabindex')).toBe('0')
-    expect(container.querySelector('.msl').getAttribute('class')).toBe(
-      'msl false '
-    )
-    const hidden = container.querySelector('input[type="hidden"]')
+    expect(q('.msl').getAttribute('class')).toBe('msl false ')
+    const hidden = q<HTMLInputElement>('input[type="hidden"]')
     expect(hidden.name).toBe('')
     expect(hidden.value).toBe('')
-    const input = container.querySelector('.msl-input')
+    const input = q('.msl-input')
     expect(input.getAttribute('data-placeholder')).toBe('Select...')
     expect(input.getAttribute('contenteditable')).toBe('true')
-    const empty = container.querySelector('.msl-option')
+    const empty = q('.msl-option')
     expect(empty.textContent).toBe('Empty')
     expect(empty.className).toContain('msl-option-disable')
     expect(empty.style.textAlign).toBe('center')
@@ -100,11 +105,11 @@ describe('render', () => {
 
   it('default callbacks are safe no-ops', () => {
     const { container } = render(<MultiSelect options={opts} />)
-    const root = container.firstChild
-    fireEvent.click(root)
-    fireEvent.click(container.querySelector('.msl-option'))
-    expect(container.querySelector('.msl-chip').textContent).toBe('Apple')
-    fireEvent.click(container.querySelector('.msl-arrow-btn'))
+    const q = (s: string) => container.querySelector(s)!
+    fireEvent.click(container.firstChild!)
+    fireEvent.click(q('.msl-option'))
+    expect(q('.msl-chip').textContent).toBe('Apple')
+    fireEvent.click(q('.msl-arrow-btn'))
     fireEvent.click(document.body)
   })
 
@@ -187,6 +192,7 @@ describe('defaultValue', () => {
   })
 
   it('ignores items that are neither string nor object', () => {
+    // @ts-expect-error not part of the typed API
     expect(setup({ defaultValue: [42, 'apple'] }).chips()).toEqual(['Apple'])
   })
 
@@ -291,6 +297,7 @@ describe('options', () => {
   })
 
   it('current behavior: falsy options render an empty menu without the empty label', () => {
+    // @ts-expect-error not part of the typed API
     const { q, input } = setup({ options: false })
     expect(q('.msl-options').textContent).toBe('')
     type(input(), 'a')
@@ -460,7 +467,7 @@ describe('singleSelect', () => {
     expect(isOpen()).toBe(true)
   })
 
-  function Controlled(props) {
+  function Controlled(props: { closeOnSelect: boolean }) {
     const [value, setValue] = useState('')
     return (
       <MultiSelect
@@ -480,14 +487,11 @@ describe('singleSelect', () => {
     'closeOnSelect=%s closes the menu when controlled (open: %s)',
     (closeOnSelect, open) => {
       const { container } = render(<Controlled closeOnSelect={closeOnSelect} />)
-      fireEvent.click(container.firstChild)
-      fireEvent.click(container.querySelector('.msl-option'))
-      expect(container.querySelector('.msl-single-value').textContent).toBe(
-        'Apple'
-      )
-      expect(/msl-active/.test(container.querySelector('.msl').className)).toBe(
-        open
-      )
+      const q = (s: string) => container.querySelector(s)!
+      fireEvent.click(container.firstChild!)
+      fireEvent.click(q('.msl-option'))
+      expect(q('.msl-single-value').textContent).toBe('Apple')
+      expect(/msl-active/.test(q('.msl').className)).toBe(open)
     }
   )
 
@@ -736,9 +740,9 @@ describe('menu open / close', () => {
   })
 
   it.each([
-    ['button', (q) => q('.msl-arrow-btn')],
-    ['svg', (q) => q('.msl-arrow-icn')],
-    ['line', (q) => q('.msl-arrow-icn line')]
+    ['button', (q: Q) => q('.msl-arrow-btn')],
+    ['svg', (q: Q) => q('.msl-arrow-icn')],
+    ['line', (q: Q) => q('.msl-arrow-icn line')]
   ])('arrow toggles from its %s', (_, get) => {
     const { q, isOpen, onMenuOpen, onMenuClose } = setup()
     fireEvent.click(get(q))
@@ -752,10 +756,10 @@ describe('menu open / close', () => {
   })
 
   it.each([
-    ['chip', (q) => q('.msl-chip')],
-    ['chip delete svg', (q) => q('.msl-chip-delete svg')],
-    ['chip delete line', (q) => q('.msl-chip-delete line')],
-    ['deep custom close icon', (q) => q('.deep')]
+    ['chip', (q: Q) => q('.msl-chip')],
+    ['chip delete svg', (q: Q) => q('.msl-chip-delete svg')],
+    ['chip delete line', (q: Q) => q('.msl-chip-delete line')],
+    ['deep custom close icon', (q: Q) => q('.deep')]
   ])('clicking %s does not open the menu', (_, get) => {
     const { q, isOpen } = setup({
       defaultValue: 'apple,banana',

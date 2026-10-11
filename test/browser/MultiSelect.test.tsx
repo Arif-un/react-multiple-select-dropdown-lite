@@ -1,10 +1,11 @@
 // Real-browser characterization tests: layout, CSS, focus and contentEditable typing that jsdom fakes.
-// Like test/MultiSelect.test.jsx, "current behavior: ..." pins known quirks of v2.0.6.
+// Like test/MultiSelect.test.tsx, "current behavior: ..." pins known quirks of v2.0.6.
 import React from 'react'
 import { expect, it } from 'vitest'
 import { userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
-import MultiSelect from '../../src/MultiSelect.jsx'
+import type { MultiSelectProps } from '../../src/index'
+import MultiSelect from '../../src/MultiSelect'
 
 const opts = [
   { label: 'Apple', value: 'apple' },
@@ -12,7 +13,7 @@ const opts = [
   { label: 'Cherry', value: 'cherry' }
 ]
 
-async function setup(props = {}, { offsetTop = 0 } = {}) {
+async function setup(props: MultiSelectProps = {}, { offsetTop = 0 } = {}) {
   const screen = await render(
     <div style={{ paddingTop: offsetTop }}>
       <button>outside</button>
@@ -20,7 +21,7 @@ async function setup(props = {}, { offsetTop = 0 } = {}) {
     </div>
   )
   const c = screen.container
-  const q = (s) => c.querySelector(s)
+  const q = (s: string) => c.querySelector<HTMLElement>(s)!
   const root = q('.msl-wrp')
   return {
     root,
@@ -35,12 +36,12 @@ async function setup(props = {}, { offsetTop = 0 } = {}) {
       [...c.querySelectorAll('.msl-options .msl-option')].map(
         (el) => el.textContent
       ),
-    option: (text) =>
-      [...c.querySelectorAll('.msl-option')].find(
+    option: (text: string) =>
+      [...c.querySelectorAll<HTMLElement>('.msl-option')].find(
         (el) => el.textContent === text
-      ),
+      )!,
     focused: () => {
-      const el = document.activeElement
+      const el = document.activeElement!
       if (el === root) return 'wrapper'
       if (el.classList.contains('msl-input')) return 'search'
       if (el.classList.contains('msl-arrow-btn')) return 'arrow'
