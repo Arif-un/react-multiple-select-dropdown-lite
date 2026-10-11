@@ -50,7 +50,9 @@
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
   border-bottom: 0;
-  transition: border-top-left-radius 400ms, border-top-right-radius 400ms;
+  transition:
+    border-top-left-radius 400ms,
+    border-top-right-radius 400ms;
 }
 .msl-active-up {
   background: var(--active-menu-background);
@@ -60,7 +62,9 @@
   border-radius: var(--active-menu-radius);
   border-top-left-radius: 0;
   border-top-right-radius: 0;
-  transition: border-bottom-left-radius 400ms, border-bottom-right-radius 400ms;
+  transition:
+    border-bottom-left-radius 400ms,
+    border-bottom-right-radius 400ms;
 }
 .msl-active ~ .msl-options {
   background: var(--active-menu-background);
@@ -72,7 +76,9 @@
   border-radius: var(--active-menu-radius);
   border-top-left-radius: 0;
   border-top-right-radius: 0;
-  transition: border-bottom-left-radius 0.5s ease-in, border-bottom-right-radius 0.5s ease-in;
+  transition:
+    border-bottom-left-radius 0.5s ease-in,
+    border-bottom-right-radius 0.5s ease-in;
 }
 .msl-active-up ~ .msl-options {
   background: var(--active-menu-background);
@@ -86,7 +92,9 @@
   border-bottom: 0;
   border-bottom-right-radius: 0;
   border-bottom-left-radius: 0;
-  transition: border-top-left-radius 700ms, border-top-right-radius 700ms;
+  transition:
+    border-top-left-radius 700ms,
+    border-top-right-radius 700ms;
 }
 .msl-options {
   position: absolute;
@@ -115,7 +123,7 @@
   line-height: var(--line-height);
   color: rgb(146, 146, 146);
 }
-.msl-input[data-placeholder]:not([data-placeholder=""]):empty::before {
+.msl-input[data-placeholder]:not([data-placeholder='']):empty::before {
   content: attr(data-placeholder);
 }
 .msl-chip {
