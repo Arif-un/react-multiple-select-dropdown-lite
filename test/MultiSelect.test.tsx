@@ -666,6 +666,12 @@ describe('search', () => {
     }
   )
 
+  it('Enter picks a match even without a keyup for the text (paste, IME)', () => {
+    const { input, chips } = setup()
+    type(input(), 'ch', 'Enter')
+    expect(chips()).toEqual(['Cherry'])
+  })
+
   it('Enter does nothing without results', () => {
     const { input, chips, onChange } = setup()
     type(input(), 'zzz')

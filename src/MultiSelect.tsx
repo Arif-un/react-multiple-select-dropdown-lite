@@ -348,6 +348,8 @@ function MultiSelect({
       }
 
       const searchedOptions = searchOptions(textValue, options)
+      // Enter reads this, not `search`: that is null when text arrived without a keyup (paste, IME)
+      let results = searchedOptions
 
       if (searchedOptions.length) {
         if (customValue) {
@@ -360,10 +362,10 @@ function MultiSelect({
 
           !exactOptionValue.length && searchedOptions.push(newValue)
         }
-        setSearch(searchedOptions)
-      } else {
-        customValue ? setSearch([newValue]) : setSearch([])
+      } else if (customValue) {
+        results = [newValue]
       }
+      setSearch(results)
 
       const filteredNewValue = filterCreateOpt(newValue)
 
@@ -377,7 +379,7 @@ function MultiSelect({
 
           addValue(newValue)
         } else {
-          search!.length > 0 && addValue(search![0])
+          results.length > 0 && addValue(results[0])
         }
       }
     } else {
