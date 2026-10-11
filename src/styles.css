@@ -195,7 +195,8 @@
   margin-bottom: 5px;
 }
 .msl-options .msl-option:hover,
-.msl-option:focus {
+.msl-option:focus,
+.msl-options .msl-option-focused {
   background: rgb(233, 233, 233);
 }
 .msl-option-active {

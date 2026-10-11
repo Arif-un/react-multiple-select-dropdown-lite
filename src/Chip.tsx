@@ -4,9 +4,11 @@ import type { MultiSelectOption } from './index'
 
 export default function Chip({
   value,
+  disabled,
   deleteAction
 }: {
   value: MultiSelectOption
+  disabled?: boolean
   deleteAction: () => void
 }) {
   const showChipText = (opt: MultiSelectOption) => {
@@ -27,8 +29,13 @@ export default function Chip({
         clickable='true'
         aria-label='delete-value'
         onClick={deleteAction}
-        onKeyPress={deleteAction}
-        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            deleteAction()
+          }
+        }}
+        tabIndex={disabled ? -1 : 0}
         className='msl-btn msl-chip-delete msl-flx'
       >
         <CloseIcon />

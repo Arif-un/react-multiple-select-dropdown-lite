@@ -78,8 +78,9 @@ const type = (el: HTMLElement, text: string, key = text.slice(-1)) => {
   el.textContent = text
   fireEvent.keyUp(el, { key })
 }
-const press = (el: Element, key = 'Enter', charCode = 13) =>
-  fireEvent.keyPress(el, { key, charCode })
+// returns false when the default action was prevented
+const press = (el: Element, key = 'Enter', init = {}) =>
+  fireEvent.keyDown(el, { key, ...init })
 
 describe('render', () => {
   it('renders with no props at all', () => {
@@ -477,25 +478,32 @@ describe('selecting (multi)', () => {
 
   it('selects with Enter key only', () => {
     const { option, chips } = setup()
-    press(option('Apple'), 'a', 97)
+    press(option('Apple'), 'a')
     expect(chips()).toEqual([])
     press(option('Apple'))
     expect(chips()).toEqual(['Apple'])
   })
 
-  it('deletes a chip by click or any keypress without opening the menu', () => {
+  it('deletes a chip by click, Enter or Space without opening the menu', () => {
     const { qa, chips, onChange, isOpen } = setup({
       defaultValue: 'apple,banana,cherry'
     })
+    expect(qa('.msl-chip-delete')[0].getAttribute('aria-label')).toBe(
+      'delete-value'
+    )
     fireEvent.click(qa('.msl-chip-delete')[1])
     expect(chips()).toEqual(['Apple', 'Cherry'])
-    press(qa('.msl-chip-delete')[0], 'x', 120)
+    press(qa('.msl-chip-delete')[0], 'x')
+    expect(chips()).toEqual(['Apple', 'Cherry'])
+    expect(press(qa('.msl-chip-delete')[0], 'Enter')).toBe(false)
     expect(chips()).toEqual(['Cherry'])
-    expect(onChange.mock.calls).toEqual([['apple,cherry'], ['cherry']])
+    expect(press(qa('.msl-chip-delete')[0], ' ')).toBe(false)
+    expect(chips()).toEqual([])
+    expect(onChange.mock.calls).toEqual([['apple,cherry'], ['cherry'], ['']])
     expect(isOpen()).toBe(false)
   })
 
-  it('clears everything by click or any keypress without opening the menu', () => {
+  it('clears everything by click, Enter or Space without opening the menu', () => {
     const { q, chips, onChange, isOpen, rerender } = setup({
       defaultValue: 'apple,banana'
     })
@@ -508,9 +516,17 @@ describe('selecting (multi)', () => {
     rerender(
       <MultiSelect options={opts} onChange={onChange} defaultValue='cherry' />
     )
-    press(q('.msl-clear-btn'), 'x', 120)
+    press(q('.msl-clear-btn'), 'x')
+    expect(chips()).toEqual(['Cherry'])
+    expect(press(q('.msl-clear-btn'), 'Enter')).toBe(false)
     expect(chips()).toEqual([])
-    expect(onChange.mock.calls).toEqual([[''], ['']])
+    rerender(
+      <MultiSelect options={opts} onChange={onChange} defaultValue='apple' />
+    )
+    expect(press(q('.msl-clear-btn'), ' ')).toBe(false)
+    expect(chips()).toEqual([])
+    expect(onChange.mock.calls).toEqual([[''], [''], ['']])
+    expect(isOpen()).toBe(false)
   })
 
   it('has no clear button when clearable is false', () => {
@@ -648,13 +664,25 @@ describe('disableChip / disableSearch / disabled', () => {
     expect(q('.msl-input')).toBeNull()
   })
 
-  it('current behavior: disabled still opens from the keyboard', () => {
-    const { root, q, isOpen, onMenuOpen } = setup({ disabled: true })
+  it('disabled leaves the tab order and ignores the keyboard', () => {
+    const { root, q, isOpen, onMenuOpen, chips } = setup({
+      disabled: true,
+      defaultValue: 'apple'
+    })
     expect(root.className).toContain('msl-disabled')
-    expect(q('.msl-input').getAttribute('contenteditable')).toBe('false')
-    press(root)
-    expect(isOpen()).toBe(true)
-    expect(onMenuOpen).toHaveBeenCalledTimes(1)
+    expect(root.tabIndex).toBe(-1)
+    expect(q('.msl-chip-delete').tabIndex).toBe(-1)
+    expect(q('.msl-clear-btn').tabIndex).toBe(-1)
+    const search = q('.msl-input')
+    expect(search.getAttribute('contenteditable')).toBe('false')
+    expect(search.getAttribute('aria-disabled')).toBe('true')
+    for (const key of ['Enter', ' ', 'a', 'ArrowDown', 'Backspace']) {
+      press(root, key)
+      press(search, key)
+    }
+    expect(isOpen()).toBe(false)
+    expect(onMenuOpen).not.toHaveBeenCalled()
+    expect(chips()).toEqual(['Apple'])
   })
 })
 
@@ -843,7 +871,7 @@ describe('menu open / close', () => {
     const { root, option, input, onMenuOpen } = setup()
     fireEvent.click(root)
     fireEvent.click(option('Apple'))
-    press(input(), 'a', 97)
+    press(input(), 'a')
     expect(onMenuOpen).toHaveBeenCalledTimes(1)
   })
 
@@ -939,5 +967,335 @@ describe('clearAll', () => {
     const { rerender, onChange } = setup()
     rerender(<MultiSelect options={opts} onChange={onChange} clearAll />)
     expect(onChange).not.toHaveBeenCalled()
+  })
+})
+
+describe('aria', () => {
+  it('the search field is a combobox wired to the listbox', () => {
+    const { root, input, q, isOpen } = setup()
+    const list = q('.msl-options')
+    expect(list.getAttribute('role')).toBe('listbox')
+    expect(list.getAttribute('aria-multiselectable')).toBe('true')
+    expect(list.id).toMatch(/^msl-listbox-\d+$/)
+    const combo = input()
+    expect(combo.getAttribute('role')).toBe('combobox')
+    expect(combo.getAttribute('aria-haspopup')).toBe('listbox')
+    expect(combo.getAttribute('aria-controls')).toBe(list.id)
+    expect(combo.getAttribute('aria-expanded')).toBe('false')
+    expect(combo.getAttribute('aria-disabled')).not.toBe('true')
+    expect(combo.hasAttribute('aria-activedescendant')).toBe(false)
+    expect(root.hasAttribute('role')).toBe(false)
+    fireEvent.click(root)
+    expect(isOpen()).toBe(true)
+    expect(combo.getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it.each([
+    [{ singleSelect: true, defaultValue: 'apple' }, 'false'],
+    [{ disableChip: true, defaultValue: 'apple' }, 'true'],
+    [{ disableSearch: true }, 'true']
+  ])(
+    'without a search field %o the wrapper is the combobox',
+    (props, multi) => {
+      const { root, q, input } = setup({
+        attr: { 'aria-label': 'Fruit' },
+        ...props
+      })
+      expect(input()).toBeNull()
+      const list = q('.msl-options')
+      expect(list.getAttribute('aria-multiselectable')).toBe(multi)
+      expect(root.getAttribute('role')).toBe('combobox')
+      expect(root.getAttribute('aria-controls')).toBe(list.id)
+      expect(root.getAttribute('aria-expanded')).toBe('false')
+      expect(root.getAttribute('aria-label')).toBe('Fruit')
+    }
+  )
+
+  it('options expose role, id, selected and disabled state', () => {
+    const { qa } = setup({
+      options: [...opts, { label: 'Off', value: 'off', disabled: true }],
+      defaultValue: 'banana'
+    })
+    const options = qa('[role="option"]')
+    expect(options.map((el) => el.textContent)).toEqual([
+      'Apple',
+      'Banana',
+      'Cherry',
+      'Off'
+    ])
+    expect(new Set(options.map((el) => el.id)).size).toBe(4)
+    expect(options.map((el) => el.getAttribute('aria-selected'))).toEqual([
+      'false',
+      'true',
+      'false',
+      'false'
+    ])
+    expect(options.map((el) => el.getAttribute('aria-disabled'))).toEqual([
+      'false',
+      'false',
+      'false',
+      'true'
+    ])
+    expect(options.map((el) => el.tabIndex)).toEqual([-1, -1, -1, -1])
+  })
+
+  it('group titles are not options', () => {
+    const { qa } = setup({ options: grouped })
+    expect(qa('.msl-grp-title').map((el) => el.getAttribute('role'))).toEqual([
+      'presentation',
+      'presentation'
+    ])
+    expect(qa('[role="option"]').map((el) => el.textContent)).toEqual([
+      'Apple',
+      'Banana',
+      'Cherry'
+    ])
+  })
+
+  it('each instance gets its own ids', () => {
+    const { container } = render(
+      <>
+        <MultiSelect options={opts} />
+        <MultiSelect options={opts} />
+      </>
+    )
+    const ids = [...container.querySelectorAll('[id]')].map((el) => el.id)
+    expect(ids).toHaveLength(8)
+    expect(new Set(ids).size).toBe(8)
+  })
+
+  it('the down arrow is decorative but still toggles on click', () => {
+    const { q, isOpen } = setup()
+    const arrow = q('.msl-arrow-btn')
+    expect(arrow.getAttribute('aria-hidden')).toBe('true')
+    expect(arrow.hasAttribute('role')).toBe(false)
+    expect(arrow.hasAttribute('tabindex')).toBe(false)
+    fireEvent.click(arrow)
+    expect(isOpen()).toBe(true)
+  })
+})
+
+describe('keyboard', () => {
+  const withDisabled = [
+    { label: 'Off A', value: 'offa', disabled: true },
+    ...opts.slice(0, 1),
+    { label: 'Off B', value: 'offb', disabled: true },
+    ...opts.slice(1),
+    { label: 'Off C', value: 'offc', disabled: true }
+  ]
+
+  function setupKeys(props: MultiSelectProps = {}) {
+    const utils = setup(props)
+    return {
+      ...utils,
+      focusedOption: () => utils.q('.msl-option-focused')?.textContent,
+      activeId: (el = utils.input()) => el.getAttribute('aria-activedescendant')
+    }
+  }
+
+  it('arrows, Home and End open the menu and move over enabled options', () => {
+    const { input, option, isOpen, onMenuOpen, focusedOption, activeId, qa } =
+      setupKeys({ options: withDisabled })
+    const walk = (key: string) => {
+      expect(press(input(), key)).toBe(false)
+      return focusedOption()
+    }
+    expect(walk('ArrowDown')).toBe('Apple')
+    expect(isOpen()).toBe(true)
+    expect(activeId()).toBe(option('Apple').id)
+    expect(
+      [
+        'ArrowDown',
+        'ArrowDown',
+        'ArrowDown',
+        'ArrowUp',
+        'ArrowUp',
+        'ArrowUp'
+      ].map(walk)
+    ).toEqual(['Banana', 'Cherry', 'Cherry', 'Banana', 'Apple', 'Apple'])
+    expect(walk('End')).toBe('Cherry')
+    expect(activeId()).toBe(option('Cherry').id)
+    expect(walk('Home')).toBe('Apple')
+    expect(qa('.msl-option-focused')).toHaveLength(1)
+    expect(onMenuOpen).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    ['ArrowUp', 'Cherry'],
+    ['ArrowDown', 'Apple'],
+    ['Home', 'Apple'],
+    ['End', 'Cherry']
+  ])('%s with nothing highlighted goes to %s', (key, text) => {
+    const { input, focusedOption } = setupKeys({ options: withDisabled })
+    press(input(), key)
+    expect(focusedOption()).toBe(text)
+  })
+
+  it('does nothing without enabled options', () => {
+    const { input, isOpen, focusedOption } = setupKeys({
+      options: [{ label: 'Off', value: 'off', disabled: true }]
+    })
+    press(input(), 'ArrowDown')
+    expect(isOpen()).toBe(true)
+    expect(focusedOption()).toBeUndefined()
+  })
+
+  it('closing and typing reset the highlight', () => {
+    const { input, isOpen, focusedOption, activeId } = setupKeys()
+    press(input(), 'ArrowDown')
+    press(input(), 'ArrowDown')
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(isOpen()).toBe(false)
+    expect(focusedOption()).toBeUndefined()
+    expect(activeId()).toBeNull()
+    press(input(), 'ArrowDown')
+    expect(focusedOption()).toBe('Apple')
+    fireEvent.input(input())
+    expect(focusedOption()).toBeUndefined()
+  })
+
+  it('Enter toggles the highlighted option and keeps it highlighted', () => {
+    const { input, chips, isOpen, focusedOption, onChange } = setupKeys()
+    press(input(), 'ArrowDown')
+    press(input(), 'ArrowDown')
+    expect(press(input(), 'Enter')).toBe(false)
+    expect(chips()).toEqual(['Banana'])
+    expect(isOpen()).toBe(true)
+    expect(focusedOption()).toBe('Banana')
+    press(input(), 'Enter')
+    expect(chips()).toEqual([])
+    expect(onChange.mock.calls).toEqual([['banana'], ['']])
+  })
+
+  it('Enter on a highlighted search result picks it once', () => {
+    const { input, chips, optionTexts, focusedOption } = setupKeys()
+    type(input(), 'an')
+    press(input(), 'ArrowDown')
+    expect(focusedOption()).toBe('Banana')
+    press(input(), 'Enter')
+    fireEvent.keyUp(input(), { key: 'Enter' })
+    expect(chips()).toEqual(['Banana'])
+    expect(input().textContent).toBe('')
+    expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry'])
+  })
+
+  it('Enter on a highlighted Create item creates the value', () => {
+    const { input, chips, onChange } = setupKeys({ customValue: true })
+    type(input(), 'kiwi')
+    press(input(), 'ArrowDown')
+    press(input(), 'Enter')
+    expect(chips()).toEqual(['Create "kiwi"'])
+    expect(onChange).toHaveBeenLastCalledWith('kiwi')
+  })
+
+  it.each([{ singleSelect: true }, { disableChip: true }])(
+    'with %o Enter picks and moves focus to the wrapper, as the search field goes away',
+    (props) => {
+      const { root, input, single } = setupKeys(props)
+      input().focus()
+      press(input(), 'ArrowDown')
+      press(input(), 'Enter')
+      expect(single()).toBe('Apple')
+      expect(input()).toBeNull()
+      expect(document.activeElement).toBe(root)
+    }
+  )
+
+  it('the wrapper drives the highlight when there is no search field', () => {
+    const { root, chips, focusedOption, activeId } = setupKeys({
+      disableSearch: true
+    })
+    press(root, 'ArrowDown')
+    expect(focusedOption()).toBe('Apple')
+    expect(activeId(root)).toBe(root.querySelector('.msl-option-focused')!.id)
+    press(root, 'Enter')
+    expect(chips()).toEqual(['Apple'])
+  })
+
+  it('Enter on a focused option picks that option only', () => {
+    const { input, option, chips } = setupKeys()
+    press(input(), 'ArrowDown')
+    press(option('Cherry'), 'Enter')
+    expect(chips()).toEqual(['Cherry'])
+  })
+
+  it('Backspace in an empty search field removes the last chip', () => {
+    const { root, input, chips, onChange } = setupKeys({
+      defaultValue: 'apple,banana'
+    })
+    input().textContent = 'x'
+    press(input(), 'Backspace')
+    expect(chips()).toEqual(['Apple', 'Banana'])
+    input().textContent = ''
+    press(root, 'Backspace')
+    expect(chips()).toEqual(['Apple', 'Banana'])
+    press(input(), 'Backspace')
+    expect(chips()).toEqual(['Apple'])
+    press(input(), 'Backspace')
+    press(input(), 'Backspace')
+    expect(chips()).toEqual([])
+    expect(onChange.mock.calls).toEqual([['apple'], ['']])
+  })
+
+  it.each(['a', ',', 'Enter', ' '])('%s opens the menu', (key) => {
+    const { root, isOpen, onMenuOpen } = setupKeys()
+    press(root, key)
+    expect(isOpen()).toBe(true)
+    expect(onMenuOpen).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    ['Tab', {}],
+    ['Shift', {}],
+    ['Escape', {}],
+    ['c', { ctrlKey: true }],
+    ['v', { metaKey: true }]
+  ])('%s %o does not open the menu', (key, init) => {
+    const { root, input, isOpen } = setupKeys()
+    press(root, key, init)
+    press(input(), key, init)
+    expect(isOpen()).toBe(false)
+  })
+
+  it('Space types in the search field but does not scroll from the wrapper', () => {
+    const { root, input } = setupKeys()
+    expect(press(input(), ' ')).toBe(true)
+    expect(press(root, ' ')).toBe(false)
+  })
+
+  it('keys on a chip or the clear button do not drive the menu', () => {
+    const { q, isOpen, focusedOption } = setupKeys({ defaultValue: 'apple' })
+    press(q('.msl-chip-delete'), 'ArrowDown')
+    press(q('.msl-clear-btn'), 'a')
+    press(q('.msl-chip'), 'Backspace')
+    expect(isOpen()).toBe(false)
+    expect(focusedOption()).toBeUndefined()
+  })
+
+  it('attr.onKeyDown still runs', () => {
+    const onKeyDown = vi.fn()
+    const { root, isOpen } = setupKeys({ attr: { onKeyDown } })
+    press(root, 'a')
+    expect(onKeyDown).toHaveBeenCalledTimes(1)
+    expect(isOpen()).toBe(true)
+    cleanup()
+    const other = setupKeys({ attr: { id: 'x' } })
+    press(other.root, 'a')
+    expect(other.isOpen()).toBe(true)
+  })
+
+  it('scrolls the highlighted option into view', () => {
+    expect(Element.prototype.scrollIntoView).toBeUndefined() // jsdom
+    const scroll = vi.fn()
+    Element.prototype.scrollIntoView = scroll
+    try {
+      const { input, option } = setupKeys()
+      press(input(), 'ArrowDown')
+      press(input(), 'ArrowDown')
+      expect(scroll).toHaveBeenLastCalledWith({ block: 'nearest' })
+      expect(scroll.mock.contexts.at(-1)).toBe(option('Banana'))
+    } finally {
+      delete (Element.prototype as Partial<Element>).scrollIntoView
+    }
   })
 })
