@@ -1,4 +1,4 @@
-# keeps the SHA-pinned actions in .github/workflows current
+# keeps the SHA-pinned actions in .github/workflows and the docs site dependencies current
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -8,3 +8,17 @@ updates:
     groups:
       actions:
         patterns: ['*']
+
+  # one PR a month; the Docs workflow builds it, and merging it redeploys GitHub Pages
+  - package-ecosystem: npm
+    directory: /docs
+    schedule:
+      interval: monthly
+    # skip releases younger than a week, the window most hijacked packages get caught in
+    cooldown:
+      default-days: 7
+    groups:
+      docs:
+        patterns: ['*']
+    commit-message:
+      prefix: chore(docs)

@@ -7,12 +7,14 @@ on:
     paths:
       - docs/**
       - dist/**
+      - package.json # entry fields the demos import through
       - CHANGELOG.md
       - .github/workflows/docs.yml
   pull_request:
     paths:
       - docs/**
       - dist/**
+      - package.json # entry fields the demos import through
       - CHANGELOG.md
       - .github/workflows/docs.yml
   workflow_dispatch:
