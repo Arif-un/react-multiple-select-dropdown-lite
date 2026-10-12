@@ -90,6 +90,7 @@ export  default App
 | name              | string                                    | ''                         | specify a name for form                                                                                                                                                                                                                                                                                                                                         |
 | disabled          | bool                                      | false                      | disable input                                                                                                                                                                                                                                                                                                                                                   |
 | defaultValue      | string \| array of object \| string array | ''                         | specify default value                                                                                                                                                                                                                                                                                                                                           |
+| value             | string \| array of object \| string array |                            | controlled selection, same forms as `defaultValue`; update it from `onChange`                                                                                                                                                                                                                                                                                   |
 | jsonValue         | bool                                      | false                      | get value from input as json                                                                                                                                                                                                                                                                                                                                    |
 | singleSelect      | bool                                      | false                      | allow one select only                                                                                                                                                                                                                                                                                                                                           |
 | downArrowIcon     | string \| icon \| component               | SVG                        | Specify custom down arrow icon                                                                                                                                                                                                                                                                                                                                  |
@@ -104,7 +105,7 @@ export  default App
 | largeData         | bool                                      | false                      | prevent slow down (DOM) for large amount of data                                                                                                                                                                                                                                                                                                                |
 | chipAlternateText | string                                    | (number) Item Selected     | Show text when chip disabled.                                                                                                                                                                                                                                                                                                                                   |
 | closeOnSelect     | bool                                      | single: true, multi: false | close option-menu on select option                                                                                                                                                                                                                                                                                                                              |
-| limit             | number \| null                            | null                       | max number of selected values, `null` for no limit                                                                                                                                                                                                                                                                                                              |
+| limit             | number \| null                            | null                       | max number of selected values, `null` for no limit. The wrapper gets `msl-limit-reached` once hit                                                                                                                                                                                                                                                               |
 | clearAll          | bool                                      | false                      | clears the value when it turns `true`                                                                                                                                                                                                                                                                                                                           |
 | emptyDataLabel    | string                                    | No Data Found              | text shown when there are no options or no search results                                                                                                                                                                                                                                                                                                       |
 | disableSearch     | bool                                      | false                      | hide the search input                                                                                                                                                                                                                                                                                                                                           |
@@ -144,11 +145,12 @@ const onChange = (value: string) => console.log(value)
 
 ### Events
 
-| Props       | Params | Description                 |
-| ----------- | ------ | --------------------------- |
-| onChange    | values | Trigger on change any value |
-| onMenuOpen  | null   | Trigger when menu open      |
-| onMenuClose | null   | Trigger when menu close     |
+| Props       | Params | Description                                                           |
+| ----------- | ------ | --------------------------------------------------------------------- |
+| onChange    | values | Trigger on change any value                                           |
+| onMenuOpen  | null   | Trigger when menu open                                                |
+| onMenuClose | null   | Trigger when menu close                                               |
+| onClear     | null   | Trigger after the clear button empties the value (not for `clearAll`) |
 
 ### CSS Variables
 
@@ -171,7 +173,7 @@ CSS variable applied in `.msl-vars` class name.
 
 ###### v-2.1.0
 
-- React 19 support (`defaultProps` replaced by parameter defaults, so `MultiSelect.defaultProps` no longer exists)
+- **Breaking:** `MultiSelect.defaultProps` no longer exists (React 19 support: defaults are parameter defaults now). Pass props instead of changing it
 - TypeScript types included (`dist/index.d.ts`)
 - `closeOnSelect` now closes the menu on pick, also in multi select when set to `true` (#9, #11)
 - `defaultValue` resolves when options load after mount (#12)
@@ -179,10 +181,18 @@ CSS variable applied in `.msl-vars` class name.
 - `onMenuClose` fires on Escape and only when an open menu closes
 - Pressing Enter after pasting into the search no longer crashes
 - No stray `undefined` / `false` class names
-- Accessibility: combobox / listbox / option ARIA roles and states; name the combobox with `attr={{ 'aria-label': '...' }}` or `'aria-labelledby'`
+- Accessibility: combobox / listbox / option ARIA roles and states, groups as `role="group"` named by their title; name the combobox with `attr={{ 'aria-label': '...' }}` or `'aria-labelledby'`
 - Keyboard: Arrow Up/Down, Home/End to move, Enter to pick, Backspace removes the last chip
 - Disabled dropdown is no longer focusable or keyboard-openable
 - Options and the down arrow are no longer Tab stops; chip delete and clear act on Enter/Space only
+- The keyboard highlight is the `msl-option-focused` class, not `:focus`: move custom `.msl-option:focus` styles to it
+- `customValue`: the chip and `onChange` get the typed text, not `Create "..."`; clicking Create adds it to Custom Values; double quotes are kept; created values survive the parent re-rendering with a new `options` array and `defaultValue` changes
+- Falsy `options` show `emptyDataLabel`
+- `onClear` event after the clear button (#10)
+- `msl-limit-reached` class on the wrapper once `limit` is hit
+- `'use client'` directive in the CJS / ESM bundles, so Next.js App Router Server Components can import it
+- `value` prop for a controlled selection (`<MultiSelect value={v} onChange={setV} />`)
+- `defaultValue` objects not in `options` (with `customValue`) keep their `value` string instead of the whole object, so `onChange` no longer gets `[object Object]` and the search no longer crashes
 
 ###### v-2.0.4
 
