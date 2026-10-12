@@ -78,38 +78,43 @@ export  default App
 - [x] Searchable <br>
 - [x] Custom Creatable Value <br>
 - [x] Themeable (using css var) <br>
+- [x] Controlled value <br>
+- [x] Keyboard navigation <br>
+- [x] Accessible (ARIA combobox) <br>
+- [x] TypeScript types <br>
+- [x] SSR and Next.js App Router <br>
 
 <!-- - [ ] Sublist <br> -->
 
 ## Props Options
 
-| Props             | type                                      | default                    | description                                                                                                                                                                                                                                                                                                                                                     |
-| ----------------- | ----------------------------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| options           | array                                     | ""                         | pass options as array of object <br> `label` : (string or JSX) Options Label <br> `value` : Option value <br> `style` : (object) custom style <br> `classes` : (string) style classes <br>`title` : must be provide for JSX label <br> <br> example: <br> `[ { label : "Option 1", value : "opt_1", style: {textAlign: 'center'}, classes: "classA classB" } ]` |
-| width             |                                           |                            | move in css var (version 2.0.1)                                                                                                                                                                                                                                                                                                                                 |
-| name              | string                                    | ''                         | specify a name for form                                                                                                                                                                                                                                                                                                                                         |
-| disabled          | bool                                      | false                      | disable input                                                                                                                                                                                                                                                                                                                                                   |
-| defaultValue      | string \| array of object \| string array | ''                         | specify default value                                                                                                                                                                                                                                                                                                                                           |
-| value             | string \| array of object \| string array |                            | controlled selection, same forms as `defaultValue`; update it from `onChange`                                                                                                                                                                                                                                                                                   |
-| jsonValue         | bool                                      | false                      | get value from input as json                                                                                                                                                                                                                                                                                                                                    |
-| singleSelect      | bool                                      | false                      | allow one select only                                                                                                                                                                                                                                                                                                                                           |
-| downArrowIcon     | string \| icon \| component               | SVG                        | Specify custom down arrow icon                                                                                                                                                                                                                                                                                                                                  |
-| closeIcon         | string \| icon \| component               | SVG                        | Specify custom close arrow icon                                                                                                                                                                                                                                                                                                                                 |
-| clearable         | bool                                      | true                       | show / hide close icon to clear value                                                                                                                                                                                                                                                                                                                           |
-| downArrow         | bool                                      | true                       | show / hide down icon in dropdown                                                                                                                                                                                                                                                                                                                               |
-| className         | string \| object                          |                            | specify custom class                                                                                                                                                                                                                                                                                                                                            |
-| placeholder       | string                                    | Select...                  | Input Placeholder                                                                                                                                                                                                                                                                                                                                               |
-| disableChip       | bool                                      | false                      | disable multiple select chips show value or total selected value only                                                                                                                                                                                                                                                                                           |
-| attr              | object                                    |                            | set custom attr to element                                                                                                                                                                                                                                                                                                                                      |
-| customValue       | bool                                      | false                      | create custom options by pressing enter or comma (,)                                                                                                                                                                                                                                                                                                            |
-| largeData         | bool                                      | false                      | prevent slow down (DOM) for large amount of data                                                                                                                                                                                                                                                                                                                |
-| chipAlternateText | string                                    | (number) Item Selected     | Show text when chip disabled.                                                                                                                                                                                                                                                                                                                                   |
-| closeOnSelect     | bool                                      | single: true, multi: false | close option-menu on select option                                                                                                                                                                                                                                                                                                                              |
-| limit             | number \| null                            | null                       | max number of selected values, `null` for no limit. The wrapper gets `msl-limit-reached` once hit                                                                                                                                                                                                                                                               |
-| clearAll          | bool                                      | false                      | clears the value when it turns `true`                                                                                                                                                                                                                                                                                                                           |
-| emptyDataLabel    | string                                    | No Data Found              | text shown when there are no options or no search results                                                                                                                                                                                                                                                                                                       |
-| disableSearch     | bool                                      | false                      | hide the search input                                                                                                                                                                                                                                                                                                                                           |
-| style             | object                                    | {}                         | inline style for the wrapper                                                                                                                                                                                                                                                                                                                                    |
+| Props             | type                                      | default                | description                                                                                                                                                                                                                                                                                                                                                                                 |
+| ----------------- | ----------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| options           | array                                     | an `Empty` option      | options and groups (see [Groups](#groups)) <br> `label`: string or JSX <br> `value`: string <br> `title`: text for search and chips, required with a JSX label <br> `disabled`: bool <br> `style`: (object) custom style <br> `classes`: (string) class names <br> <br> example: <br> `[ { label : "Option 1", value : "opt_1", style: {textAlign: 'center'}, classes: "classA classB" } ]` |
+| width             |                                           |                        | deprecated, no effect: set the `--input-width` CSS variable (since 2.0.1)                                                                                                                                                                                                                                                                                                                   |
+| name              | string                                    | ''                     | specify a name for form                                                                                                                                                                                                                                                                                                                                                                     |
+| disabled          | bool                                      | false                  | disable input                                                                                                                                                                                                                                                                                                                                                                               |
+| defaultValue      | string \| array of object \| string array | ''                     | initial value: comma separated string, or an array of values or option objects. Resolves once `options` load, and follows later changes until the user picks (use `value` to stay in sync)                                                                                                                                                                                                  |
+| value             | string \| array of object \| string array |                        | controlled selection, same forms as `defaultValue`; update it from `onChange`                                                                                                                                                                                                                                                                                                               |
+| jsonValue         | bool                                      | false                  | `onChange` gets the selected option objects instead of a comma joined string                                                                                                                                                                                                                                                                                                                |
+| singleSelect      | bool                                      | false                  | allow one select only                                                                                                                                                                                                                                                                                                                                                                       |
+| downArrowIcon     | ReactNode                                 | SVG                    | custom down arrow icon                                                                                                                                                                                                                                                                                                                                                                      |
+| closeIcon         | ReactNode                                 | SVG                    | custom clear icon                                                                                                                                                                                                                                                                                                                                                                           |
+| clearable         | bool                                      | true                   | show / hide close icon to clear value                                                                                                                                                                                                                                                                                                                                                       |
+| downArrow         | bool                                      | true                   | show / hide down icon in dropdown                                                                                                                                                                                                                                                                                                                                                           |
+| className         | string                                    |                        | custom class for the wrapper                                                                                                                                                                                                                                                                                                                                                                |
+| placeholder       | string                                    | Select...              | Input Placeholder                                                                                                                                                                                                                                                                                                                                                                           |
+| disableChip       | bool                                      | false                  | disable multiple select chips show value or total selected value only                                                                                                                                                                                                                                                                                                                       |
+| attr              | object                                    |                        | props for the wrapper div, e.g. `id` or `data-*`. `aria-label` / `aria-labelledby` name the dropdown for screen readers                                                                                                                                                                                                                                                                     |
+| customValue       | bool                                      | false                  | create options by typing and pressing Enter or comma (,); they are listed under Custom Values                                                                                                                                                                                                                                                                                               |
+| largeData         | bool                                      | false                  | render options only while the menu is open, for long lists                                                                                                                                                                                                                                                                                                                                  |
+| chipAlternateText | string                                    | (number) Item Selected | Show text when chip disabled.                                                                                                                                                                                                                                                                                                                                                               |
+| closeOnSelect     | bool                                      | unset                  | close the menu after a pick. Unset: single select closes, multi select stays open                                                                                                                                                                                                                                                                                                           |
+| limit             | number \| null                            | null                   | max number of selected values, `null` for no limit. The wrapper gets `msl-limit-reached` once hit                                                                                                                                                                                                                                                                                           |
+| clearAll          | bool                                      | false                  | clears the value when it turns `true`                                                                                                                                                                                                                                                                                                                                                       |
+| emptyDataLabel    | string                                    | No Data Found          | text shown when there are no options or no search results                                                                                                                                                                                                                                                                                                                                   |
+| disableSearch     | bool                                      | false                  | hide the search input                                                                                                                                                                                                                                                                                                                                                                       |
+| style             | object                                    | {}                     | inline style for the wrapper                                                                                                                                                                                                                                                                                                                                                                |
 
 ### Groups
 
@@ -130,94 +135,114 @@ const options = [
 ]
 ```
 
+### Controlled value
+
+Pass `value` and update it from `onChange` to own the selection, e.g. to reset or set it from outside. It takes the same forms as `defaultValue`.
+
+```
+const [value, setValue] = useState('option_1')
+
+<MultiSelect options={options} value={value} onChange={setValue} />
+<button onClick={() => setValue('')}>Reset</button>
+```
+
+With `defaultValue` instead, the dropdown keeps its own state after the user picks.
+
 ### TypeScript
 
 Types ship with the package. `onChange` gets a `string` by default, or `MultiSelectOption[]` with `jsonValue`.
 
 ```
 import MultiSelect from 'react-multiple-select-dropdown-lite'
+import type { MultiSelectOption } from 'react-multiple-select-dropdown-lite'
 
 const onChange = (value: string) => console.log(value)
 <MultiSelect options={options} onChange={onChange} />
+
+const onJsonChange = (value: MultiSelectOption[]) => console.log(value)
+<MultiSelect jsonValue options={options} onChange={onJsonChange} />
+```
+
+Also exported: `MultiSelectGroup`, `MultiSelectProps`, `MultiSelectValue`.
+
+### Next.js and SSR
+
+Server rendering works on React 16 to 19, with matching ids on hydration. The bundles start with `'use client'`, so a Next.js App Router Server Component can import it directly when it passes only serializable props (for example `name` inside a form). To handle `onChange`, render it from your own `'use client'` component.
+
+```
+import MultiSelect from 'react-multiple-select-dropdown-lite'
+import 'react-multiple-select-dropdown-lite/dist/index.css'
 ```
 
 <br>
 
 ### Events
 
-| Props       | Params | Description                                                           |
-| ----------- | ------ | --------------------------------------------------------------------- |
-| onChange    | values | Trigger on change any value                                           |
-| onMenuOpen  | null   | Trigger when menu open                                                |
-| onMenuClose | null   | Trigger when menu close                                               |
-| onClear     | null   | Trigger after the clear button empties the value (not for `clearAll`) |
+| Props       | Params | Description                                                                          |
+| ----------- | ------ | ------------------------------------------------------------------------------------ |
+| onChange    | value  | after any change: a comma joined `string`, or `MultiSelectOption[]` with `jsonValue` |
+| onMenuOpen  | null   | Trigger when menu open                                                               |
+| onMenuClose | null   | Trigger when menu close                                                              |
+| onClear     | null   | Trigger after the clear button empties the value (not for `clearAll`)                |
+
+### Keyboard
+
+| Key             | Action                                                                     |
+| --------------- | -------------------------------------------------------------------------- |
+| Arrow Down / Up | open the menu and move the highlight over enabled options                  |
+| Home / End      | first / last option (in the search field only while it is empty)           |
+| Enter           | pick the highlighted option, else the first search result                  |
+| , (comma)       | pick the first search result, or create the typed value with `customValue` |
+| Backspace       | in an empty search field, remove the last chip                             |
+| Escape          | close the menu                                                             |
+| Tab             | move on; the menu closes once focus leaves                                 |
+| Enter / Space   | on a chip's delete button or the clear button, press it                    |
+| any character   | on the focused dropdown, open the menu                                     |
+
+### Accessibility
+
+The search field (or the dropdown itself when there is no search field) is an ARIA combobox that controls a listbox of options, with `aria-expanded`, `aria-activedescendant`, `aria-selected` and `aria-disabled`. Groups are `role="group"`, named by their title. Give it an accessible name through `attr`:
+
+```
+<MultiSelect options={options} attr={{ 'aria-label': 'Fruits' }} />
+<MultiSelect options={options} attr={{ 'aria-labelledby': 'fruits-label' }} />
+```
 
 ### CSS Variables
 
 CSS variable applied in `.msl-vars` class name.
 
-| Variable                 | Default Value        | Details                                          |
-| ------------------------ | -------------------- | ------------------------------------------------ |
-| --menu-max-height        | 400px                | Dropdown menu <br> maximum height.               |
-| --input-width            | 300px                | Dropdown input width.                            |
-| --font-size              | 16px                 | Dropdown font size.                              |
-| --border-radius          | 8px 8px 8px 8px      | Dropdown Border Radius.                          |
-| --active-menu-shadow     | 1px 1px 5px 0px gray | Menu Shadow <br> when active.                    |
-| --line-height            | 1.4                  | fonts line height.                               |
-| --active-menu-background | white                | Dropdown menu <br> background color when active. |
-| --active-menu-radius     | var(--border-radius) | Dropdown menu border <br> radius when active.    |
+| Variable                 | Default Value         | Details                                          |
+| ------------------------ | --------------------- | ------------------------------------------------ |
+| --menu-max-height        | 400px                 | Dropdown menu <br> maximum height.               |
+| --input-width            | 300px                 | Dropdown input width.                            |
+| --font-size              | 16px                  | Dropdown font size.                              |
+| --border-radius          | 8px 8px 8px 8px       | Dropdown Border Radius.                          |
+| --active-menu-shadow     | 0 2px 8px 0px #b1b1b1 | Menu Shadow <br> when active.                    |
+| --line-height            | 1.4                   | fonts line height.                               |
+| --active-menu-background | white                 | Dropdown menu <br> background color when active. |
+| --active-menu-radius     | var(--border-radius)  | Dropdown menu border <br> radius when active.    |
+
+### CSS Classes
+
+State classes to style against:
+
+| Class                          | Element | When                                  |
+| ------------------------------ | ------- | ------------------------------------- |
+| `msl-disabled`                 | wrapper | `disabled`                            |
+| `msl-limit-reached`            | wrapper | `limit` is reached                    |
+| `msl-active` / `msl-active-up` | `.msl`  | menu is open, below / above the input |
+| `msl-option-active`            | option  | selected                              |
+| `msl-option-focused`           | option  | highlighted by the keyboard           |
+| `msl-option-disable`           | option  | disabled                              |
+
+Other parts: `msl-wrp` (wrapper), `msl-chip`, `msl-chip-delete`, `msl-single-value`, `msl-input`, `msl-clear-btn`, `msl-arrow-btn`, `msl-options`, `msl-option`, `msl-grp-title`.
 
 <br>
 
 ### Change Log
 
-###### v-2.1.0
-
-- **Breaking:** `MultiSelect.defaultProps` no longer exists (React 19 support: defaults are parameter defaults now). Pass props instead of changing it
-- TypeScript types included (`dist/index.d.ts`)
-- `closeOnSelect` now closes the menu on pick, also in multi select when set to `true` (#9, #11)
-- `defaultValue` resolves when options load after mount (#12)
-- Search no longer crashes on characters like `(`, `[` or `*`
-- `onMenuClose` fires on Escape and only when an open menu closes
-- Pressing Enter after pasting into the search no longer crashes
-- No stray `undefined` / `false` class names
-- Accessibility: combobox / listbox / option ARIA roles and states, groups as `role="group"` named by their title; name the combobox with `attr={{ 'aria-label': '...' }}` or `'aria-labelledby'`
-- Keyboard: Arrow Up/Down, Home/End to move, Enter to pick, Backspace removes the last chip
-- Disabled dropdown is no longer focusable or keyboard-openable
-- Options and the down arrow are no longer Tab stops; chip delete and clear act on Enter/Space only
-- The keyboard highlight is the `msl-option-focused` class, not `:focus`: move custom `.msl-option:focus` styles to it
-- `customValue`: the chip and `onChange` get the typed text, not `Create "..."`; clicking Create adds it to Custom Values; double quotes are kept; created values survive the parent re-rendering with a new `options` array and `defaultValue` changes
-- Falsy `options` show `emptyDataLabel`
-- `onClear` event after the clear button (#10)
-- `msl-limit-reached` class on the wrapper once `limit` is hit
-- `'use client'` directive in the CJS / ESM bundles, so Next.js App Router Server Components can import it
-- `value` prop for a controlled selection (`<MultiSelect value={v} onChange={setV} />`)
-- `defaultValue` objects not in `options` (with `customValue`) keep their `value` string instead of the whole object, so `onChange` no longer gets `[object Object]` and the search no longer crashes
-- Enter no longer adds a line break to the search field
-- Pasting into the search inserts plain text, and text pasted from the context menu or dropped in now filters too
-- Enter or comma confirming an IME composition (Chinese, Japanese, Korean input) no longer picks an option
-- The menu closes when Tab moves focus out of the dropdown
-- Works inside a shadow root (React 17+): no crash on keys, and clicks inside no longer close the menu
-- Custom `downArrowIcon` / `closeIcon` of any nesting depth toggle and clear correctly
-- Numeric option values or labels (untyped JS) no longer crash the search
-- The menu opens upward only when there is more room above than below
-
-###### v-2.0.4
-
-- CSS variables updated
-
-###### v-2.0.1
-
-- Provide component width in css vars intead of props
-- Menu rise up at page bottom
-- events added on menu open/close
-
-###### v-2.0.0
-
-- React component support as label
-- Search feature improved
-- Custom values grouped
-- Single Select Bug fixed
+See [CHANGELOG.md](https://github.com/Arif-un/react-multiple-select-dropdown-lite/blob/master/CHANGELOG.md). Upgrading from 2.0.x? Check the [2.1.0 upgrade notes](https://github.com/Arif-un/react-multiple-select-dropdown-lite/blob/master/CHANGELOG.md#upgrade-notes).
 
 <br>
 <br>
