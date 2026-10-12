@@ -1,0 +1,34 @@
+---
+// a live demo above the source that renders it
+import { Code } from '@astrojs/starlight/components'
+
+interface Props {
+  code: string
+  title: string
+  dark?: boolean
+}
+const { code, title, dark } = Astro.props
+---
+
+<div class:list={['preview', 'not-content', { dark }]}><slot /></div>
+<Code code={code} lang='tsx' title={title} />
+
+<style>
+  /* the dropdown's default theme is light, so the stage stays light in dark mode */
+  .preview {
+    margin-top: 1.5rem;
+    padding: 2rem 1.5rem;
+    min-height: 8rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.5rem;
+    background: #fff;
+    color: #23262f;
+    color-scheme: light;
+    font-size: 1rem;
+  }
+  .preview.dark {
+    background: #151922;
+    color: #e6e6e6;
+    color-scheme: dark;
+  }
+</style>

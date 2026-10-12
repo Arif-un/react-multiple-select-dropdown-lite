@@ -1,0 +1,52 @@
+---
+title: React Multiple Select Dropdown Lite
+description: Lightweight, accessible multi / single select dropdown for React. Searchable, creatable, groupable and themeable with CSS variables.
+template: splash
+hero:
+  tagline: A lightweight multi / single select dropdown for React. Searchable, creatable, groupable, keyboard and screen reader friendly, themeable with CSS variables.
+  actions:
+    - text: Get started
+      link: getting-started/
+      icon: right-arrow
+    - text: Examples
+      link: examples/
+      variant: secondary
+    - text: GitHub
+      link: https://github.com/Arif-un/react-multiple-select-dropdown-lite
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components'
+import Playground from '../../examples/Playground'
+
+## Try it
+
+Toggle props on the left; the JSX updates to match.
+
+<div class='not-content'>
+  <Playground client:load />
+</div>
+
+## Features
+
+<CardGrid>
+  <Card title='Lightweight' icon='rocket'>
+    About 5 kB gzipped. No dependencies besides React 16.9 to 19.
+  </Card>
+  <Card title='Search and create' icon='magnifier'>
+    Filter as you type, or let users add their own values with `customValue`.
+  </Card>
+  <Card title='Groups' icon='list-format'>
+    Nested option groups with their own empty state.
+  </Card>
+  <Card title='Accessible' icon='approve-check'>
+    ARIA combobox and listbox, full keyboard support, SSR-safe ids.
+  </Card>
+  <Card title='Themeable' icon='setting'>
+    CSS variables for sizes and colors, plain class names for everything else.
+  </Card>
+  <Card title='TypeScript' icon='document'>
+    Types ship with the package; `onChange` is typed per `jsonValue`.
+  </Card>
+</CardGrid>

@@ -1,0 +1,82 @@
+/* example output (selected values) under a demo */
+.demo-output {
+  margin-top: 1rem;
+  font-family: var(--sl-font-mono);
+  font-size: 0.875rem;
+  color: #5c6370;
+  word-break: break-all;
+}
+.preview.dark .demo-output {
+  color: #9aa3b5;
+}
+.demo-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+.demo-row button {
+  font: inherit;
+  font-size: 0.875rem;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid #c4c8d0;
+  border-radius: 0.375rem;
+  background: #f6f7f9;
+  color: inherit;
+  cursor: pointer;
+}
+.demo-row button:hover {
+  background: #eceef2;
+}
+
+.playground {
+  display: grid;
+  grid-template-columns: minmax(12rem, 16rem) 1fr;
+  gap: 2rem;
+  padding: 1.5rem;
+  border: 1px solid #d7dbe2;
+  border-radius: 0.75rem;
+  background: #fff;
+  color: #23262f;
+  color-scheme: light;
+  text-align: start;
+}
+.playground fieldset {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-family: var(--sl-font-mono);
+  font-size: 0.875rem;
+}
+.playground legend {
+  margin-bottom: 0.5rem;
+  font-family: var(--sl-font);
+  font-weight: 600;
+}
+.playground label {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  cursor: pointer;
+}
+.playground pre {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  background: #f6f7f9;
+  font-size: 0.8125rem;
+  overflow-x: auto;
+}
+@media (max-width: 40rem) {
+  .playground {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* CHANGELOG.md is rendered as is: the page already has its title */
+.changelog > h1:first-child,
+.changelog > h1:first-child + p {
+  display: none;
+}
