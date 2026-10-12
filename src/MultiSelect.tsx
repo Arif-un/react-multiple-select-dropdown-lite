@@ -533,7 +533,10 @@ function MultiSelect({
     'aria-controls': listId,
     'aria-activedescendant':
       activeIdx < 0 ? undefined : `${listId}-${activeIdx}`,
-    'aria-disabled': disabled
+    'aria-disabled': disabled,
+    // the wrapper's label names whichever element is the combobox
+    'aria-label': attr?.['aria-label'],
+    'aria-labelledby': attr?.['aria-labelledby']
   } as const
 
   const showLabel = (optionObj: MultiSelectOption) => {

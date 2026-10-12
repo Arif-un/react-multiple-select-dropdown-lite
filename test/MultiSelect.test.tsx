@@ -996,9 +996,18 @@ describe('aria', () => {
     expect(combo.getAttribute('aria-disabled')).not.toBe('true')
     expect(combo.hasAttribute('aria-activedescendant')).toBe(false)
     expect(root.hasAttribute('role')).toBe(false)
+    expect(combo.hasAttribute('aria-label')).toBe(false)
     fireEvent.click(root)
     expect(isOpen()).toBe(true)
     expect(combo.getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('the search field takes its accessible name from attr', () => {
+    const { input } = setup({
+      attr: { 'aria-label': 'Fruit', 'aria-labelledby': 'fruit-label' }
+    })
+    expect(input().getAttribute('aria-label')).toBe('Fruit')
+    expect(input().getAttribute('aria-labelledby')).toBe('fruit-label')
   })
 
   it.each([
