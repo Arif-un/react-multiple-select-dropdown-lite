@@ -1,0 +1,122 @@
+---
+title: Examples
+description: Live examples of react-multiple-select-dropdown-lite.
+---
+
+import Preview from '../../components/Preview.astro'
+import Basic from '../../examples/Basic'
+import basicCode from '../../examples/Basic.tsx?raw'
+import SingleSelect from '../../examples/SingleSelect'
+import singleSelectCode from '../../examples/SingleSelect.tsx?raw'
+import Groups from '../../examples/Groups'
+import groupsCode from '../../examples/Groups.tsx?raw'
+import Creatable from '../../examples/Creatable'
+import creatableCode from '../../examples/Creatable.tsx?raw'
+import JsonValue from '../../examples/JsonValue'
+import jsonValueCode from '../../examples/JsonValue.tsx?raw'
+import Controlled from '../../examples/Controlled'
+import controlledCode from '../../examples/Controlled.tsx?raw'
+import Limit from '../../examples/Limit'
+import limitCode from '../../examples/Limit.tsx?raw'
+import DisableChip from '../../examples/DisableChip'
+import disableChipCode from '../../examples/DisableChip.tsx?raw'
+import JsxLabels from '../../examples/JsxLabels'
+import jsxLabelsCode from '../../examples/JsxLabels.tsx?raw'
+import CustomIcons from '../../examples/CustomIcons'
+import customIconsCode from '../../examples/CustomIcons.tsx?raw'
+import Disabled from '../../examples/Disabled'
+import disabledCode from '../../examples/Disabled.tsx?raw'
+import LargeData from '../../examples/LargeData'
+import largeDataCode from '../../examples/LargeData.tsx?raw'
+
+Every demo below runs the code under it.
+
+## Multi select
+
+<Preview code={basicCode} title='Basic.tsx'>
+  <Basic client:visible />
+</Preview>
+
+## Single select
+
+`singleSelect` keeps one value and closes the menu after a pick. Disabled options stay visible but can't be picked.
+
+<Preview code={singleSelectCode} title='SingleSelect.tsx'>
+  <SingleSelect client:visible />
+</Preview>
+
+## Groups
+
+Groups have `type: 'group'`, a `title` and `childs`, and can nest. `emptyDataLabel` shows when a group has no options. Search looks inside groups.
+
+<Preview code={groupsCode} title='Groups.tsx'>
+  <Groups client:visible />
+</Preview>
+
+## Creatable values
+
+With `customValue`, typing text that matches no option offers **Create "..."**. Enter or comma adds it; created values are listed under **Custom Values**.
+
+<Preview code={creatableCode} title='Creatable.tsx'>
+  <Creatable client:visible />
+</Preview>
+
+## Option objects (jsonValue)
+
+`jsonValue` makes `onChange` return the selected option objects, including any extra fields you put on them.
+
+<Preview code={jsonValueCode} title='JsonValue.tsx'>
+  <JsonValue client:visible />
+</Preview>
+
+## Controlled value
+
+Pass `value` and update it from `onChange` to own the selection, for example to reset it or set it from elsewhere.
+
+<Preview code={controlledCode} title='Controlled.tsx'>
+  <Controlled client:visible />
+</Preview>
+
+## Limit
+
+`limit` caps how many values can be picked.
+
+<Preview code={limitCode} title='Limit.tsx'>
+  <Limit client:visible />
+</Preview>
+
+## Count instead of chips
+
+`disableChip` shows the single label, or a count with `chipAlternateText`.
+
+<Preview code={disableChipCode} title='DisableChip.tsx'>
+  <DisableChip client:visible />
+</Preview>
+
+## JSX labels
+
+Labels can be JSX. Give such options a string `title`, which search and chips use.
+
+<Preview code={jsxLabelsCode} title='JsxLabels.tsx'>
+  <JsxLabels client:visible />
+</Preview>
+
+## Custom icons
+
+<Preview code={customIconsCode} title='CustomIcons.tsx'>
+  <CustomIcons client:visible />
+</Preview>
+
+## Disabled
+
+<Preview code={disabledCode} title='Disabled.tsx'>
+  <Disabled client:visible />
+</Preview>
+
+## Large lists
+
+`largeData` renders the options only while the menu is open, which keeps pages with long lists fast.
+
+<Preview code={largeDataCode} title='LargeData.tsx'>
+  <LargeData client:visible />
+</Preview>

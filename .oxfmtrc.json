@@ -13,5 +13,12 @@
   "bracketSameLine": false,
   "arrowParens": "always",
   "sortPackageJson": false,
-  "ignorePatterns": ["dist", "coverage", "pnpm-lock.yaml", "test/example"]
+  "ignorePatterns": [
+    "dist",
+    "coverage",
+    "pnpm-lock.yaml",
+    "test/example",
+    "docs/dist",
+    "docs/.astro"
+  ]
 }

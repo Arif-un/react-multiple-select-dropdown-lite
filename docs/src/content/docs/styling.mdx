@@ -1,0 +1,69 @@
+---
+title: Styling
+description: Theme react-multiple-select-dropdown-lite with CSS variables and class names.
+---
+
+import { Code } from '@astrojs/starlight/components'
+import Preview from '../../components/Preview.astro'
+import Theming from '../../examples/Theming'
+import themingCode from '../../examples/Theming.tsx?raw'
+import themingCss from '../../examples/Theming.css?raw'
+
+Import the stylesheet once:
+
+```ts
+import 'react-multiple-select-dropdown-lite/dist/index.css'
+```
+
+## CSS variables
+
+The defaults live on `.msl-vars`, the wrapper of every dropdown. Override them on `.msl-vars` for all dropdowns, or add your own class for one. Keep `.msl-vars` in the selector: a lone class of yours ties with the defaults, so it only wins when its CSS loads later.
+
+| Variable                   | Default                 | Controls                      |
+| -------------------------- | ----------------------- | ----------------------------- |
+| `--input-width`            | `300px`                 | width                         |
+| `--menu-max-height`        | `400px`                 | menu height before it scrolls |
+| `--font-size`              | `16px`                  | font size                     |
+| `--line-height`            | `1.4`                   | line height                   |
+| `--border-radius`          | `8px 8px 8px 8px`       | corner radius                 |
+| `--active-menu-background` | `white`                 | background while open         |
+| `--active-menu-shadow`     | `0 2px 8px 0px #b1b1b1` | shadow while open             |
+| `--active-menu-radius`     | `var(--border-radius)`  | corner radius while open      |
+
+```css
+/* every dropdown */
+.msl-vars {
+  --input-width: 100%;
+}
+/* one dropdown: <MultiSelect className='compact' /> */
+.msl-vars.compact {
+  --font-size: 14px;
+}
+```
+
+## Dark theme
+
+Variables cover sizes and the open menu; target the class names for colors.
+
+<Preview code={themingCode} title='Theming.tsx' dark>
+  <Theming client:visible />
+</Preview>
+
+<Code code={themingCss} lang='css' title='Theming.css' />
+
+## Class names
+
+State classes:
+
+| Class                          | On      | When                                  |
+| ------------------------------ | ------- | ------------------------------------- |
+| `msl-disabled`                 | wrapper | `disabled`                            |
+| `msl-limit-reached`            | wrapper | `limit` is reached                    |
+| `msl-active` / `msl-active-up` | `.msl`  | menu is open, below / above the input |
+| `msl-option-active`            | option  | selected                              |
+| `msl-option-focused`           | option  | highlighted by the keyboard           |
+| `msl-option-disable`           | option  | disabled                              |
+
+Parts: `msl-wrp` (wrapper), `msl` (input box), `msl-chip`, `msl-chip-delete`, `msl-single-value`, `msl-input`, `msl-clear-btn`, `msl-arrow-btn`, `msl-options` (menu), `msl-option`, `msl-grp-title`.
+
+A single option can carry its own `classes` and `style`.

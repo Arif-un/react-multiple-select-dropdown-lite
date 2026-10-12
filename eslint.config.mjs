@@ -4,7 +4,8 @@ import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
 export default [
-  { ignores: ['dist', 'coverage', 'test/example'] },
+  // docs: Astro site, type-checked by `astro check`
+  { ignores: ['dist', 'coverage', 'test/example', 'docs'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   react.configs.flat.recommended,
