@@ -4,6 +4,8 @@ on:
   push:
     branches: [master]
   pull_request:
+  # release.yml runs it on the tagged commit before publishing
+  workflow_call:
 
 permissions:
   contents: read
@@ -15,13 +17,13 @@ jobs:
       matrix:
         react: [16, 17, 18, 19]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           version: 10
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: pnpm
