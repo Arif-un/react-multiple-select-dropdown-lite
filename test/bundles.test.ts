@@ -16,6 +16,13 @@ it.each(['index.js', 'index.esm.js', 'index.modern.js', 'index.umd.js'])(
   }
 )
 
+it.each(['index.js', 'index.esm.js', 'index.modern.js'])(
+  "dist/%s starts with 'use client' for React Server Components",
+  (file) => {
+    expect(read(`dist/${file}`)).toMatch(/^'use client';\n/)
+  }
+)
+
 it('UMD keeps everything inside its wrapper', () => {
   expect(read('dist/index.umd.js')).toMatch(/^!function\(/)
 })

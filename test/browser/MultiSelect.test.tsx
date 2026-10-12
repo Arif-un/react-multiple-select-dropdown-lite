@@ -101,11 +101,11 @@ it.each(['{Enter}', ','])(
   }
 )
 
-it('current behavior: typed custom value keeps the Create label in its chip', async () => {
+it('a typed custom value gets the typed text as its chip', async () => {
   const { input, chips, option } = await setup({ customValue: true })
   await userEvent.type(input(), 'kiwi')
   await userEvent.keyboard('{Enter}')
-  await expect.poll(chips).toEqual(['Create "kiwi"'])
+  await expect.poll(chips).toEqual(['kiwi'])
   expect(option('kiwi')).toBeDefined()
 })
 
