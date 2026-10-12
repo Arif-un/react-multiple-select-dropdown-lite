@@ -172,13 +172,14 @@ CSS variable applied in `.msl-vars` class name.
 ###### v-2.1.0
 
 - React 19 support (`defaultProps` replaced by parameter defaults, so `MultiSelect.defaultProps` no longer exists)
+- TypeScript types included (`dist/index.d.ts`)
 - `closeOnSelect` now closes the menu on pick, also in multi select when set to `true` (#9, #11)
 - `defaultValue` resolves when options load after mount (#12)
 - Search no longer crashes on characters like `(`, `[` or `*`
 - `onMenuClose` fires on Escape and only when an open menu closes
 - Pressing Enter after pasting into the search no longer crashes
 - No stray `undefined` / `false` class names
-- Accessibility: combobox / listbox / option ARIA roles and states
+- Accessibility: combobox / listbox / option ARIA roles and states; name the combobox with `attr={{ 'aria-label': '...' }}` or `'aria-labelledby'`
 - Keyboard: Arrow Up/Down, Home/End to move, Enter to pick, Backspace removes the last chip
 - Disabled dropdown is no longer focusable or keyboard-openable
 - Options and the down arrow are no longer Tab stops; chip delete and clear act on Enter/Space only
