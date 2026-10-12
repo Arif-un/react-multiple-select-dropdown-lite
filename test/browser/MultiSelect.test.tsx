@@ -128,6 +128,41 @@ it('closes on Escape and on outside click', async () => {
   await expect.poll(menuHeight).toBe(0)
 })
 
+it('closes when Tab moves focus out', async () => {
+  const { root, menuHeight, focused } = await setup()
+  await userEvent.click(root)
+  await expect.poll(menuHeight).toBeGreaterThan(0)
+  await userEvent.tab({ shift: true })
+  expect(focused()).toBe('wrapper')
+  expect(menuHeight()).toBeGreaterThan(0)
+  await userEvent.tab({ shift: true })
+  await expect.poll(menuHeight).toBe(0)
+})
+
+it('Enter adds no line break to the search field', async () => {
+  const { root, input } = await setup()
+  await userEvent.click(root)
+  await userEvent.keyboard('{Enter}zzz{Enter}')
+  expect(input().innerHTML).toBe('zzz')
+})
+
+it('a rich paste lands as plain text and filters', async () => {
+  const { root, q, input, visibleOptions } = await setup()
+  const rich = document.body.appendChild(document.createElement('p'))
+  rich.innerHTML = '<b style="font-size: 40px">Ban</b>'
+  try {
+    getSelection()!.selectAllChildren(rich)
+    await userEvent.copy()
+    await userEvent.click(root)
+    await userEvent.paste()
+    expect(input().innerHTML).toBe('Ban')
+    expect(visibleOptions()).toEqual(['Banana'])
+    expect(q('.msl-options').textContent).toBe('Banana')
+  } finally {
+    rich.remove()
+  }
+})
+
 it('Tab skips the arrow and the options', async () => {
   const { root, outside, menuHeight, focused } = await setup({
     defaultValue: 'apple'

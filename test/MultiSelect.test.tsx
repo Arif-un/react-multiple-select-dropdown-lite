@@ -1,6 +1,7 @@
 // Characterization tests: they pin the CURRENT behavior of v2.0.6, quirks included.
 // Tests named "current behavior: ..." document known bugs; a fix should update them on purpose.
 import React, { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { renderToString } from 'react-dom/server'
 import { jsx } from 'react/jsx-runtime'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -783,6 +784,77 @@ describe('search', () => {
     expect(chips()).toEqual(['Cherry'])
   })
 
+  it('searches on input too: text can arrive without a keyup (context menu paste)', () => {
+    const { input, optionTexts } = setup()
+    input().textContent = 'ch'
+    fireEvent.input(input())
+    expect(optionTexts()).toEqual(['Cherry'])
+  })
+
+  it('pastes as plain text, spaces for line breaks', () => {
+    const exec = vi.fn(() => true)
+    document.execCommand = exec
+    try {
+      const { input } = setup()
+      const paste = () =>
+        fireEvent.paste(input(), {
+          clipboardData: {
+            getData: (t: string) => t === 'text/plain' && 'a\n b'
+          }
+        })
+      expect(paste()).toBe(false)
+      expect(exec).toHaveBeenCalledWith('insertText', false, 'a b')
+      exec.mockReturnValue(false)
+      expect(paste()).toBe(true)
+    } finally {
+      delete (document as Partial<Document>).execCommand
+    }
+    // jsdom: no execCommand, the default paste runs
+    const { input } = setup()
+    expect(
+      fireEvent.paste(input(), { clipboardData: { getData: () => 'a' } })
+    ).toBe(true)
+  })
+
+  it('numeric option values and labels (untyped JS) search and resolve', () => {
+    const { input, optionTexts, chips } = setup({
+      options: [
+        { label: 'One', value: 1 },
+        { label: 20, value: 'twenty' }
+      ] as unknown as MultiSelectProps['options'],
+      defaultValue: '1'
+    })
+    expect(chips()).toEqual(['One'])
+    type(input(), '1')
+    expect(optionTexts()).toEqual(['One'])
+    type(input(), '2')
+    expect(optionTexts()).toEqual(['20'])
+  })
+
+  it.each([
+    ['isComposing', { isComposing: true }],
+    ['keyCode 229 (Safari)', { keyCode: 229 }]
+  ])(
+    'an Enter or comma confirming an IME composition (%s) does not pick',
+    (_, init) => {
+      const { input, chips, isOpen, onChange } = setup({ customValue: true })
+      fireEvent.click(input())
+      press(input(), 'ArrowDown')
+      for (const key of ['Enter', ',']) {
+        input().textContent = 'ch'
+        expect(press(input(), key, init)).toBe(true)
+        fireEvent.keyUp(input(), { key })
+      }
+      expect(chips()).toEqual([])
+      expect(onChange).not.toHaveBeenCalled()
+      expect(isOpen()).toBe(true)
+      // the next, plain Enter picks
+      press(input(), 'Enter')
+      fireEvent.keyUp(input(), { key: 'Enter' })
+      expect(chips()).toEqual(['Cherry'])
+    }
+  )
+
   it('Enter does nothing without results', () => {
     const { input, chips, onChange } = setup()
     type(input(), 'zzz')
@@ -933,9 +1005,16 @@ describe('menu open / close', () => {
     expect(focus).toHaveBeenCalled()
   })
 
-  it('opens upward near the bottom of the viewport', () => {
+  it('opens upward near the bottom of the viewport, if there is more room above', () => {
     vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(100)
     const { root, q } = setup()
+    // jsdom: top 0, so below has more room
+    fireEvent.click(root)
+    expect(q('.msl').getAttribute('class')).toBe('msl msl-active ')
+    fireEvent.click(document.body)
+    vi.spyOn(root, 'getBoundingClientRect').mockReturnValue({
+      top: 60
+    } as DOMRect)
     fireEvent.click(root)
     expect(q('.msl').getAttribute('class')).toBe('msl msl-active-up ')
   })
@@ -981,6 +1060,86 @@ describe('menu open / close', () => {
       )
     })
     fireEvent.click(get(q))
+    expect(isOpen()).toBe(false)
+  })
+
+  it('a deep custom down arrow icon still toggles', () => {
+    const { q, isOpen } = setup({
+      downArrowIcon: (
+        <span>
+          <b>
+            <i className='deep' />
+          </b>
+        </span>
+      )
+    })
+    fireEvent.click(q('.deep'))
+    expect(isOpen()).toBe(true)
+    fireEvent.click(q('.deep'))
+    expect(isOpen()).toBe(false)
+  })
+
+  it('closes when focus moves out (Tab), not when it moves inside', () => {
+    const outside = document.body.appendChild(document.createElement('button'))
+    try {
+      const { root, q, isOpen, onMenuClose } = setup({ defaultValue: 'apple' })
+      fireEvent.click(root)
+      fireEvent.focusIn(q('.msl-chip-delete'))
+      expect(isOpen()).toBe(true)
+      fireEvent.focusIn(outside)
+      expect(isOpen()).toBe(false)
+      expect(onMenuClose).toHaveBeenCalledTimes(1)
+    } finally {
+      outside.remove()
+    }
+  })
+
+  // React 16 delegates events at the document, which only sees the shadow host
+  it.skipIf(parseInt(React.version) < 17)('works in a shadow root', () => {
+    const host = document.body.appendChild(document.createElement('div'))
+    const container = host
+      .attachShadow({ mode: 'open' })
+      .appendChild(document.createElement('div'))
+    try {
+      const onChange = vi.fn()
+      render(<MultiSelect options={opts} onChange={onChange} />, {
+        container
+      })
+      const q = (s: string) => container.querySelector<HTMLElement>(s)!
+      const isOpen = () => /msl-active/.test(q('.msl').className)
+      // the wrapper's ancestors include the ShadowRoot, which has no hasAttribute
+      press(q('.msl-wrp'), 'ArrowDown')
+      expect(isOpen()).toBe(true)
+      // the document sees the host as target: still a click inside
+      fireEvent.click(q('.msl-option'))
+      expect(onChange).toHaveBeenLastCalledWith('apple')
+      expect(isOpen()).toBe(true)
+      fireEvent.click(document.body)
+      expect(isOpen()).toBe(false)
+    } finally {
+      host.remove()
+    }
+  })
+
+  it('a click from a portal in a label does not crash', () => {
+    // React reports handler errors instead of throwing them
+    const errors = vi.fn((e: Event) => e.preventDefault())
+    window.addEventListener('error', errors)
+    const { root, isOpen } = setup({
+      options: [
+        {
+          label: <b>{createPortal(<i className='portal' />, document.body)}</b>,
+          title: 'Portal',
+          value: 'p'
+        }
+      ]
+    })
+    fireEvent.click(root)
+    // React bubbles it to the wrapper; climbing from it ends at the document
+    fireEvent.click(document.querySelector('.portal')!)
+    window.removeEventListener('error', errors)
+    expect(errors).not.toHaveBeenCalled()
+    // outside the wrapper's DOM: an outside click
     expect(isOpen()).toBe(false)
   })
 
@@ -1513,6 +1672,12 @@ describe('keyboard', () => {
     const { root, input } = setupKeys()
     expect(press(input(), ' ')).toBe(true)
     expect(press(root, ' ')).toBe(false)
+  })
+
+  it('Enter adds no line break to the search field', () => {
+    const { root, input } = setupKeys()
+    expect(press(input())).toBe(false)
+    expect(press(root)).toBe(false)
   })
 
   it('keys on a chip or the clear button do not drive the menu', () => {
