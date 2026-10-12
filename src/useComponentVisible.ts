@@ -23,17 +23,20 @@ export default function useComponentVisible({
       event.key === 'Escape' && close()
     }
 
-    const handleClickOutside = (event: MouseEvent) => {
-      if (ref.current && !ref.current.contains(event.target as Node)) {
+    // clicks, and focus moving out (Tab). composedPath: in a shadow root the document sees the host as target
+    const handleClickOutside = (event: Event) => {
+      if (ref.current && !event.composedPath().includes(ref.current)) {
         close()
       }
     }
 
     document.addEventListener('keydown', handleHideDropdown, true)
     document.addEventListener('click', handleClickOutside, true)
+    document.addEventListener('focusin', handleClickOutside, true)
     return () => {
       document.removeEventListener('keydown', handleHideDropdown, true)
       document.removeEventListener('click', handleClickOutside, true)
+      document.removeEventListener('focusin', handleClickOutside, true)
     }
   }, [isComponentVisible, onClose])
 

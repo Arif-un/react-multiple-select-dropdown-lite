@@ -24,12 +24,6 @@ type Props = MultiSelectBaseProps & {
   onChange?: (value: string | MultiSelectOption[]) => void
 }
 
-// climbed without null checks below, as in v2.0.6
-interface Climbable {
-  hasAttribute(name: string): boolean
-  parentNode: Climbable
-}
-
 // Defaults as parameter defaults: React 19's jsx runtime ignores defaultProps on function components.
 // Objects live here so their identity is stable (a new options array per render would loop the options effect).
 const noop = () => {}
@@ -105,13 +99,15 @@ function MultiSelect({
   const [search, setSearch] = useState<MultiSelectOption[] | null>(null)
   const items = search || options
   // the Create "..." item last offered by the search
-  const createOpt = useRef<MultiSelectOption>(null)
+  const createOpt = useRef<MultiSelectOption | null>(null)
   const inputFld = useRef<HTMLDivElement>(null)
   const listId = useListId()
   // the keyboard highlighted option: idx tells repeated values apart
   const [active, setActive] = useState<{ value: string; idx: number } | null>(
     null
   )
+  // the last keydown belonged to an IME composition: its Enter confirms the text, not a pick
+  const composing = useRef(false)
   // the user changed the value since defaultValue last changed
   const userChanged = useRef(false)
   // with `value` the parent owns the selection: user changes only call onChange
@@ -346,11 +342,12 @@ function MultiSelect({
         if (opt[i]?.type === 'group') {
           searchInOptions(opt[i].childs as MultiSelectOption[])
         } else if (!exact) {
-          // plain substring match: typed text is not a regex
+          // plain substring match: typed text is not a regex.
+          // String(): untyped JS often passes numbers
           const needle = str.toLowerCase()
           if (
             typeof opt[i].label !== 'object' &&
-            (opt[i].label as string).toLowerCase().includes(needle)
+            String(opt[i].label).toLowerCase().includes(needle)
           ) {
             searchedOptions.push(opt[i])
           } else if (
@@ -358,11 +355,11 @@ function MultiSelect({
             opt[i]?.title?.toLowerCase().includes(needle)
           ) {
             searchedOptions.push(opt[i])
-          } else if (opt[i].value.toLowerCase().includes(needle)) {
+          } else if (String(opt[i].value).toLowerCase().includes(needle)) {
             searchedOptValues.push(opt[i])
           }
         } else {
-          if (opt[i][type!] === str) {
+          if (String(opt[i][type!]) === str) {
             searchedOptions.push(opt[i])
           }
         }
@@ -377,7 +374,10 @@ function MultiSelect({
     return [...searchedOptions, ...searchedOptValues]
   }
 
-  const handleSearchAndCustomValue = (e: React.KeyboardEvent) => {
+  // also runs on input: text can arrive without a keyup (context menu paste, drag and drop)
+  const handleSearchAndCustomValue = (
+    e: React.SyntheticEvent & { key?: string }
+  ) => {
     const textValue = (e.target as HTMLElement)
       .textContent!.trim()
       .replace(/,+/g, '')
@@ -397,7 +397,11 @@ function MultiSelect({
       }
       setSearch(results)
 
-      if ((e.key === 'Enter' || e.key === ',') && results.length) {
+      if (
+        (e.key === 'Enter' || e.key === ',') &&
+        results.length &&
+        !composing.current
+      ) {
         addValue(results[0])
       }
     } else {
@@ -405,26 +409,17 @@ function MultiSelect({
     }
   }
 
-  const nonClickableItem = (target: Climbable) => {
-    if (
-      target.hasAttribute('clickable') ||
-      target.parentNode.hasAttribute('clickable') ||
-      target.parentNode.parentNode.hasAttribute('clickable') ||
-      target.parentNode.parentNode.parentNode.hasAttribute('clickable')
+  // the target or an ancestor below the wrapper has attr: any icon depth, and never
+  // climbs past the wrapper (a ShadowRoot or document has no hasAttribute)
+  const marked = (target: EventTarget, attr: string) => {
+    for (
+      let el = target as Element | null;
+      el && el !== componentRef.current;
+      el = el.parentNode as Element | null
     ) {
-      return false
+      if (el.hasAttribute?.(attr)) return true
     }
-    return true
-  }
-
-  const checkIsDropdownHandle = (target: Climbable) => {
-    if (
-      target.hasAttribute('dropdown-handle') ||
-      target.parentNode.hasAttribute('dropdown-handle') ||
-      target.parentNode.parentNode.hasAttribute('dropdown-handle')
-    ) {
-      return true
-    }
+    return false
   }
 
   const focusSearchInput = () => {
@@ -434,8 +429,8 @@ function MultiSelect({
   }
 
   const openMenu = ({ target }: React.SyntheticEvent) => {
-    if (nonClickableItem(target as unknown as Climbable)) {
-      if (checkIsDropdownHandle(target as unknown as Climbable)) {
+    if (!marked(target, 'clickable')) {
+      if (marked(target, 'dropdown-handle')) {
         if (!menuOpen) {
           setMenuOpen(true)
           onMenuOpen()
@@ -472,9 +467,12 @@ function MultiSelect({
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     attr?.onKeyDown?.(e)
+    // Safari ends the composition before the keydown, leaving only keyCode 229
+    composing.current = e.nativeEvent.isComposing || e.keyCode === 229
+    if (composing.current) return
     const { key, target } = e
     // chips and the clear button handle their own keys
-    if (disabled || !nonClickableItem(target as unknown as Climbable)) return
+    if (disabled || marked(target, 'clickable')) return
     if (key === 'Enter' && activeIdx >= 0) {
       e.preventDefault()
       addValue(shown[activeIdx])
@@ -500,8 +498,9 @@ function MultiSelect({
       key === 'Enter' ||
       (key.length === 1 && !e.ctrlKey && !e.metaKey)
     ) {
-      // Space on the wrapper would scroll the page
-      key === ' ' && target === e.currentTarget && e.preventDefault()
+      // Space on the wrapper would scroll the page; Enter in the search adds a line break
+      ;((key === ' ' && target === e.currentTarget) || key === 'Enter') &&
+        e.preventDefault()
       openMenu(e)
     }
   }
@@ -530,7 +529,9 @@ function MultiSelect({
   const getActiveClass = () => {
     const el = componentRef.current!
     const rect = el.getBoundingClientRect()
-    if (window.innerHeight - (rect.top + el.clientHeight) < 200) {
+    const below = window.innerHeight - (rect.top + el.clientHeight)
+    // up only if that has more room: else it goes off the top of the page
+    if (below < 200 && rect.top > below) {
       return 'msl-active-up'
     }
     return 'msl-active'
@@ -589,7 +590,20 @@ function MultiSelect({
               className='msl-input'
               contentEditable={!disabled}
               onKeyUp={handleSearchAndCustomValue}
-              onInput={() => setActive(null)}
+              onInput={(e) => {
+                setActive(null)
+                handleSearchAndCustomValue(e)
+              }}
+              onPaste={(e) => {
+                // plain text only: a rich paste keeps its formatting in a contentEditable.
+                // jsdom has no execCommand: then the browser default runs
+                const text = e.clipboardData.getData('text/plain')
+                document.execCommand?.(
+                  'insertText',
+                  false,
+                  text.replace(/\s+/g, ' ')
+                ) && e.preventDefault()
+              }}
               ref={inputFld}
               {...combobox}
             />
