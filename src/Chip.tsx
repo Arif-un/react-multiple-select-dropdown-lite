@@ -9,7 +9,7 @@ export default function Chip({
 }: {
   value: MultiSelectOption
   disabled?: boolean
-  deleteAction: () => void
+  deleteAction: (byKey?: boolean) => void
 }) {
   const showChipText = (opt: MultiSelectOption) => {
     if (typeof opt.label === 'object') {
@@ -28,11 +28,11 @@ export default function Chip({
         // @ts-expect-error see above
         clickable='true'
         aria-label='delete-value'
-        onClick={deleteAction}
+        onClick={() => deleteAction()}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
-            deleteAction()
+            deleteAction(true)
           }
         }}
         tabIndex={disabled ? -1 : 0}

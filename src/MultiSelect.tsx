@@ -75,6 +75,7 @@ function MultiSelect({
   singleSelect = false,
   jsonValue = false,
   defaultValue = '',
+  value: valueProp,
   className,
   placeholder = 'Select...',
   disableChip = false,
@@ -88,19 +89,34 @@ function MultiSelect({
   customValue = false,
   onMenuOpen = noop,
   onMenuClose = noop,
+  onClear = noop,
   chipAlternateText = 'Item Selected',
   closeOnSelect,
   disableSearch = false
 }: Props) {
   const [value, setValue] = useState<MultiSelectOption[]>([])
-  const [options, setOptions] = useState<readonly Item[]>(userOptions || [])
+  // values created by customValue, listed after the user's options.
+  // Own state, so a parent passing a new options array doesn't wipe them
+  const [custom, setCustom] = useState<MultiSelectOption[]>([])
+  const base = userOptions || []
+  const options: readonly Item[] = custom.length
+    ? [...base, { title: 'Custom Values', type: 'group', childs: custom }]
+    : base
   const [search, setSearch] = useState<MultiSelectOption[] | null>(null)
+  const items = search || options
+  // the Create "..." item last offered by the search
+  const createOpt = useRef<MultiSelectOption>(null)
   const inputFld = useRef<HTMLDivElement>(null)
   const listId = useListId()
-  // value of the keyboard highlighted option
-  const [active, setActive] = useState<string | null>(null)
+  // the keyboard highlighted option: idx tells repeated values apart
+  const [active, setActive] = useState<{ value: string; idx: number } | null>(
+    null
+  )
   // the user changed the value since defaultValue last changed
   const userChanged = useRef(false)
+  // with `value` the parent owns the selection: user changes only call onChange
+  const controlled = valueProp !== undefined
+  const selected = controlled ? valueProp : defaultValue
   const {
     ref: componentRef,
     isComponentVisible: menuOpen,
@@ -110,8 +126,13 @@ function MultiSelect({
     onClose: onMenuClose
   })
 
-  const shown = flatten(search || options || [])
-  const activeIdx = shown.findIndex((opt) => opt.value === active)
+  const shown = flatten(items)
+  // by value once the list changes under it (search, pick)
+  const activeIdx = !active
+    ? -1
+    : shown[active.idx]?.value === active.value
+      ? active.idx
+      : shown.findIndex((opt) => opt.value === active.value)
 
   useEffect(() => {
     !menuOpen && setActive(null)
@@ -145,17 +166,12 @@ function MultiSelect({
       if (typeof value === 'string') {
         extraValues.push({ label: value, value })
       } else {
-        // current behavior: value stays the whole object
-        const newValueObj = { label: value, value } as unknown as {
-          label: unknown
-          value: string
-        }
-        if ('label' in value && typeof value.label === 'string') {
-          newValueObj.label = value.label
-        } else if ('title' in value) {
-          newValueObj.label = value.title
-        }
-        extraValues.push(newValueObj as MultiSelectOption)
+        // a JSX label falls back to title, then value, as in chips
+        const label =
+          typeof value.label === 'string'
+            ? value.label
+            : value.title || value.value
+        extraValues.push({ label, value: value.value })
       }
     }
 
@@ -187,11 +203,14 @@ function MultiSelect({
       }
     }
 
-    let customValuesGroup: MultiSelectGroup[] = []
-    if (extraValues.length) {
-      customValuesGroup = createCustomValueAndOption(extraValues)
-    }
-    setOptions([...userOptions, ...customValuesGroup])
+    // created values stay, as without a parent; ones the options now have go (#12)
+    setCustom((prev) =>
+      [...prev, ...extraValues].filter(
+        (opt, i, all) =>
+          all.findIndex((o) => o.value === opt.value) === i &&
+          !flatten(options).some((o) => o.value === opt.value)
+      )
+    )
     return [...searchedOptions, ...extraValues]
   }
 
@@ -202,29 +221,27 @@ function MultiSelect({
   }, [clearAll])
 
   useEffect(() => {
-    setOptions(userOptions)
-  }, [userOptions])
-
-  useEffect(() => {
     userChanged.current = false
-  }, [defaultValue])
+  }, [selected])
 
   // options too, as they may arrive after mount (#12). Not after a user change:
   // parents often pass a new options array on every render
   useEffect(() => {
     if (userChanged.current) return
-    let preDefinedValue = getValueObjFromOptions(defaultValue, userOptions)
+    let preDefinedValue = getValueObjFromOptions(selected, userOptions)
 
     if (singleSelect && preDefinedValue.length) {
       preDefinedValue = [preDefinedValue[0]]
     }
 
     setValue(preDefinedValue)
-  }, [defaultValue, userOptions])
+  }, [selected, userOptions])
 
   const setNewValue = (val: MultiSelectOption[]) => {
-    userChanged.current = true
-    setValue(val)
+    if (!controlled) {
+      userChanged.current = true
+      setValue(val)
+    }
     if (jsonValue) {
       onChange(val)
     } else {
@@ -242,15 +259,12 @@ function MultiSelect({
     return bool
   }
 
-  const filterCreateOpt = ({ label, value }: MultiSelectOption) => {
-    /* v8 ignore else -- label is always 'Create "..."' */
-    if (typeof label !== 'object' && label.match(/Create "|"+/g)) {
-      label = label.replace(/Create "|"+/g, '')
-    }
-    return { label, value }
-  }
-
   const addValue = (newValObj: MultiSelectOption) => {
+    // picking Create (click, Enter or comma) adds the typed text as an option
+    if (newValObj === createOpt.current) {
+      newValObj = { label: newValObj.value, value: newValObj.value }
+      setCustom([...custom, newValObj])
+    }
     let tmp = [...value]
     if (singleSelect) {
       if (checkValueExist(newValObj, value)) {
@@ -291,6 +305,15 @@ function MultiSelect({
   const clearValue = () => {
     setNewValue([])
   }
+
+  // the clear button; clearAll clears without onClear
+  const clearByUser = () => {
+    clearValue()
+    onClear()
+  }
+
+  // a keyboard delete unmounts the focused button: keep focus in the widget
+  const refocus = () => (inputFld.current || componentRef.current)!.focus()
 
   const showSearchOption = () => {
     if (disableSearch) {
@@ -354,82 +377,28 @@ function MultiSelect({
     return [...searchedOptions, ...searchedOptValues]
   }
 
-  const createCustomValueAndOption = (
-    valueObj: MultiSelectOption | MultiSelectOption[]
-  ) => {
-    const customValuesGroup: MultiSelectGroup[] = []
-    const customValuesIndx = options.findIndex(
-      (opt) => opt?.type === 'group' && opt?.title === 'Custom Values'
-    )
-
-    if (customValuesIndx === -1) {
-      customValuesGroup.push({
-        title: 'Custom Values',
-        type: 'group',
-        // published bundles compiled `[...valueObj]` loosely to concat, which also accepts a single object
-        childs: ([] as MultiSelectOption[]).concat(valueObj)
-      })
-    } else if (Array.isArray(valueObj)) {
-      valueObj.map((value) =>
-        ((options[customValuesIndx] as MultiSelectGroup).childs as Item[]).push(
-          value
-        )
-      )
-    } else {
-      ;((options[customValuesIndx] as MultiSelectGroup).childs as Item[]).push(
-        valueObj
-      )
-    }
-    setOptions([...options, ...customValuesGroup])
-
-    return customValuesGroup
-  }
-
   const handleSearchAndCustomValue = (e: React.KeyboardEvent) => {
     const textValue = (e.target as HTMLElement)
       .textContent!.trim()
       .replace(/,+/g, '')
 
     if (textValue) {
-      const newValue = {
+      createOpt.current = {
         label: `Create "${textValue}"`,
         value: textValue
       }
-
-      const searchedOptions = searchOptions(textValue, options)
       // Enter reads this, not `search`: that is null when text arrived without a keyup (paste, IME)
-      let results = searchedOptions
-
-      if (searchedOptions.length) {
-        if (customValue) {
-          const exactOptionValue = searchOptions(
-            textValue,
-            options,
-            true,
-            'value'
-          )
-
-          !exactOptionValue.length && searchedOptions.push(newValue)
-        }
-      } else if (customValue) {
-        results = [newValue]
+      const results = searchOptions(textValue, options)
+      if (
+        customValue &&
+        !searchOptions(textValue, options, true, 'value').length
+      ) {
+        results.push(createOpt.current)
       }
       setSearch(results)
 
-      const filteredNewValue = filterCreateOpt(newValue)
-
-      if (e.key === 'Enter' || e.key === ',') {
-        if (
-          customValue &&
-          !searchedOptions.length &&
-          !checkValueExist(filteredNewValue, value)
-        ) {
-          createCustomValueAndOption(filteredNewValue)
-
-          addValue(newValue)
-        } else {
-          results.length > 0 && addValue(results[0])
-        }
+      if ((e.key === 'Enter' || e.key === ',') && results.length) {
+        addValue(results[0])
       }
     } else {
       setSearch(null)
@@ -496,7 +465,8 @@ function MultiSelect({
           ? shown.length
           : activeIdx
     for (i += dir; i >= 0 && i < shown.length; i += dir) {
-      if (!shown[i].disabled) return setActive(shown[i].value)
+      if (!shown[i].disabled)
+        return setActive({ value: shown[i].value, idx: i })
     }
   }
 
@@ -517,7 +487,12 @@ function MultiSelect({
     ) {
       // a value next to the search field means chips mode
       value.length && deleteValue(value.length - 1)
-    } else if (/^(Arrow(Down|Up)|Home|End)$/.test(key)) {
+    } else if (
+      /^Arrow(Down|Up)$/.test(key) ||
+      // with search text, Home/End move the caret
+      (/^(Home|End)$/.test(key) &&
+        !(target === inputFld.current && inputFld.current.textContent))
+    ) {
       e.preventDefault()
       highlight(key)
       openMenu(e)
@@ -572,7 +547,7 @@ function MultiSelect({
       style={{ ...style }}
       className={`msl-wrp msl-vars ${className || ''} ${
         disabled ? 'msl-disabled' : ''
-      }`}
+      }${limit !== null && value.length >= limit ? ' msl-limit-reached' : ''}`}
     >
       <input name={name} type='hidden' value={value?.map((itm) => itm.value)} />
       <div data-msl className={`msl ${menuOpen ? getActiveClass() : ''} `}>
@@ -588,7 +563,11 @@ function MultiSelect({
                 key={`msl-chip-${i + 11}`}
                 value={val}
                 disabled={disabled}
-                deleteAction={() => deleteValue(i)}
+                deleteAction={(byKey) => {
+                  deleteValue(i)
+                  // index keys: only the last chip's button goes away
+                  byKey && i === value.length - 1 && refocus()
+                }}
               />
             ))}
           {!singleSelect && disableChip && value.length > 0 && (
@@ -631,11 +610,12 @@ function MultiSelect({
                 // @ts-expect-error clickable is a custom attribute (it stops the menu from opening)
                 clickable='true'
                 aria-label='close-menu'
-                onClick={clearValue}
+                onClick={clearByUser}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault()
-                    clearValue()
+                    clearByUser()
+                    refocus()
                   }
                 }}
                 tabIndex={disabled ? -1 : 0}
@@ -666,23 +646,9 @@ function MultiSelect({
         // else Chrome makes this scroller a tab stop, as no option is tabbable
         tabIndex={-1}
       >
-        {!search && options.length ? (
+        {items.length ? (
           <Options
-            opts={options}
-            {...{
-              singleSelect,
-              addValue,
-              checkValueExist,
-              value,
-              largeData,
-              menuOpen,
-              listId,
-              activeIdx
-            }}
-          />
-        ) : search && search.length ? (
-          <Options
-            opts={search}
+            opts={items}
             {...{
               singleSelect,
               addValue,
@@ -695,11 +661,9 @@ function MultiSelect({
             }}
           />
         ) : (
-          ((search && !search.length) || (options && !options.length)) && (
-            <option className='msl-option msl-option-disable'>
-              {emptyDataLabel}
-            </option>
-          )
+          <option className='msl-option msl-option-disable'>
+            {emptyDataLabel}
+          </option>
         )}
       </div>
     </div>

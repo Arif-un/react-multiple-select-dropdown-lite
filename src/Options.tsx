@@ -26,37 +26,45 @@ function Options({
   activeIdx: number
 }) {
   if (largeData && !menuOpen) return null
-  const optsArr: React.ReactElement[] = []
   // counts options only, like MultiSelect's flattened list
   let n = 0
-  function addInArr(opts: Item[]) {
+  let g = 0
+  function addInArr(opts: Item[], out: React.ReactElement[]) {
     for (const [i, opt] of opts.entries()) {
       if (opt.type === 'group') {
-        optsArr.push(
+        // the title names the group, as in the APG grouped listbox
+        const titleId = /* v8 ignore next */ listId && `${listId}-g${g++}`
+        const childs = [
           <div
-            key={opt.title + i}
+            key='msl-grp-title'
+            id={titleId}
             data-msl
             role='presentation'
             className='msl-grp-title'
           >
             {opt.title}
           </div>
-        )
+        ]
         if (opt.childs.length > 0) {
-          addInArr(opt.childs as Item[])
+          addInArr(opt.childs as Item[], childs)
         } else {
-          optsArr.push(
+          childs.push(
             <option
-              key={opt.title + i + '-empty'}
+              key='msl-grp-empty'
               className='msl-option msl-option-disable'
             >
               {opt.emptyDataLabel || 'No Data Found'}
             </option>
           )
         }
+        out.push(
+          <div key={opt.title + i} role='group' aria-labelledby={titleId}>
+            {childs}
+          </div>
+        )
       } else {
         const idx = n++
-        optsArr.push(
+        out.push(
           <div
             // no listId only before mount on React < 18
             id={/* v8 ignore next */ listId && `${listId}-${idx}`}
@@ -93,9 +101,9 @@ function Options({
         )
       }
     }
+    return out
   }
-  addInArr(opts as Item[])
-  return <div>{optsArr}</div>
+  return <div>{addInArr(opts as Item[], [])}</div>
 }
 
 export default Options

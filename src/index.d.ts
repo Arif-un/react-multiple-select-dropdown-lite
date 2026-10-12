@@ -32,22 +32,27 @@ declare namespace MultiSelect {
     emptyDataLabel?: string
   }
 
+  type MultiSelectValue =
+    | string
+    | ReadonlyArray<
+        | string
+        | {
+            value: string
+            label?: string | React.ReactElement
+            title?: string
+          }
+      >
+
   interface MultiSelectBaseProps {
     options?: ReadonlyArray<MultiSelectOption | MultiSelectGroup>
     /**
      * comma separated values, or an array of values / option-like objects.
-     * With `customValue`, an object not found in `options` keeps the whole object as its `value`.
+     * With `customValue`, values not found in `options` are added under Custom Values.
+     * Follows later changes until the user picks something; use `value` to keep it in sync
      */
-    defaultValue?:
-      | string
-      | ReadonlyArray<
-          | string
-          | {
-              value: string
-              label?: string | React.ReactElement
-              title?: string
-            }
-        >
+    defaultValue?: MultiSelectValue
+    /** controlled selection, in the same forms as `defaultValue`: update it from `onChange` */
+    value?: MultiSelectValue
     singleSelect?: boolean
     clearable?: boolean
     /** clears the value when it turns true */
@@ -73,7 +78,7 @@ declare namespace MultiSelect {
     /** render options only while the menu is open */
     largeData?: boolean
     disabled?: boolean
-    /** max selected values, `null` for no limit */
+    /** max selected values, `null` for no limit. The wrapper gets `msl-limit-reached` once hit */
     limit?: number | null
     emptyDataLabel?: string
     /** create options by typing and pressing Enter or comma */
@@ -83,6 +88,8 @@ declare namespace MultiSelect {
     disableSearch?: boolean
     onMenuOpen?: () => void
     onMenuClose?: () => void
+    /** after the clear button empties the value (not for `clearAll`) */
+    onClear?: () => void
     /** @deprecated no effect since v2.0.1, set the `--input-width` CSS variable instead */
     width?: unknown
   }
