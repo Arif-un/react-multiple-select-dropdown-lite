@@ -83,9 +83,23 @@ export default defineConfig({
     rolldownOptions: {
       external: ['react'],
       output: [
-        { format: 'cjs', entryFileNames: 'index.js', exports: 'default' },
-        { format: 'es', entryFileNames: 'index.esm.js' },
-        { format: 'es', entryFileNames: 'index.modern.js' },
+        // 'use client': Next.js App Router can import it from a Server Component
+        {
+          format: 'cjs',
+          entryFileNames: 'index.js',
+          exports: 'default',
+          postBanner: "'use client';"
+        },
+        {
+          format: 'es',
+          entryFileNames: 'index.esm.js',
+          postBanner: "'use client';"
+        },
+        {
+          format: 'es',
+          entryFileNames: 'index.modern.js',
+          postBanner: "'use client';"
+        },
         {
           format: 'umd',
           entryFileNames: 'index.umd.js',
