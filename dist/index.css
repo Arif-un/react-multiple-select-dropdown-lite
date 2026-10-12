@@ -191,7 +191,8 @@
   opacity: 0.7;
 }
 
-.msl-options .msl-option:last-child {
+/* the last option's margin collapses into this, groups or not */
+.msl-options > :last-child {
   margin-bottom: 5px;
 }
 .msl-options .msl-option:hover,
