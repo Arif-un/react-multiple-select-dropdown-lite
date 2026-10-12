@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  # release.yml runs it on the tagged commit before publishing
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        react: [16, 17, 18, 19]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 10
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # vitest-browser-react needs React 18+, so React < 18 skips the Chromium suite
+      - if: matrix.react >= 18
+        run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm fmt:check
+      - run: pnpm lint
+      # the lockfile pins React 19
+      - if: matrix.react == 18
+        run: pnpm add -D react@18 react-dom@18 @types/react@18 @types/react-dom@18
+      # Testing Library 13+ needs createRoot; types stay at 19, so typecheck runs on 18/19 only
+      - if: matrix.react < 18
+        run: pnpm add -D react@${{ matrix.react }} react-dom@${{ matrix.react }} @testing-library/react@12
+      - if: matrix.react >= 18
+        run: pnpm typecheck
+      # builds dist; jsdom suite on src (100% coverage gate) + every bundle; then real-Chromium suite
+      - if: matrix.react >= 18
+        run: pnpm test
+      # dist is committed: fail if it was not rebuilt (React 19 leaves the lockfile untouched)
+      - if: matrix.react == 19
+        run: test -z "$(git status --porcelain -- dist)" || { git status --short -- dist; exit 1; }
+      - if: matrix.react < 18
+        run: pnpm build && pnpm exec vitest run --coverage --project '!browser'

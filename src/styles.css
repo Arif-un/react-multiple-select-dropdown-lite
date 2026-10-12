@@ -50,7 +50,9 @@
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
   border-bottom: 0;
-  transition: border-top-left-radius 400ms, border-top-right-radius 400ms;
+  transition:
+    border-top-left-radius 400ms,
+    border-top-right-radius 400ms;
 }
 .msl-active-up {
   background: var(--active-menu-background);
@@ -60,31 +62,39 @@
   border-radius: var(--active-menu-radius);
   border-top-left-radius: 0;
   border-top-right-radius: 0;
-  transition: border-bottom-left-radius 400ms, border-bottom-right-radius 400ms;
+  transition:
+    border-bottom-left-radius 400ms,
+    border-bottom-right-radius 400ms;
 }
 .msl-active ~ .msl-options {
   background: var(--active-menu-background);
   z-index: 9999;
   box-shadow: var(--active-menu-shadow);
+  -webkit-clip-path: inset(0px -10px -10px -10px);
   clip-path: inset(0px -10px -10px -10px);
   max-height: var(--menu-max-height);
   border-radius: var(--active-menu-radius);
   border-top-left-radius: 0;
   border-top-right-radius: 0;
-  transition: border-bottom-left-radius 0.5s ease-in, border-bottom-right-radius 0.5s ease-in;
+  transition:
+    border-bottom-left-radius 0.5s ease-in,
+    border-bottom-right-radius 0.5s ease-in;
 }
 .msl-active-up ~ .msl-options {
   background: var(--active-menu-background);
   z-index: 9999;
   bottom: 99%;
   box-shadow: var(--active-menu-shadow);
+  -webkit-clip-path: inset(-10px -10px 0 -10px);
   clip-path: inset(-10px -10px 0 -10px);
   max-height: var(--menu-max-height);
   border-radius: var(--active-menu-radius);
   border-bottom: 0;
   border-bottom-right-radius: 0;
   border-bottom-left-radius: 0;
-  transition: border-top-left-radius 700ms, border-top-right-radius 700ms;
+  transition:
+    border-top-left-radius 700ms,
+    border-top-right-radius 700ms;
 }
 .msl-options {
   position: absolute;
@@ -92,7 +102,7 @@
   background: white;
   max-height: 0;
   overflow: auto;
-  scrollbar-color: rgb(0, 0, 0, 0.1) transparent;
+  scrollbar-color: rgba(0, 0, 0, 0.1) transparent;
   scrollbar-width: thin;
   border-radius: var(--border-radius);
 }
@@ -113,7 +123,7 @@
   line-height: var(--line-height);
   color: rgb(146, 146, 146);
 }
-.msl-input[data-placeholder]:not([data-placeholder=""]):empty::before {
+.msl-input[data-placeholder]:not([data-placeholder='']):empty::before {
   content: attr(data-placeholder);
 }
 .msl-chip {
@@ -147,12 +157,12 @@
 }
 
 .msl-options::-webkit-scrollbar-thumb {
-  background: rgb(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.1);
   border-radius: 20px;
 }
 
 .msl-options::-webkit-scrollbar-thumb:hover {
-  background: rgb(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.2);
 }
 .msl-options .msl-option,
 .msl-grp-title {
@@ -181,11 +191,13 @@
   opacity: 0.7;
 }
 
-.msl-options .msl-option:last-child {
+/* the last option's margin collapses into this, groups or not */
+.msl-options > :last-child {
   margin-bottom: 5px;
 }
 .msl-options .msl-option:hover,
-.msl-option:focus {
+.msl-option:focus,
+.msl-options .msl-option-focused {
   background: rgb(233, 233, 233);
 }
 .msl-option-active {
@@ -239,7 +251,7 @@
   min-height: 20px;
   margin-left: 3px;
   background: rgb(218, 218, 218);
-  color: rgb(0, 0, 0, 0.6);
+  color: rgba(0, 0, 0, 0.6);
 }
 .msl-chip-delete:hover {
   background: lightgray;

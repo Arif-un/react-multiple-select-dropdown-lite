@@ -1,0 +1,112 @@
+# Publishes to npm and creates the GitHub release when a version tag is pushed.
+#
+# To release: on master, bump "version" in package.json and add its CHANGELOG.md section, commit, then
+#   git tag v2.1.0 && git push origin v2.1.0
+# A prerelease version (2.2.0-beta.1) goes to the `next` dist-tag and a GitHub prerelease.
+#
+# npm side: trusted publishing (OIDC), so no npm token is stored anywhere. The package's trusted
+# publisher on npmjs.com must name this repo, workflow file `release.yml` and environment `npm`.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: $/.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  # packs the committed dist, which CI just checked is fresh. Runs no project code (npm pack
+  # runs no prepublishOnly) and restores no cache, so nothing can slip into the tarball
+  pack:
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - id: version
+        name: Tag matches package.json
+        run: |
+          version=$(jq -r .version package.json)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package.json version $version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Release notes from CHANGELOG.md
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          awk -v v="$VERSION" '/^## \[/ { if (f) exit; f = index($0, "## [" v "]") == 1; next } f' CHANGELOG.md > notes.md
+          if ! grep -q '[^[:space:]]' notes.md; then
+            echo "::error::CHANGELOG.md has no '## [$VERSION]' section"
+            exit 1
+          fi
+          printf '\nnpm: https://www.npmjs.com/package/%s/v/%s\n' "$(jq -r .name package.json)" "$VERSION" >> notes.md
+      - run: npm pack
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release
+          path: |
+            *.tgz
+            notes.md
+          if-no-files-found: error
+
+  npm:
+    needs: pack
+    runs-on: ubuntu-latest
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/react-multiple-select-dropdown-lite/v/${{ needs.pack.outputs.version }}
+    permissions:
+      id-token: write # OIDC token for npm trusted publishing (provenance included)
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+      # Node 24 ships npm >= 11.5.1, which trusted publishing needs
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      # a tarball publish runs no lifecycle scripts
+      - env:
+          VERSION: ${{ needs.pack.outputs.version }}
+        run: |
+          case "$VERSION" in *-*) tag=next ;; *) tag=latest ;; esac
+          npm publish ./*.tgz --provenance --tag "$tag"
+
+  github:
+    needs: [pack, npm]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the release
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.pack.outputs.version }}
+        run: |
+          case "$VERSION" in *-*) pre=--prerelease ;; *) pre= ;; esac
+          gh release create "$GITHUB_REF_NAME" ./*.tgz --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" --notes-file notes.md --verify-tag $pre
