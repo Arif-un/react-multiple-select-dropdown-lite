@@ -1,8 +1,13 @@
 version = 1
 
+# dist is committed minified build output
+exclude_patterns = ["dist/**", "coverage/**", "test/example/**"]
+test_patterns = ["test/**"]
+
 [[analyzers]]
 name = "javascript"
 enabled = true
 
 [analyzers.meta]
 plugins = ["react"]
+environment = ["nodejs", "browser", "vitest"]
