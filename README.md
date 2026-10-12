@@ -2,7 +2,7 @@
 
 A lightweight Multiple/Single Select Pure functional component for react using React-Hooks.
 
-**[Live demo and docs](https://arif-un.github.io/react-multiple-select-dropdown-lite/)**
+**[Live demo and docs](https://arif-un.github.io/react-multiple-select-dropdown-lite/)**: [Getting started](https://arif-un.github.io/react-multiple-select-dropdown-lite/getting-started/) · [Examples](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/) · [API](https://arif-un.github.io/react-multiple-select-dropdown-lite/api/) · [Styling](https://arif-un.github.io/react-multiple-select-dropdown-lite/styling/)
 
 <p align="center">
   <a href="https://github.com/Arif-un/react-multiple-select-dropdown-lite/blob/master/LICENSE">
@@ -24,6 +24,8 @@ A lightweight Multiple/Single Select Pure functional component for react using R
 
 ### Screenshot
 
+Try it in the [playground](https://arif-un.github.io/react-multiple-select-dropdown-lite/#try-it).
+
 ![react-multiple-select-dropdown-menu](https://github.com/Arif-un/react-multiple-select-dropdown-lite/blob/master/screenshot/react%20multiple%20select%20dropdown%20menu%20,%20lightweight,%20react%20hooks.gif?raw=true)
 
 ### Install
@@ -32,63 +34,58 @@ A lightweight Multiple/Single Select Pure functional component for react using R
 
 ### Basic Initialization
 
-```
+```jsx
 import React, { useState } from 'react'
-import MultiSelect from  'react-multiple-select-dropdown-lite'
-import  'react-multiple-select-dropdown-lite/dist/index.css'
+import MultiSelect from 'react-multiple-select-dropdown-lite'
+import 'react-multiple-select-dropdown-lite/dist/index.css'
+
+const options = [
+  { label: 'Option 1', value: 'option_1' },
+  { label: 'Option 2', value: 'option_2' },
+  { label: 'Option 3', value: 'option_3' },
+  { label: 'Option 4', value: 'option_4' }
+]
 
 const App = () => {
+  const [value, setValue] = useState('')
 
-  const [value, setvalue] = useState('')
+  return (
+    <div className='app'>
+      <h4>Values</h4>
+      {value}
 
-  const  handleOnchange  =  val  => {
-    setvalue(val)
-  }
-
-  const  options  = [
-    { label:  'Option 1', value:  'option_1'  },
-    { label:  'Option 2', value:  'option_2'  },
-    { label:  'Option 3', value:  'option_3'  },
-    { label:  'Option 4', value:  'option_4'  },
-  ]
-
-  return(
-    <div className="app">
-      <div  className="preview-values">
-        <h4>Values</h4>
-        {value}
-      </div>
-
-      <MultiSelect
-        onChange={handleOnchange}
-        options={options}
-      />
+      <MultiSelect onChange={setValue} options={options} />
     </div>
-)}
-export  default App
+  )
+}
+export default App
 ```
+
+More in the [examples](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/), each with a live demo.
 
 ## Features and Roadmap
 
-- [x] JSON Value <br>
+- [x] [JSON Value](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#option-objects-jsonvalue) <br>
 - [x] Clearable <br>
-- [x] Disable Chip <br>
-- [x] Custom Down Arrow Icon <br>
-- [x] Disabled <br>
-- [x] Select Limit <br>
-- [x] Group <br>
-- [x] Searchable <br>
-- [x] Custom Creatable Value <br>
-- [x] Themeable (using css var) <br>
-- [x] Controlled value <br>
-- [x] Keyboard navigation <br>
-- [x] Accessible (ARIA combobox) <br>
-- [x] TypeScript types <br>
-- [x] SSR and Next.js App Router <br>
+- [x] [Disable Chip](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#count-instead-of-chips) <br>
+- [x] [Custom Down Arrow Icon](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#custom-icons) <br>
+- [x] [Disabled](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#disabled) <br>
+- [x] [Select Limit](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#limit) <br>
+- [x] [Group](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#groups) <br>
+- [x] [Searchable](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#multi-select) <br>
+- [x] [Custom Creatable Value](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#creatable-values) <br>
+- [x] [Themeable (using css var)](https://arif-un.github.io/react-multiple-select-dropdown-lite/styling/) <br>
+- [x] [Controlled value](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#controlled-value) <br>
+- [x] [Keyboard navigation](https://arif-un.github.io/react-multiple-select-dropdown-lite/accessibility/#keyboard) <br>
+- [x] [Accessible (ARIA combobox)](https://arif-un.github.io/react-multiple-select-dropdown-lite/accessibility/#aria) <br>
+- [x] [TypeScript types](https://arif-un.github.io/react-multiple-select-dropdown-lite/api/#types) <br>
+- [x] [SSR and Next.js App Router](https://arif-un.github.io/react-multiple-select-dropdown-lite/ssr/) <br>
 
 <!-- - [ ] Sublist <br> -->
 
 ## Props Options
+
+Also in the [API docs](https://arif-un.github.io/react-multiple-select-dropdown-lite/api/).
 
 | Props             | type                                      | default                | description                                                                                                                                                                                                                                                                                                                                                                                 |
 | ----------------- | ----------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -120,9 +117,9 @@ export  default App
 
 ### Groups
 
-Put options in a group with `type: 'group'`. Groups can nest.
+Put options in a group with `type: 'group'`. Groups can nest ([demo](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#groups)).
 
-```
+```js
 const options = [
   { label: 'Option 1', value: 'option_1' },
   {
@@ -139,9 +136,9 @@ const options = [
 
 ### Controlled value
 
-Pass `value` and update it from `onChange` to own the selection, e.g. to reset or set it from outside. It takes the same forms as `defaultValue`.
+Pass `value` and update it from `onChange` to own the selection, e.g. to reset or set it from outside. It takes the same forms as `defaultValue` ([demo](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#controlled-value)).
 
-```
+```jsx
 const [value, setValue] = useState('option_1')
 
 <MultiSelect options={options} value={value} onChange={setValue} />
@@ -154,7 +151,7 @@ With `defaultValue` instead, the dropdown keeps its own state after the user pic
 
 Types ship with the package. `onChange` gets a `string` by default, or `MultiSelectOption[]` with `jsonValue`.
 
-```
+```tsx
 import MultiSelect from 'react-multiple-select-dropdown-lite'
 import type { MultiSelectOption } from 'react-multiple-select-dropdown-lite'
 
@@ -169,9 +166,9 @@ Also exported: `MultiSelectGroup`, `MultiSelectProps`, `MultiSelectValue`.
 
 ### Next.js and SSR
 
-Server rendering works on React 16 to 19, with matching ids on hydration. The bundles start with `'use client'`, so a Next.js App Router Server Component can import it directly when it passes only serializable props (for example `name` inside a form). To handle `onChange`, render it from your own `'use client'` component.
+Server rendering works on React 16 to 19, with matching ids on hydration. The bundles start with `'use client'`, so a Next.js App Router Server Component can import it directly when it passes only serializable props (for example `name` inside a form). To handle `onChange`, render it from your own `'use client'` component. More in the [SSR guide](https://arif-un.github.io/react-multiple-select-dropdown-lite/ssr/).
 
-```
+```js
 import MultiSelect from 'react-multiple-select-dropdown-lite'
 import 'react-multiple-select-dropdown-lite/dist/index.css'
 ```
@@ -205,14 +202,25 @@ import 'react-multiple-select-dropdown-lite/dist/index.css'
 
 The search field (or the dropdown itself when there is no search field) is an ARIA combobox that controls a listbox of options, with `aria-expanded`, `aria-activedescendant`, `aria-selected` and `aria-disabled`. Groups are `role="group"`, named by their title. Give it an accessible name through `attr`:
 
-```
+```jsx
 <MultiSelect options={options} attr={{ 'aria-label': 'Fruits' }} />
 <MultiSelect options={options} attr={{ 'aria-labelledby': 'fruits-label' }} />
 ```
 
 ### CSS Variables
 
-CSS variable applied in `.msl-vars` class name.
+The defaults live on `.msl-vars`, the wrapper of every dropdown. Override them on `.msl-vars` for all dropdowns, or add your own class for one. Keep `.msl-vars` in the selector: a lone class of yours ties with the defaults, so it only wins when its CSS loads later. See the [styling guide](https://arif-un.github.io/react-multiple-select-dropdown-lite/styling/) for a dark theme.
+
+```css
+/* every dropdown */
+.msl-vars {
+  --input-width: 100%;
+}
+/* one dropdown: <MultiSelect className='compact' /> */
+.msl-vars.compact {
+  --font-size: 14px;
+}
+```
 
 | Variable                 | Default Value         | Details                                          |
 | ------------------------ | --------------------- | ------------------------------------------------ |
@@ -244,7 +252,7 @@ Other parts: `msl-wrp` (wrapper), `msl-chip`, `msl-chip-delete`, `msl-single-val
 
 ### Change Log
 
-See [CHANGELOG.md](https://github.com/Arif-un/react-multiple-select-dropdown-lite/blob/master/CHANGELOG.md). Upgrading from 2.0.x? Check the [2.1.0 upgrade notes](https://github.com/Arif-un/react-multiple-select-dropdown-lite/blob/master/CHANGELOG.md#upgrade-notes).
+See [CHANGELOG.md](https://github.com/Arif-un/react-multiple-select-dropdown-lite/blob/master/CHANGELOG.md) or the [docs changelog](https://arif-un.github.io/react-multiple-select-dropdown-lite/changelog/). Upgrading from 2.0.x? Check the [2.1.0 upgrade notes](https://github.com/Arif-un/react-multiple-select-dropdown-lite/blob/master/CHANGELOG.md#upgrade-notes).
 
 <br>
 <br>
