@@ -65,7 +65,8 @@ declare namespace MultiSelect {
     style?: React.CSSProperties
     /**
      * spread onto the wrapper div, which then sets its own onClick, onKeyDown (after calling yours), tabIndex, style and className,
-     * plus the combobox role and aria attributes when there is no search field
+     * plus the combobox role and aria attributes when there is no search field.
+     * `aria-label` / `aria-labelledby` are also copied to the search field, which is the combobox otherwise
      */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     attr?: React.HTMLAttributes<HTMLDivElement> & { [key: string]: any }
