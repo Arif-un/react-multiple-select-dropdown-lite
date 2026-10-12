@@ -193,6 +193,14 @@ CSS variable applied in `.msl-vars` class name.
 - `'use client'` directive in the CJS / ESM bundles, so Next.js App Router Server Components can import it
 - `value` prop for a controlled selection (`<MultiSelect value={v} onChange={setV} />`)
 - `defaultValue` objects not in `options` (with `customValue`) keep their `value` string instead of the whole object, so `onChange` no longer gets `[object Object]` and the search no longer crashes
+- Enter no longer adds a line break to the search field
+- Pasting into the search inserts plain text, and text pasted from the context menu or dropped in now filters too
+- Enter or comma confirming an IME composition (Chinese, Japanese, Korean input) no longer picks an option
+- The menu closes when Tab moves focus out of the dropdown
+- Works inside a shadow root (React 17+): no crash on keys, and clicks inside no longer close the menu
+- Custom `downArrowIcon` / `closeIcon` of any nesting depth toggle and clear correctly
+- Numeric option values or labels (untyped JS) no longer crash the search
+- The menu opens upward only when there is more room above than below
 
 ###### v-2.0.4
 
