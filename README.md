@@ -2,6 +2,8 @@
 
 A lightweight Multiple/Single Select Pure functional component for react using React-Hooks.
 
+**[Live demo and docs](https://arif-un.github.io/react-multiple-select-dropdown-lite/)**
+
 <p align="center">
   <a href="https://github.com/Arif-un/react-multiple-select-dropdown-lite/blob/master/LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="React Multiple Select Dropdown Lite is released under the MIT license." />
