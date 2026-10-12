@@ -43,12 +43,17 @@ const emptyOptions: readonly Item[] = [
   }
 ]
 
-// aria ids: useId (React 18+) keeps SSR and hydration in sync; older React gets a counter
+// aria ids: useId (React 18+) keeps SSR and hydration in sync. Older React has no
+// SSR-safe id, so a counter sets it after mount: server and first client render both omit it
 let lastId = 0
-/* v8 ignore next -- the counter is for React < 18 */
-const useListId = React.useId
+/* v8 ignore next -- the counter is for React < 18 (covered by the React 16/17 CI jobs) */
+const useListId: () => string | undefined = React.useId
   ? () => `msl-listbox${React.useId()}`
-  : () => useState(() => `msl-listbox-${++lastId}`)[0]
+  : () => {
+      const [id, setId] = useState<string>()
+      useEffect(() => setId(`msl-listbox-${++lastId}`), [])
+      return id
+    }
 
 // options in render order, groups unwrapped, the way Options.tsx walks them
 function flatten(items: readonly Item[], out: MultiSelectOption[] = []) {

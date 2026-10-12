@@ -22,7 +22,7 @@ function Options({
   value: MultiSelectOption[]
   largeData?: boolean
   menuOpen: boolean
-  listId: string
+  listId?: string
   activeIdx: number
 }) {
   if (largeData && !menuOpen) return null
@@ -58,7 +58,8 @@ function Options({
         const idx = n++
         optsArr.push(
           <div
-            id={`${listId}-${idx}`}
+            // no listId only before mount on React < 18
+            id={/* v8 ignore next */ listId && `${listId}-${idx}`}
             role='option'
             aria-selected={checkValueExist(opt, value)}
             aria-disabled={!!opt.disabled}
