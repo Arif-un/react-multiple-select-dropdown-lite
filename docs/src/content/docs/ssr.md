@@ -34,7 +34,7 @@ import { useState } from 'react'
 import MultiSelect from 'react-multiple-select-dropdown-lite'
 
 export default function TopicPicker() {
-  const [topics, setTopics] = useState('')
+  const [topics, setTopics] = useState<string[]>([])
   return (
     <MultiSelect
       options={[{ label: 'News', value: 'news' }]}

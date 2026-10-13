@@ -35,10 +35,10 @@ type Flag = keyof typeof flags
 export default function Playground() {
   const [props, setProps] = useState(flags)
   const [limit, setLimit] = useState(false)
-  const [value, setValue] = useState('')
+  const [value, setValue] = useState<string[]>([])
   const toggle = (name: Flag) => {
     setProps({ ...props, [name]: !props[name] })
-    setValue('')
+    setValue([])
   }
   const changed = (Object.keys(flags) as Flag[]).filter(
     (name) => props[name] !== flags[name]
@@ -72,7 +72,7 @@ export default function Playground() {
             checked={limit}
             onChange={() => {
               setLimit(!limit)
-              setValue('')
+              setValue([])
             }}
           />
           limit={'{2}'}
@@ -89,7 +89,7 @@ export default function Playground() {
           onChange={setValue}
           attr={{ 'aria-label': 'Fruits' }}
         />
-        <p className='demo-output'>value: "{value}"</p>
+        <p className='demo-output'>value: {JSON.stringify(value)}</p>
         <pre>{jsx}</pre>
       </div>
     </div>

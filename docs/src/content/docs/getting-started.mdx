@@ -38,27 +38,28 @@ React 16.9 to 19 is supported.
 
 ## Use it
 
-Import the component and its stylesheet once, pass `options`, and read the selection from `onChange`. By default `onChange` gets the selected values joined by commas.
+Import the component and its stylesheet once, pass `options`, and read the selection from `onChange`. It gets the selected values as an array, and their option objects as a second argument.
 
 <Preview code={basicCode} title='Basic.tsx'>
   <Basic client:load />
 </Preview>
 
-Each option needs a `label` (string or JSX) and a unique string `value`. Pre-select with `defaultValue`, as a comma separated string or an array.
+Each option needs a `label` (string or JSX) and a unique string `value`. Pre-select with `defaultValue`, an array of option values. It only sets the initial selection; to change the selection from outside, pass `value` instead ([controlled value](../examples/#controlled-value)).
 
 ## TypeScript
 
-Types ship with the package. `onChange` gets a `string`, or `MultiSelectOption[]` with `jsonValue`:
+Types ship with the package:
 
 ```tsx
 import MultiSelect from 'react-multiple-select-dropdown-lite'
 import type { MultiSelectOption } from 'react-multiple-select-dropdown-lite'
 
-<MultiSelect options={options} onChange={(value: string) => {}} />
-<MultiSelect jsonValue options={options} onChange={(value: MultiSelectOption[]) => {}} />
+const onChange = (values: string[], options: MultiSelectOption[]) =>
+  console.log(values, options)
+<MultiSelect options={options} onChange={onChange} />
 ```
 
-Also exported: `MultiSelectGroup`, `MultiSelectProps` and `MultiSelectValue`.
+Also exported: `MultiSelectGroup` and `MultiSelectProps`.
 
 ## Next steps
 

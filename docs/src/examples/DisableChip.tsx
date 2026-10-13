@@ -13,7 +13,7 @@ export default function DisableChip() {
       disableChip
       chipAlternateText='days selected'
       options={options}
-      defaultValue='mon,wed,fri'
+      defaultValue={['mon', 'wed', 'fri']}
     />
   )
 }

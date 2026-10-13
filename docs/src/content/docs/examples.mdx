@@ -12,8 +12,8 @@ import Groups from '../../examples/Groups'
 import groupsCode from '../../examples/Groups.tsx?raw'
 import Creatable from '../../examples/Creatable'
 import creatableCode from '../../examples/Creatable.tsx?raw'
-import JsonValue from '../../examples/JsonValue'
-import jsonValueCode from '../../examples/JsonValue.tsx?raw'
+import OptionObjects from '../../examples/OptionObjects'
+import optionObjectsCode from '../../examples/OptionObjects.tsx?raw'
 import Controlled from '../../examples/Controlled'
 import controlledCode from '../../examples/Controlled.tsx?raw'
 import Limit from '../../examples/Limit'
@@ -61,17 +61,17 @@ With `customValue`, typing text that matches no option offers **Create "..."**. 
   <Creatable client:visible />
 </Preview>
 
-## Option objects (jsonValue)
+## Option objects
 
-`jsonValue` makes `onChange` return the selected option objects, including any extra fields you put on them.
+`onChange` gets the selected option objects as its second argument, including any extra fields you put on them.
 
-<Preview code={jsonValueCode} title='JsonValue.tsx'>
-  <JsonValue client:visible />
+<Preview code={optionObjectsCode} title='OptionObjects.tsx'>
+  <OptionObjects client:visible />
 </Preview>
 
 ## Controlled value
 
-Pass `value` and update it from `onChange` to own the selection, for example to reset it or set it from elsewhere.
+Pass `value` and update it from `onChange` to own the selection, for example to reset it or set it from elsewhere. `defaultValue` only sets the initial selection.
 
 <Preview code={controlledCode} title='Controlled.tsx'>
   <Controlled client:visible />
