@@ -61,7 +61,7 @@ function setup(props: MultiSelectProps = {}) {
     q,
     qa,
     root: c.firstChild as HTMLElement,
-    input: () => q('.msl-input[contenteditable="true"]'),
+    input: () => q<HTMLInputElement>('input.msl-input:enabled'),
     chips: () => qa('.msl-chip').map((el) => el.textContent),
     single: () => q('.msl-single-value')?.textContent,
     optionTexts: () =>
@@ -76,8 +76,8 @@ function setup(props: MultiSelectProps = {}) {
 
 type Q = ReturnType<typeof setup>['q']
 
-const type = (el: HTMLElement, text: string, key = text.slice(-1)) => {
-  el.textContent = text
+const type = (el: Element, text: string, key = text.slice(-1)) => {
+  ;(el as HTMLInputElement).value = text
   fireEvent.keyUp(el, { key })
 }
 // returns false when the default action was prevented
@@ -99,9 +99,10 @@ describe('render', () => {
     const hidden = q<HTMLInputElement>('input[type="hidden"]')
     expect(hidden.name).toBe('')
     expect(hidden.value).toBe('')
-    const input = q('.msl-input')
-    expect(input.getAttribute('data-placeholder')).toBe('Select...')
-    expect(input.getAttribute('contenteditable')).toBe('true')
+    const input = q<HTMLInputElement>('.msl-input')
+    expect(input.placeholder).toBe('Select...')
+    expect(input.disabled).toBe(false)
+    expect(input.getAttribute('autocomplete')).toBe('off')
     const empty = q('.msl-option')
     expect(empty.textContent).toBe('Empty')
     expect(empty.className).toContain('msl-option-disable')
@@ -127,7 +128,7 @@ describe('render', () => {
     // jsx(), not the classic createElement this file compiles to (that one still applies defaultProps)
     const { container, rerender } = render(jsx(MultiSelect, {}))
     const q = (s: string) => container.querySelector(s)!
-    expect(q('.msl-input').getAttribute('data-placeholder')).toBe('Select...')
+    expect(q('.msl-input').getAttribute('placeholder')).toBe('Select...')
     expect(q('.msl-option').textContent).toBe('Empty')
     rerender(jsx(MultiSelect, { options: opts }))
     fireEvent.click(container.firstChild!)
@@ -154,7 +155,7 @@ describe('render', () => {
     expect(root.id).toBe('ms')
     expect(root.getAttribute('data-x')).toBe('1')
     expect(hidden().name).toBe('fruits')
-    expect(input().getAttribute('data-placeholder')).toBe('Pick one')
+    expect(input().placeholder).toBe('Pick one')
   })
 
   it.each([
@@ -648,8 +649,8 @@ describe('disableChip / disableSearch / disabled', () => {
     expect(root.tabIndex).toBe(-1)
     expect(q('.msl-chip-delete').tabIndex).toBe(-1)
     expect(q('.msl-clear-btn').tabIndex).toBe(-1)
-    const search = q('.msl-input')
-    expect(search.getAttribute('contenteditable')).toBe('false')
+    const search = q<HTMLInputElement>('.msl-input')
+    expect(search.disabled).toBe(true)
     expect(search.getAttribute('aria-disabled')).toBe('true')
     for (const key of ['Enter', ' ', 'a', 'ArrowDown', 'Backspace']) {
       press(root, key)
@@ -739,7 +740,7 @@ describe('search', () => {
       type(input(), 'ch')
       type(input(), 'ch', key)
       expect(chips()).toEqual(['Cherry'])
-      expect(input().innerHTML).toBe('')
+      expect(input().value).toBe('')
       expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry'])
     }
   )
@@ -752,34 +753,9 @@ describe('search', () => {
 
   it('searches on input too: text can arrive without a keyup (context menu paste)', () => {
     const { input, optionTexts } = setup()
-    input().textContent = 'ch'
+    input().value = 'ch'
     fireEvent.input(input())
     expect(optionTexts()).toEqual(['Cherry'])
-  })
-
-  it('pastes as plain text, spaces for line breaks', () => {
-    const exec = vi.fn(() => true)
-    document.execCommand = exec
-    try {
-      const { input } = setup()
-      const paste = () =>
-        fireEvent.paste(input(), {
-          clipboardData: {
-            getData: (t: string) => t === 'text/plain' && 'a\n b'
-          }
-        })
-      expect(paste()).toBe(false)
-      expect(exec).toHaveBeenCalledWith('insertText', false, 'a b')
-      exec.mockReturnValue(false)
-      expect(paste()).toBe(true)
-    } finally {
-      delete (document as Partial<Document>).execCommand
-    }
-    // jsdom: no execCommand, the default paste runs
-    const { input } = setup()
-    expect(
-      fireEvent.paste(input(), { clipboardData: { getData: () => 'a' } })
-    ).toBe(true)
   })
 
   it('numeric option values and labels (untyped JS) search and resolve', () => {
@@ -807,7 +783,7 @@ describe('search', () => {
       fireEvent.click(input())
       press(input(), 'ArrowDown')
       for (const key of ['Enter', ',']) {
-        input().textContent = 'ch'
+        input().value = 'ch'
         expect(press(input(), key, init)).toBe(true)
         fireEvent.keyUp(input(), { key })
       }
@@ -1422,7 +1398,8 @@ describe('keyboard', () => {
     return {
       ...utils,
       focusedOption: () => utils.q('.msl-option-focused')?.textContent,
-      activeId: (el = utils.input()) => el.getAttribute('aria-activedescendant')
+      activeId: (el: Element = utils.input()) =>
+        el.getAttribute('aria-activedescendant')
     }
   }
 
@@ -1581,7 +1558,7 @@ describe('keyboard', () => {
     press(input(), 'Enter')
     fireEvent.keyUp(input(), { key: 'Enter' })
     expect(chips()).toEqual(['Banana'])
-    expect(input().textContent).toBe('')
+    expect(input().value).toBe('')
     expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry'])
   })
 
@@ -1629,10 +1606,10 @@ describe('keyboard', () => {
     const { root, input, chips, onChange } = setupKeys({
       defaultValue: ['apple', 'banana']
     })
-    input().textContent = 'x'
+    input().value = 'x'
     press(input(), 'Backspace')
     expect(chips()).toEqual(['Apple', 'Banana'])
-    input().textContent = ''
+    input().value = ''
     press(root, 'Backspace')
     expect(chips()).toEqual(['Apple', 'Banana'])
     press(input(), 'Backspace')

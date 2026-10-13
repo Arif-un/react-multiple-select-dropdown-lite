@@ -11,6 +11,7 @@
   --line-height: 1.4;
   --active-menu-background: white;
   --active-menu-radius: var(--border-radius);
+  --placeholder-color: rgb(146, 146, 146);
 }
 
 .msl-wrp * {
@@ -117,11 +118,24 @@
   margin: 5px;
   padding: 3px;
   font-size: var(--font-size);
+  font-family: inherit;
+  color: inherit;
+  border: 0;
+  background: none;
+  /* ponytail: without field-sizing (older Safari) the input keeps its default width; a hidden text copy could size it there */
+  field-sizing: content;
+  /* content-box: 100% less the margin and padding */
+  max-width: calc(100% - 16px);
+  text-overflow: ellipsis;
+}
+.msl-input::placeholder {
+  color: var(--placeholder-color);
+  opacity: 1;
 }
 
 .msl-input::before {
   line-height: var(--line-height);
-  color: rgb(146, 146, 146);
+  color: var(--placeholder-color);
 }
 .msl-input[data-placeholder]:not([data-placeholder='']):empty::before {
   content: attr(data-placeholder);

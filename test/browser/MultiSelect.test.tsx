@@ -1,6 +1,6 @@
-// Real-browser characterization tests: layout, CSS, focus and contentEditable typing that jsdom fakes.
+// Real-browser characterization tests: layout, CSS, focus and typing that jsdom fakes.
 // Like test/MultiSelect.test.tsx, "current behavior: ..." pins known quirks.
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 import type { MultiSelectProps } from '../../src/index'
@@ -26,7 +26,7 @@ async function setup(props: MultiSelectProps = {}, { offsetTop = 0 } = {}) {
     root,
     q,
     outside: q('button'),
-    input: () => q('.msl-input[contenteditable="true"]'),
+    input: () => q('input.msl-input:enabled') as HTMLInputElement,
     // closed menu = max-height: 0 in CSS, so its real height is the open/closed signal
     menuHeight: () => q('.msl-options').getBoundingClientRect().height,
     chips: () =>
@@ -95,7 +95,7 @@ it.each(['{Enter}', ','])(
     await expect.poll(visibleOptions).toEqual(['Cherry'])
     await userEvent.keyboard(key)
     await expect.poll(chips).toEqual(['Cherry'])
-    expect(input().textContent).toBe('')
+    expect(input().value).toBe('')
     expect(visibleOptions()).toEqual(['Apple', 'Banana', 'Cherry'])
   }
 )
@@ -138,11 +138,29 @@ it('closes when Tab moves focus out', async () => {
   await expect.poll(menuHeight).toBe(0)
 })
 
-it('Enter adds no line break to the search field', async () => {
-  const { root, input } = await setup()
-  await userEvent.click(root)
+it('Enter in the search does not submit a surrounding form', async () => {
+  const onSubmit = vi.fn((e: React.FormEvent) => e.preventDefault())
+  const screen = await render(
+    <form onSubmit={onSubmit}>
+      <MultiSelect options={opts} />
+    </form>
+  )
+  await userEvent.click(screen.container.querySelector('.msl-wrp')!)
   await userEvent.keyboard('{Enter}zzz{Enter}')
-  expect(input().innerHTML).toBe('zzz')
+  expect(onSubmit).not.toHaveBeenCalled()
+})
+
+it('the search field fits its text, and long text scrolls clear of the buttons', async () => {
+  const { q, input } = await setup()
+  const box = () => input().getBoundingClientRect()
+  const placeholderWidth = box().width
+  await userEvent.type(input(), 'ba')
+  expect(box().width).toBeLessThan(placeholderWidth)
+  await userEvent.type(input(), 'nana'.repeat(20))
+  expect(box().height).toBeLessThan(30)
+  expect(box().right).toBeLessThanOrEqual(
+    q('.msl-actions').getBoundingClientRect().left
+  )
 })
 
 it('a rich paste lands as plain text and filters', async () => {
@@ -154,7 +172,7 @@ it('a rich paste lands as plain text and filters', async () => {
     await userEvent.copy()
     await userEvent.click(root)
     await userEvent.paste()
-    expect(input().innerHTML).toBe('Ban')
+    expect(input().value).toBe('Ban')
     expect(visibleOptions()).toEqual(['Banana'])
     expect(q('.msl-options').textContent).toBe('Banana')
   } finally {
@@ -262,7 +280,7 @@ it('arrows move the highlight over enabled options and Enter picks it', async ()
   await userEvent.keyboard('{Enter}')
   await expect.poll(chips).toEqual(['Cherry'])
   expect(focused()).toBe('search')
-  expect(input().innerHTML).toBe('')
+  expect(input().value).toBe('')
   expect(menuHeight()).toBeGreaterThan(0)
 })
 
@@ -281,7 +299,7 @@ it('picks a highlighted search result with Enter', async () => {
   await expect.poll(visibleOptions).toEqual(['Banana'])
   await userEvent.keyboard('{ArrowDown}{Enter}')
   await expect.poll(chips).toEqual(['Banana'])
-  expect(input().innerHTML).toBe('')
+  expect(input().value).toBe('')
   expect(highlighted()?.textContent).toBe('Banana')
 })
 
@@ -289,7 +307,7 @@ it('Backspace in an empty search field removes the last chip', async () => {
   const { input, chips } = await setup({ defaultValue: ['apple', 'banana'] })
   await userEvent.type(input(), 'c')
   await userEvent.keyboard('{Backspace}')
-  expect(input().textContent).toBe('')
+  expect(input().value).toBe('')
   expect(chips()).toEqual(['Apple', 'Banana'])
   await userEvent.keyboard('{Backspace}')
   await expect.poll(chips).toEqual(['Apple'])

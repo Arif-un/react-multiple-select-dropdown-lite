@@ -94,7 +94,7 @@ function MultiSelect({
   const items = search || options
   // the Create "..." item last offered by the search
   const createOpt = useRef<MultiSelectOption | null>(null)
-  const inputFld = useRef<HTMLDivElement>(null)
+  const inputFld = useRef<HTMLInputElement>(null)
   const listId = `msl-listbox${useId()}`
   // the keyboard highlighted option: idx tells repeated values apart
   const [active, setActive] = useState<{ value: string; idx: number } | null>(
@@ -182,7 +182,7 @@ function MultiSelect({
     setSearch(null)
     // clear search input
     if (inputFld.current) {
-      inputFld.current.innerHTML = ''
+      inputFld.current.value = ''
     }
     // unset closeOnSelect: single select closes, multi select stays open
     if (menuOpen && (closeOnSelect ?? singleSelect)) {
@@ -266,8 +266,8 @@ function MultiSelect({
   const handleSearchAndCustomValue = (
     e: React.SyntheticEvent & { key?: string }
   ) => {
-    const textValue = (e.target as HTMLElement)
-      .textContent!.trim()
+    const textValue = (e.target as HTMLInputElement).value
+      .trim()
       .replace(/,+/g, '')
 
     if (textValue) {
@@ -366,7 +366,7 @@ function MultiSelect({
     } else if (
       key === 'Backspace' &&
       target === inputFld.current &&
-      !inputFld.current.textContent
+      !inputFld.current.value
     ) {
       // a value next to the search field means chips mode
       value.length && deleteValue(value.length - 1)
@@ -374,7 +374,7 @@ function MultiSelect({
       /^Arrow(Down|Up)$/.test(key) ||
       // with search text, Home/End move the caret
       (/^(Home|End)$/.test(key) &&
-        !(target === inputFld.current && inputFld.current.textContent))
+        !(target === inputFld.current && inputFld.current.value))
     ) {
       e.preventDefault()
       highlight(key)
@@ -383,7 +383,7 @@ function MultiSelect({
       key === 'Enter' ||
       (key.length === 1 && !e.ctrlKey && !e.metaKey)
     ) {
-      // Space on the wrapper would scroll the page; Enter in the search adds a line break
+      // Space on the wrapper would scroll the page; Enter in the search would submit a form
       ;((key === ' ' && target === e.currentTarget) || key === 'Enter') &&
         e.preventDefault()
       openMenu(e)
@@ -473,25 +473,17 @@ function MultiSelect({
             </span>
           )}
           {showSearchOption() && (
-            <div
+            <input
               data-msl
-              data-placeholder={placeholder}
+              placeholder={placeholder}
               className='msl-input'
-              contentEditable={!disabled}
+              disabled={disabled}
+              // the browser's own history list would cover the menu
+              autoComplete='off'
               onKeyUp={handleSearchAndCustomValue}
               onInput={(e) => {
                 setActive(null)
                 handleSearchAndCustomValue(e)
-              }}
-              onPaste={(e) => {
-                // plain text only: a rich paste keeps its formatting in a contentEditable.
-                // jsdom has no execCommand: then the browser default runs
-                const text = e.clipboardData.getData('text/plain')
-                document.execCommand?.(
-                  'insertText',
-                  false,
-                  text.replace(/\s+/g, ' ')
-                ) && e.preventDefault()
               }}
               ref={inputFld}
               {...combobox}
