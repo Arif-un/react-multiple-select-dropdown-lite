@@ -1,6 +1,6 @@
-// Characterization tests: they pin the CURRENT behavior of v2.0.6, quirks included.
+// Characterization tests: they pin the current behavior, quirks included.
 // Tests named "current behavior: ..." document known bugs; a fix should update them on purpose.
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { renderToString } from 'react-dom/server'
 import { jsx } from 'react/jsx-runtime'
