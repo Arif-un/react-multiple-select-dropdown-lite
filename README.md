@@ -229,6 +229,7 @@ The defaults live on `.msl-vars`, the wrapper of every dropdown. Override them o
 | --line-height            | 1.4                   | fonts line height.                               |
 | --active-menu-background | white                 | Dropdown menu <br> background color when active. |
 | --active-menu-radius     | var(--border-radius)  | Dropdown menu border <br> radius when active.    |
+| --placeholder-color      | rgb(146, 146, 146)    | Placeholder text color.                          |
 
 ### CSS Classes
 
