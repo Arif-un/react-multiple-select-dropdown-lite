@@ -1,4 +1,4 @@
-import React from 'react'
+import type { ReactElement } from 'react'
 import type { MultiSelectGroup, MultiSelectOption } from './index'
 
 // options and groups share one loop, told apart by `type` at runtime
@@ -22,18 +22,18 @@ function Options({
   value: MultiSelectOption[]
   largeData?: boolean
   menuOpen: boolean
-  listId?: string
+  listId: string
   activeIdx: number
 }) {
   if (largeData && !menuOpen) return null
   // counts options only, like MultiSelect's flattened list
   let n = 0
   let g = 0
-  function addInArr(opts: Item[], out: React.ReactElement[]) {
+  function addInArr(opts: Item[], out: ReactElement[]) {
     for (const [i, opt] of opts.entries()) {
       if (opt.type === 'group') {
         // the title names the group, as in the APG grouped listbox
-        const titleId = /* v8 ignore next */ listId && `${listId}-g${g++}`
+        const titleId = `${listId}-g${g++}`
         const childs = [
           <div
             key='msl-grp-title'
@@ -66,8 +66,7 @@ function Options({
         const idx = n++
         out.push(
           <div
-            // no listId only before mount on React < 18
-            id={/* v8 ignore next */ listId && `${listId}-${idx}`}
+            id={`${listId}-${idx}`}
             role='option'
             aria-selected={checkValueExist(opt, value)}
             aria-disabled={!!opt.disabled}

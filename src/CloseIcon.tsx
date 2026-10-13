@@ -1,5 +1,3 @@
-import React from 'react'
-
 export default function CloseIcon() {
   return (
     <svg viewBox='0 0 10 10' className='msl-close-icn'>

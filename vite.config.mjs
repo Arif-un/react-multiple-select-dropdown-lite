@@ -45,14 +45,12 @@ const typesAsIs = {
 }
 
 export default defineConfig({
-  // classic runtime: react/jsx-runtime does not exist before React 16.14
-  oxc: { jsx: { runtime: 'classic' } },
   plugins: [cssAsIs, typesAsIs],
   build: {
     lib: { entry: 'src/MultiSelect.tsx' },
     sourcemap: true,
     rolldownOptions: {
-      external: ['react'],
+      external: ['react', 'react/jsx-runtime'],
       output: [
         // 'use client': Next.js App Router can import it from a Server Component
         {

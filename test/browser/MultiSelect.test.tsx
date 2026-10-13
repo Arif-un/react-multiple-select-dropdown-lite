@@ -1,6 +1,5 @@
 // Real-browser characterization tests: layout, CSS, focus and contentEditable typing that jsdom fakes.
 // Like test/MultiSelect.test.tsx, "current behavior: ..." pins known quirks of v2.0.6.
-import React from 'react'
 import { expect, it } from 'vitest'
 import { userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
