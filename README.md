@@ -166,7 +166,7 @@ Also exported: `MultiSelectGroup`, `MultiSelectProps`, `MultiSelectValue`.
 
 ### Next.js and SSR
 
-Server rendering works on React 16 to 19, with matching ids on hydration. The bundles start with `'use client'`, so a Next.js App Router Server Component can import it directly when it passes only serializable props (for example `name` inside a form). To handle `onChange`, render it from your own `'use client'` component. More in the [SSR guide](https://arif-un.github.io/react-multiple-select-dropdown-lite/ssr/).
+Server rendering works on React 18 and 19, with matching ids on hydration. The bundles start with `'use client'`, so a Next.js App Router Server Component can import it directly when it passes only serializable props (for example `name` inside a form). To handle `onChange`, render it from your own `'use client'` component. More in the [SSR guide](https://arif-un.github.io/react-multiple-select-dropdown-lite/ssr/).
 
 ```js
 import MultiSelect from 'react-multiple-select-dropdown-lite'

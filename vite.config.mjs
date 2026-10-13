@@ -1,12 +1,10 @@
-import babel, { getBabelOutputPlugin } from '@rollup/plugin-babel'
 import { playwright } from '@vitest/browser-playwright'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 
-const bundles = ['index.js', 'index.esm.js', 'index.modern.js', 'index.umd.js']
-const es5 = { targets: { ie: '11' }, loose: true }
+const bundles = ['index.js', 'index.modern.js']
 
 // Copies imported CSS to dist/index.css byte for byte. Vite's CSS pipeline would add a marker comment.
 // The JS never imports it; users import dist/index.css themselves.
@@ -47,41 +45,12 @@ const typesAsIs = {
 }
 
 export default defineConfig({
-  // classic runtime: react/jsx-runtime does not exist before React 16.14
-  oxc: { jsx: { runtime: 'classic' } },
-  // Babel (not Oxc) compiles the bundles to reproduce what microbundle-crl shipped up to v2.0.6:
-  // ES5 everywhere, loose mode (array spread becomes concat, see MultiSelect.tsx).
-  // Oxc strips the TypeScript first, so Babel only sees JavaScript.
-  plugins: [
-    cssAsIs,
-    typesAsIs,
-    {
-      // inline, not bundled: Rolldown can't tree-shake Babel's bundled helper module
-      ...babel({
-        babelHelpers: 'inline',
-        babelrc: false,
-        configFile: false,
-        extensions: ['.js', '.jsx', '.ts', '.tsx'],
-        presets: [['@babel/preset-env', es5]]
-      }),
-      apply: 'build'
-    },
-    {
-      // lowers Rolldown's own CJS interop helpers (arrow functions, let); needs no Babel helpers,
-      // so nothing lands outside the UMD wrapper (guarded by test/bundles.test.ts)
-      ...getBabelOutputPlugin({
-        presets: [['@babel/preset-env', es5]],
-        allowAllFormats: true
-      }),
-      apply: 'build'
-    }
-  ],
+  plugins: [cssAsIs, typesAsIs],
   build: {
     lib: { entry: 'src/MultiSelect.tsx' },
     sourcemap: true,
-    minify: 'terser',
     rolldownOptions: {
-      external: ['react'],
+      external: ['react', 'react/jsx-runtime'],
       output: [
         // 'use client': Next.js App Router can import it from a Server Component
         {
@@ -92,21 +61,12 @@ export default defineConfig({
         },
         {
           format: 'es',
-          entryFileNames: 'index.esm.js',
-          postBanner: "'use client';"
-        },
-        {
-          format: 'es',
           entryFileNames: 'index.modern.js',
-          postBanner: "'use client';"
-        },
-        {
-          format: 'umd',
-          entryFileNames: 'index.umd.js',
-          name: 'reactMultipleSelectDropdownLite',
-          globals: { react: 'React' } // React's own UMD build sets window.React (v2.0.6 read window.react)
+          postBanner: "'use client';",
+          // Vite skips whitespace minification for ES libs by default
+          minify: true
         }
-      ].map((output) => ({ ...output, generatedCode: { preset: 'es5' } }))
+      ]
     }
   },
   test: {
@@ -140,9 +100,9 @@ export default defineConfig({
         test: {
           name: `dist/${file}`,
           include: ['test/MultiSelect.test.tsx'],
-          // let Node load CJS/UMD bundles as-is
+          // let Node load the CJS bundle as-is
           server: {
-            deps: { external: file.match(/esm|modern/) ? [] : [/\/dist\//] }
+            deps: { external: file.endsWith('.modern.js') ? [] : [/\/dist\//] }
           }
         },
         resolve: {

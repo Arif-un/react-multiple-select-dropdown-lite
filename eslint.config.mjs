@@ -9,6 +9,7 @@ export default [
   js.configs.recommended,
   ...tseslint.configs.recommended,
   react.configs.flat.recommended,
+  react.configs.flat['jsx-runtime'],
   {
     files: ['**/*.{js,jsx,mjs,ts,tsx}'],
     languageOptions: { globals: { ...globals.browser, ...globals.node } },

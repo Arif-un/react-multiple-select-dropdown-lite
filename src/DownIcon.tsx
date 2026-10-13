@@ -1,5 +1,3 @@
-import React from 'react'
-
 export default function DownIcon() {
   return (
     <svg viewBox='0 0 20 20' className='msl-arrow-icn'>
