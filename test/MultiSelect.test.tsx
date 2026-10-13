@@ -83,6 +83,9 @@ const type = (el: HTMLElement, text: string, key = text.slice(-1)) => {
 // returns false when the default action was prevented
 const press = (el: Element, key = 'Enter', init = {}) =>
   fireEvent.keyDown(el, { key, ...init })
+// the values argument of each onChange call
+const values = (onChange: ReturnType<typeof vi.fn>) =>
+  onChange.mock.calls.map(([v]) => v)
 
 describe('render', () => {
   it('renders with no props at all', () => {
@@ -171,7 +174,7 @@ describe('render', () => {
 
   it('renders custom icons', () => {
     const { q } = setup({
-      defaultValue: 'apple',
+      defaultValue: ['apple'],
       closeIcon: <i className='my-close' />,
       downArrowIcon: <i className='my-arrow' />
     })
@@ -190,76 +193,43 @@ describe('render', () => {
 })
 
 describe('defaultValue', () => {
-  it('parses a comma separated string in the given order', () => {
-    const { chips, hidden, onChange } = setup({ defaultValue: 'cherry,apple' })
+  it('selects the values in the given order', () => {
+    const { chips, hidden, onChange } = setup({
+      defaultValue: ['cherry', 'apple']
+    })
     expect(chips()).toEqual(['Cherry', 'Apple'])
     expect(hidden().value).toBe('cherry,apple')
     expect(onChange).not.toHaveBeenCalled()
   })
 
   it('drops unknown values without customValue', () => {
-    expect(setup({ defaultValue: 'apple,zzz' }).chips()).toEqual(['Apple'])
-    cleanup()
-    expect(
-      setup({ defaultValue: [{ value: 'zzz' }, 'banana'] }).chips()
-    ).toEqual(['Banana'])
-  })
-
-  it('accepts an array of strings', () => {
-    expect(setup({ defaultValue: ['banana'] }).chips()).toEqual(['Banana'])
-  })
-
-  it('accepts an array of objects, taking labels from options', () => {
-    const { chips } = setup({
-      defaultValue: [{ value: 'cherry' }, { label: 'Other', value: 'apple' }]
+    const { chips, hidden, option, onChange } = setup({
+      defaultValue: ['apple', 'zzz']
     })
-    expect(chips()).toEqual(['Cherry', 'Apple'])
+    expect(chips()).toEqual(['Apple'])
+    expect(hidden().value).toBe('apple')
+    fireEvent.click(option('Banana'))
+    expect(values(onChange)).toEqual([['apple', 'banana']])
   })
 
-  it('ignores items that are neither string nor object', () => {
-    // @ts-expect-error not part of the typed API
-    expect(setup({ defaultValue: [42, 'apple'] }).chips()).toEqual(['Apple'])
-  })
-
-  it('creates a Custom Values group for unknown strings with customValue', () => {
-    const { chips, groupTitles, optionTexts } = setup({
-      defaultValue: 'apple,zzz',
+  it('creates a Custom Values group for unknown values with customValue', () => {
+    const { chips, groupTitles, optionTexts, onChange, option } = setup({
+      defaultValue: ['apple', 'zzz'],
       customValue: true
     })
     expect(chips()).toEqual(['Apple', 'zzz'])
     expect(groupTitles()).toEqual(['Custom Values'])
     expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry', 'zzz'])
-  })
-
-  it('labels unknown objects by label, then title', () => {
-    const { chips } = setup({
-      defaultValue: [
-        { label: 'Lbl', value: 'v1' },
-        { title: 'Ttl', value: 'v2' }
-      ],
-      customValue: true
-    })
-    expect(chips()).toEqual(['Lbl', 'Ttl'])
-  })
-
-  it('unknown objects keep their value string; no label or a JSX one falls back to title, then value', () => {
-    const { chips, hidden, input, optionTexts } = setup({
-      defaultValue: [
-        { value: 'a' },
-        { label: <b>B</b>, title: 'Bee', value: 'b' }
-      ],
-      customValue: true
-    })
-    expect(chips()).toEqual(['a', 'Bee'])
-    expect(hidden().value).toBe('a,b')
-    // object values used to make the search throw
-    type(input(), 'x')
-    expect(optionTexts()).toEqual(['Create "x"'])
+    fireEvent.click(option('Banana'))
+    expect(onChange).toHaveBeenLastCalledWith(
+      ['apple', 'zzz', 'banana'],
+      [opts[0], { label: 'zzz', value: 'zzz' }, opts[1]]
+    )
   })
 
   it('keeps only the first value in singleSelect', () => {
     const { single, chips, q } = setup({
-      defaultValue: 'banana,apple',
+      defaultValue: ['banana', 'apple'],
       singleSelect: true
     })
     expect(single()).toBe('Banana')
@@ -267,100 +237,78 @@ describe('defaultValue', () => {
     expect(q('.msl-input')).toBeNull()
   })
 
-  it('re-syncs when the prop changes, without firing onChange', () => {
-    const { rerender, chips, onChange } = setup({ defaultValue: 'apple' })
+  it('ignores later changes, like an uncontrolled input; a new key resets', () => {
+    const { rerender, chips, onChange } = setup({ defaultValue: ['apple'] })
     rerender(
       <MultiSelect
         options={opts}
         onChange={onChange}
-        defaultValue='banana,cherry'
+        defaultValue={['banana', 'cherry']}
+      />
+    )
+    expect(chips()).toEqual(['Apple'])
+    rerender(
+      <MultiSelect
+        key='reset'
+        options={opts}
+        onChange={onChange}
+        defaultValue={['banana', 'cherry']}
       />
     )
     expect(chips()).toEqual(['Banana', 'Cherry'])
-    rerender(<MultiSelect options={opts} onChange={onChange} defaultValue='' />)
-    expect(chips()).toEqual([])
     expect(onChange).not.toHaveBeenCalled()
   })
 
   it('resolves once options arrive after mount (#12)', () => {
-    const { rerender, chips, single, onChange } = setup({
+    const { rerender, chips, onChange } = setup({
       options: [],
-      defaultValue: 'banana'
+      defaultValue: ['banana']
     })
     expect(chips()).toEqual([])
     rerender(
-      <MultiSelect options={opts} onChange={onChange} defaultValue='banana' />
+      <MultiSelect options={opts} onChange={onChange} defaultValue={['x']} />
     )
     expect(chips()).toEqual(['Banana'])
-    rerender(
-      <MultiSelect options={[]} defaultValue='apple,cherry' singleSelect />
-    )
-    rerender(
-      <MultiSelect options={opts} defaultValue='apple,cherry' singleSelect />
+    expect(onChange).not.toHaveBeenCalled()
+    cleanup()
+    const { rerender: rerenderSingle, single } = setup({
+      options: [],
+      defaultValue: ['zzz', 'apple', 'cherry'],
+      singleSelect: true
+    })
+    rerenderSingle(
+      <MultiSelect options={opts} defaultValue={[]} singleSelect />
     )
     expect(single()).toBe('Apple')
-    expect(onChange).not.toHaveBeenCalled()
   })
 
-  it('keeps user changes when options get a new array, until defaultValue changes', () => {
+  it('keeps user changes when options get a new array', () => {
     const { rerender, option, chips, onChange } = setup({
-      defaultValue: 'apple'
+      defaultValue: ['apple']
     })
     fireEvent.click(option('Banana'))
     rerender(
       <MultiSelect
         options={[...opts]}
         onChange={onChange}
-        defaultValue='apple'
+        defaultValue={['apple']}
       />
     )
     expect(chips()).toEqual(['Apple', 'Banana'])
-    rerender(
-      <MultiSelect
-        options={[...opts]}
-        onChange={onChange}
-        defaultValue='cherry'
-      />
-    )
-    expect(chips()).toEqual(['Cherry'])
-    rerender(
-      <MultiSelect
-        options={[...opts]}
-        onChange={onChange}
-        defaultValue='cherry'
-      />
-    )
-    expect(chips()).toEqual(['Cherry'])
   })
 
-  it('keeps the Custom Values group when defaultValue adds custom values', () => {
-    const { rerender, chips, groupTitles, optionTexts } = setup({
-      defaultValue: 'zzz',
-      customValue: true
-    })
-    expect(groupTitles()).toEqual(['Custom Values'])
-    rerender(<MultiSelect options={opts} defaultValue='zzz,yyy' customValue />)
-    expect(chips()).toEqual(['zzz', 'yyy'])
-    expect(groupTitles()).toEqual(['Custom Values'])
-    expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry', 'zzz', 'yyy'])
-  })
-
-  it('warns for JSX labels without title and shows value in the chip', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  it('shows value in the chip for JSX labels without title', () => {
     const { chips } = setup({
       options: [{ label: <b>Bold</b>, value: 'bold' }],
-      defaultValue: 'bold'
+      defaultValue: ['bold']
     })
     expect(chips()).toEqual(['bold'])
-    expect(warn).toHaveBeenCalledWith(
-      '[multiselect] you must provide a title property as typeof string, if you want to render jsx in option label'
-    )
   })
 
   it('shows title in the chip for JSX labels with title', () => {
     const { chips } = setup({
       options: [{ label: <b>Bold</b>, value: 'bold', title: 'Bold title' }],
-      defaultValue: 'bold'
+      defaultValue: ['bold']
     })
     expect(chips()).toEqual(['Bold title'])
   })
@@ -439,7 +387,7 @@ describe('options', () => {
 })
 
 describe('selecting (multi)', () => {
-  it('toggles options and reports a comma joined string', () => {
+  it('toggles options and reports the values and their options', () => {
     const { option, chips, onChange } = setup()
     fireEvent.click(option('Apple'))
     fireEvent.click(option('Banana'))
@@ -448,16 +396,20 @@ describe('selecting (multi)', () => {
     fireEvent.click(option('Apple'))
     expect(chips()).toEqual(['Banana'])
     expect(onChange.mock.calls).toEqual([
-      ['apple'],
-      ['apple,banana'],
-      ['banana']
+      [['apple'], [opts[0]]],
+      [
+        ['apple', 'banana'],
+        [opts[0], opts[1]]
+      ],
+      [['banana'], [opts[1]]]
     ])
   })
 
-  it('reports option objects with jsonValue', () => {
-    const { option, onChange } = setup({ jsonValue: true })
-    fireEvent.click(option('Apple'))
-    expect(onChange).toHaveBeenLastCalledWith([opts[0]])
+  it('reports the option objects themselves, extra fields included', () => {
+    const options = [{ label: 'Ada', value: 'ada', email: 'ada@example.com' }]
+    const { option, onChange } = setup({ options })
+    fireEvent.click(option('Ada'))
+    expect(onChange.mock.calls[0][1][0]).toBe(options[0])
   })
 
   it('respects limit, still firing onChange when blocked', () => {
@@ -468,10 +420,10 @@ describe('selecting (multi)', () => {
     expect(root.classList).toContain('msl-limit-reached')
     fireEvent.click(option('Cherry'))
     expect(chips()).toEqual(['Apple', 'Banana'])
-    expect(onChange.mock.calls).toEqual([
+    expect(values(onChange)).toEqual([
       ['apple'],
-      ['apple,banana'],
-      ['apple,banana']
+      ['apple', 'banana'],
+      ['apple', 'banana']
     ])
   })
 
@@ -495,7 +447,7 @@ describe('selecting (multi)', () => {
 
   it('deletes a chip by click, Enter or Space without opening the menu', () => {
     const { qa, chips, onChange, isOpen } = setup({
-      defaultValue: 'apple,banana,cherry'
+      defaultValue: ['apple', 'banana', 'cherry']
     })
     expect(qa('.msl-chip-delete')[0].getAttribute('aria-label')).toBe(
       'delete-value'
@@ -508,13 +460,13 @@ describe('selecting (multi)', () => {
     expect(chips()).toEqual(['Cherry'])
     expect(press(qa('.msl-chip-delete')[0], ' ')).toBe(false)
     expect(chips()).toEqual([])
-    expect(onChange.mock.calls).toEqual([['apple,cherry'], ['cherry'], ['']])
+    expect(values(onChange)).toEqual([['apple', 'cherry'], ['cherry'], []])
     expect(isOpen()).toBe(false)
   })
 
   it('clears everything by click, Enter or Space without opening the menu', () => {
     const { q, chips, onChange, isOpen, rerender } = setup({
-      defaultValue: 'apple,banana'
+      defaultValue: ['apple', 'banana']
     })
     const clear = q('.msl-clear-btn')
     expect(clear.getAttribute('aria-label')).toBe('close-menu')
@@ -522,25 +474,40 @@ describe('selecting (multi)', () => {
     expect(chips()).toEqual([])
     expect(q('.msl-clear-btn')).toBeNull()
     expect(isOpen()).toBe(false)
+    // a new key remounts with the new defaultValue
     rerender(
-      <MultiSelect options={opts} onChange={onChange} defaultValue='cherry' />
+      <MultiSelect
+        key='b'
+        options={opts}
+        onChange={onChange}
+        defaultValue={['cherry']}
+      />
     )
     press(q('.msl-clear-btn'), 'x')
     expect(chips()).toEqual(['Cherry'])
     expect(press(q('.msl-clear-btn'), 'Enter')).toBe(false)
     expect(chips()).toEqual([])
     rerender(
-      <MultiSelect options={opts} onChange={onChange} defaultValue='apple' />
+      <MultiSelect
+        key='c'
+        options={opts}
+        onChange={onChange}
+        defaultValue={['apple']}
+      />
     )
     expect(press(q('.msl-clear-btn'), ' ')).toBe(false)
     expect(chips()).toEqual([])
-    expect(onChange.mock.calls).toEqual([[''], [''], ['']])
+    expect(onChange.mock.calls).toEqual([
+      [[], []],
+      [[], []],
+      [[], []]
+    ])
     expect(isOpen()).toBe(false)
   })
 
   it('has no clear button when clearable is false', () => {
     expect(
-      setup({ defaultValue: 'apple', clearable: false }).q('.msl-clear-btn')
+      setup({ defaultValue: ['apple'], clearable: false }).q('.msl-clear-btn')
     ).toBeNull()
   })
 })
@@ -558,7 +525,7 @@ describe('singleSelect', () => {
     expect(single()).toBe('Banana')
     fireEvent.click(option('Banana'))
     expect(single()).toBeUndefined()
-    expect(onChange.mock.calls).toEqual([['apple'], ['banana'], ['']])
+    expect(values(onChange)).toEqual([['apple'], ['banana'], []])
   })
 
   it.each([
@@ -590,12 +557,12 @@ describe('singleSelect', () => {
   })
 
   function Controlled(props: { closeOnSelect: boolean }) {
-    const [value, setValue] = useState('')
+    const [value, setValue] = useState<string[]>([])
     return (
       <MultiSelect
         options={opts}
         singleSelect
-        defaultValue={value}
+        value={value}
         onChange={setValue}
         {...props}
       />
@@ -620,7 +587,7 @@ describe('singleSelect', () => {
   it('opens without a search input to focus', () => {
     const { root, isOpen, onMenuOpen } = setup({
       singleSelect: true,
-      defaultValue: 'apple'
+      defaultValue: ['apple']
     })
     fireEvent.click(root)
     expect(isOpen()).toBe(true)
@@ -644,24 +611,23 @@ describe('disableChip / disableSearch / disabled', () => {
     expect(
       setup({
         disableChip: true,
-        defaultValue: 'apple,banana',
+        defaultValue: ['apple', 'banana'],
         chipAlternateText: 'picked'
       }).single()
     ).toBe('2 picked')
   })
 
   it('shows title, else value, for a single JSX label', () => {
-    vi.spyOn(console, 'warn').mockImplementation(() => {})
     const options = [
       { label: <b>A</b>, value: 'a', title: 'A title' },
       { label: <b>B</b>, value: 'b' }
     ]
     expect(
-      setup({ disableChip: true, options, defaultValue: 'a' }).single()
+      setup({ disableChip: true, options, defaultValue: ['a'] }).single()
     ).toBe('A title')
     cleanup()
     expect(
-      setup({ singleSelect: true, options, defaultValue: 'b' }).single()
+      setup({ singleSelect: true, options, defaultValue: ['b'] }).single()
     ).toBe('b')
   })
 
@@ -676,7 +642,7 @@ describe('disableChip / disableSearch / disabled', () => {
   it('disabled leaves the tab order and ignores the keyboard', () => {
     const { root, q, isOpen, onMenuOpen, chips } = setup({
       disabled: true,
-      defaultValue: 'apple'
+      defaultValue: ['apple']
     })
     expect(root.className).toContain('msl-disabled')
     expect(root.tabIndex).toBe(-1)
@@ -822,7 +788,7 @@ describe('search', () => {
         { label: 'One', value: 1 },
         { label: 20, value: 'twenty' }
       ] as unknown as MultiSelectProps['options'],
-      defaultValue: '1'
+      defaultValue: ['1']
     })
     expect(chips()).toEqual(['One'])
     type(input(), '1')
@@ -882,7 +848,11 @@ describe('customValue', () => {
     type(input(), 'kiwi')
     type(input(), 'kiwi', 'Enter')
     expect(chips()).toEqual(['kiwi'])
-    expect(onChange).toHaveBeenLastCalledWith('kiwi')
+    // the typed text is the label too
+    expect(onChange).toHaveBeenLastCalledWith(
+      ['kiwi'],
+      [{ label: 'kiwi', value: 'kiwi' }]
+    )
     expect(groupTitles()).toEqual(['Custom Values'])
     expect(option('kiwi').className).toContain('msl-option-active')
 
@@ -890,15 +860,6 @@ describe('customValue', () => {
     type(input(), 'lime', ',')
     expect(chips()).toEqual(['kiwi', 'lime'])
     expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry', 'kiwi', 'lime'])
-  })
-
-  it('jsonValue receives the typed text as label', () => {
-    const { input, onChange } = setup({ customValue: true, jsonValue: true })
-    type(input(), 'kiwi')
-    type(input(), 'kiwi', 'Enter')
-    expect(onChange).toHaveBeenLastCalledWith([
-      { label: 'kiwi', value: 'kiwi' }
-    ])
   })
 
   it('clicking Create creates the value too; Enter on it again toggles it off', () => {
@@ -912,7 +873,9 @@ describe('customValue', () => {
     type(input(), 'kiwi')
     type(input(), 'kiwi', 'Enter')
     expect(chips()).toEqual([])
-    expect(onChange.mock.calls).toEqual([['kiwi'], ['']])
+    // still listed once deselected
+    expect(groupTitles()).toEqual(['Custom Values'])
+    expect(values(onChange)).toEqual([['kiwi'], []])
   })
 
   it('current behavior: Enter with a partial match picks the match, not a new value', () => {
@@ -932,7 +895,7 @@ describe('customValue', () => {
 
   it('keeps created values when the parent re-renders with a new options array', () => {
     function Parent() {
-      const [, setValue] = useState('')
+      const [, setValue] = useState<string[]>([])
       return <MultiSelect options={[...opts]} customValue onChange={setValue} />
     }
     const { container } = render(<Parent />)
@@ -944,51 +907,42 @@ describe('customValue', () => {
     ).toEqual(['Apple', 'Banana', 'Cherry', 'kiwi'])
   })
 
-  it.each([
-    ['a string', 'apple', ''],
-    ['an array', ['apple'], []]
-  ])(
-    'keeps created values when the parent value changes or empties, as %s',
-    (_, picked, empty) => {
-      function Parent() {
-        const [value, setValue] = useState<MultiSelectProps['value']>(empty)
-        return (
-          <>
-            <MultiSelect
-              options={opts}
-              value={value}
-              onChange={setValue}
-              jsonValue={Array.isArray(empty)}
-              customValue
-            />
-            <button onClick={() => setValue(picked)}>pick</button>
-            <button onClick={() => setValue(empty)}>reset</button>
-          </>
-        )
-      }
-      const { container, getByText } = render(<Parent />)
-      const optionTexts = () =>
-        [...container.querySelectorAll('.msl-option')].map(
-          (el) => el.textContent
-        )
-      const input = container.querySelector<HTMLElement>('.msl-input')!
-      type(input, 'kiwi')
-      type(input, 'kiwi', 'Enter')
-      fireEvent.click(getByText('pick'))
-      expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry', 'kiwi'])
-      fireEvent.click(getByText('reset'))
-      expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry', 'kiwi'])
+  it('keeps created values when the parent value changes or empties', () => {
+    function Parent() {
+      const [value, setValue] = useState<string[]>([])
+      return (
+        <>
+          <MultiSelect
+            options={opts}
+            value={value}
+            onChange={setValue}
+            customValue
+          />
+          <button onClick={() => setValue(['apple'])}>pick</button>
+          <button onClick={() => setValue([])}>reset</button>
+        </>
+      )
     }
-  )
+    const { container, getByText } = render(<Parent />)
+    const optionTexts = () =>
+      [...container.querySelectorAll('.msl-option')].map((el) => el.textContent)
+    const input = container.querySelector<HTMLElement>('.msl-input')!
+    type(input, 'kiwi')
+    type(input, 'kiwi', 'Enter')
+    fireEvent.click(getByText('pick'))
+    expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry', 'kiwi'])
+    fireEvent.click(getByText('reset'))
+    expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry', 'kiwi'])
+  })
 
   it('drops a custom value once options arriving later have it', () => {
     const { rerender, chips, groupTitles, optionTexts } = setup({
       options: [],
-      defaultValue: 'banana',
+      defaultValue: ['banana'],
       customValue: true
     })
     expect(groupTitles()).toEqual(['Custom Values'])
-    rerender(<MultiSelect options={opts} defaultValue='banana' customValue />)
+    rerender(<MultiSelect options={opts} customValue />)
     expect(chips()).toEqual(['Banana'])
     expect(groupTitles()).toEqual([])
     expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry'])
@@ -1050,7 +1004,7 @@ describe('menu open / close', () => {
     ['deep custom close icon', (q: Q) => q('.deep')]
   ])('clicking %s does not open the menu', (_, get) => {
     const { q, isOpen } = setup({
-      defaultValue: 'apple,banana',
+      defaultValue: ['apple', 'banana'],
       closeIcon: (
         <span>
           <b>
@@ -1082,7 +1036,9 @@ describe('menu open / close', () => {
   it('closes when focus moves out (Tab), not when it moves inside', () => {
     const outside = document.body.appendChild(document.createElement('button'))
     try {
-      const { root, q, isOpen, onMenuClose } = setup({ defaultValue: 'apple' })
+      const { root, q, isOpen, onMenuClose } = setup({
+        defaultValue: ['apple']
+      })
       fireEvent.click(root)
       fireEvent.focusIn(q('.msl-chip-delete'))
       expect(isOpen()).toBe(true)
@@ -1094,8 +1050,7 @@ describe('menu open / close', () => {
     }
   })
 
-  // React 16 delegates events at the document, which only sees the shadow host
-  it.skipIf(parseInt(React.version) < 17)('works in a shadow root', () => {
+  it('works in a shadow root', () => {
     const host = document.body.appendChild(document.createElement('div'))
     const container = host
       .attachShadow({ mode: 'open' })
@@ -1112,7 +1067,7 @@ describe('menu open / close', () => {
       expect(isOpen()).toBe(true)
       // the document sees the host as target: still a click inside
       fireEvent.click(q('.msl-option'))
-      expect(onChange).toHaveBeenLastCalledWith('apple')
+      expect(onChange).toHaveBeenLastCalledWith(['apple'], [opts[0]])
       expect(isOpen()).toBe(true)
       fireEvent.click(document.body)
       expect(isOpen()).toBe(false)
@@ -1182,17 +1137,10 @@ describe('menu open / close', () => {
 
 describe('clearAll', () => {
   it('clears when it turns true and there is a value', () => {
-    const { rerender, chips, onChange } = setup({ defaultValue: 'apple' })
-    rerender(
-      <MultiSelect
-        options={opts}
-        onChange={onChange}
-        defaultValue='apple'
-        clearAll
-      />
-    )
+    const { rerender, chips, onChange } = setup({ defaultValue: ['apple'] })
+    rerender(<MultiSelect options={opts} onChange={onChange} clearAll />)
     expect(chips()).toEqual([])
-    expect(onChange).toHaveBeenCalledWith('')
+    expect(onChange).toHaveBeenCalledWith([], [])
   })
 
   it('does nothing without a value', () => {
@@ -1204,25 +1152,32 @@ describe('clearAll', () => {
 
 describe('value (controlled)', () => {
   it('shows value and changes only when the parent passes a new one', () => {
-    const { option, chips, onChange, rerender, q } = setup({ value: 'apple' })
+    const { option, chips, onChange, rerender, q } = setup({ value: ['apple'] })
     expect(chips()).toEqual(['Apple'])
     fireEvent.click(option('Banana'))
-    expect(onChange).toHaveBeenLastCalledWith('apple,banana')
+    expect(onChange).toHaveBeenLastCalledWith(
+      ['apple', 'banana'],
+      [opts[0], opts[1]]
+    )
     expect(chips()).toEqual(['Apple'])
     rerender(
-      <MultiSelect options={opts} onChange={onChange} value='apple,banana' />
+      <MultiSelect
+        options={opts}
+        onChange={onChange}
+        value={['apple', 'banana']}
+      />
     )
     expect(chips()).toEqual(['Apple', 'Banana'])
     fireEvent.click(q('.msl-clear-btn'))
-    expect(onChange).toHaveBeenLastCalledWith('')
+    expect(onChange).toHaveBeenLastCalledWith([], [])
     expect(chips()).toEqual(['Apple', 'Banana'])
-    rerender(<MultiSelect options={opts} onChange={onChange} value='' />)
+    rerender(<MultiSelect options={opts} onChange={onChange} value={[]} />)
     expect(chips()).toEqual([])
   })
 
   it('follows the parent state, including resets and created values', () => {
     function Parent() {
-      const [value, setValue] = useState('cherry')
+      const [value, setValue] = useState<string[]>(['cherry'])
       return (
         <>
           <MultiSelect
@@ -1231,7 +1186,7 @@ describe('value (controlled)', () => {
             onChange={setValue}
             customValue
           />
-          <button onClick={() => setValue('')}>reset</button>
+          <button onClick={() => setValue([])}>reset</button>
         </>
       )
     }
@@ -1250,31 +1205,65 @@ describe('value (controlled)', () => {
     fireEvent.click(getByText('reset'))
     expect(chips()).toEqual([])
   })
+
+  it('leaves unknown values out without customValue', () => {
+    const { chips, hidden, option, onChange } = setup({
+      value: ['zzz', 'apple']
+    })
+    expect(chips()).toEqual(['Apple'])
+    expect(hidden().value).toBe('apple')
+    fireEvent.click(option('Banana'))
+    expect(onChange).toHaveBeenLastCalledWith(
+      ['apple', 'banana'],
+      [opts[0], opts[1]]
+    )
+  })
+
+  it('lists unknown values under Custom Values with customValue, while selected', () => {
+    const { chips, groupTitles, optionTexts, rerender } = setup({
+      value: ['zzz', 'apple'],
+      customValue: true
+    })
+    expect(chips()).toEqual(['zzz', 'Apple'])
+    expect(groupTitles()).toEqual(['Custom Values'])
+    rerender(
+      <MultiSelect options={opts} value={['zzz', 'yyy', 'zzz']} customValue />
+    )
+    expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry', 'zzz', 'yyy'])
+    rerender(<MultiSelect options={opts} value={['apple']} customValue />)
+    expect(groupTitles()).toEqual([])
+  })
 })
 
 describe('onClear', () => {
   it('fires after the clear button empties the value, not for clearAll', () => {
     const onClear = vi.fn()
-    const { q, rerender, onChange } = setup({ defaultValue: 'apple', onClear })
+    const { q, rerender, onChange } = setup({
+      defaultValue: ['apple'],
+      onClear
+    })
     fireEvent.click(q('.msl-clear-btn'))
-    expect(onChange).toHaveBeenLastCalledWith('')
+    expect(onChange).toHaveBeenLastCalledWith([], [])
     expect(onClear).toHaveBeenCalledTimes(1)
     rerender(
-      <MultiSelect options={opts} defaultValue='cherry' onClear={onClear} />
+      <MultiSelect
+        key='b'
+        options={opts}
+        defaultValue={['cherry']}
+        onClear={onClear}
+      />
     )
     press(q('.msl-clear-btn'), 'Enter')
     expect(onClear).toHaveBeenCalledTimes(2)
     rerender(
-      <MultiSelect options={opts} defaultValue='apple' onClear={onClear} />
-    )
-    rerender(
       <MultiSelect
+        key='c'
         options={opts}
-        defaultValue='apple'
+        defaultValue={['apple']}
         onClear={onClear}
-        clearAll
       />
     )
+    rerender(<MultiSelect key='c' options={opts} onClear={onClear} clearAll />)
     expect(q('.msl-clear-btn')).toBeNull()
     expect(onClear).toHaveBeenCalledTimes(2)
   })
@@ -1320,8 +1309,8 @@ describe('aria', () => {
   })
 
   it.each([
-    [{ singleSelect: true, defaultValue: 'apple' }, 'false'],
-    [{ disableChip: true, defaultValue: 'apple' }, 'true'],
+    [{ singleSelect: true, defaultValue: ['apple'] }, 'false'],
+    [{ disableChip: true, defaultValue: ['apple'] }, 'true'],
     [{ disableSearch: true }, 'true']
   ])(
     'without a search field %o the wrapper is the combobox',
@@ -1343,7 +1332,7 @@ describe('aria', () => {
   it('options expose role, id, selected and disabled state', () => {
     const { qa } = setup({
       options: [...opts, { label: 'Off', value: 'off', disabled: true }],
-      defaultValue: 'banana'
+      defaultValue: ['banana']
     })
     const options = qa('[role="option"]')
     expect(options.map((el) => el.textContent)).toEqual([
@@ -1520,8 +1509,8 @@ describe('keyboard', () => {
   })
 
   it('a keyboard clear or deleting the last chip keeps focus in the widget', () => {
-    const { q, qa, input, root, chips, rerender, onChange } = setupKeys({
-      defaultValue: 'apple,banana'
+    const { q, qa, input, chips, rerender, onChange } = setupKeys({
+      defaultValue: ['apple', 'banana']
     })
     qa('.msl-chip-delete')[0].focus()
     press(qa('.msl-chip-delete')[0], 'Enter')
@@ -1532,23 +1521,29 @@ describe('keyboard', () => {
     expect(chips()).toEqual([])
     expect(document.activeElement).toBe(input())
     rerender(
-      <MultiSelect options={opts} onChange={onChange} defaultValue='cherry' />
+      <MultiSelect
+        key='b'
+        options={opts}
+        onChange={onChange}
+        defaultValue={['cherry']}
+      />
     )
     q('.msl-clear-btn').focus()
     press(q('.msl-clear-btn'), 'Enter')
     expect(document.activeElement).toBe(input())
     rerender(
       <MultiSelect
+        key='c'
         options={opts}
         onChange={onChange}
         singleSelect
-        defaultValue='apple'
+        defaultValue={['apple']}
       />
     )
     q('.msl-clear-btn').focus()
     press(q('.msl-clear-btn'), ' ')
     // the search field only comes back on the next render
-    expect(document.activeElement).toBe(root)
+    expect(document.activeElement).toBe(q('.msl-wrp'))
   })
 
   it('closing and typing reset the highlight', () => {
@@ -1575,7 +1570,7 @@ describe('keyboard', () => {
     expect(focusedOption()).toBe('Banana')
     press(input(), 'Enter')
     expect(chips()).toEqual([])
-    expect(onChange.mock.calls).toEqual([['banana'], ['']])
+    expect(values(onChange)).toEqual([['banana'], []])
   })
 
   it('Enter on a highlighted search result picks it once', () => {
@@ -1596,7 +1591,7 @@ describe('keyboard', () => {
     press(input(), 'ArrowDown')
     press(input(), 'Enter')
     expect(chips()).toEqual(['kiwi'])
-    expect(onChange).toHaveBeenLastCalledWith('kiwi')
+    expect(values(onChange)).toEqual([['kiwi']])
   })
 
   it.each([{ singleSelect: true }, { disableChip: true }])(
@@ -1632,7 +1627,7 @@ describe('keyboard', () => {
 
   it('Backspace in an empty search field removes the last chip', () => {
     const { root, input, chips, onChange } = setupKeys({
-      defaultValue: 'apple,banana'
+      defaultValue: ['apple', 'banana']
     })
     input().textContent = 'x'
     press(input(), 'Backspace')
@@ -1645,7 +1640,7 @@ describe('keyboard', () => {
     press(input(), 'Backspace')
     press(input(), 'Backspace')
     expect(chips()).toEqual([])
-    expect(onChange.mock.calls).toEqual([['apple'], ['']])
+    expect(values(onChange)).toEqual([['apple'], []])
   })
 
   it.each(['a', ',', 'Enter', ' '])('%s opens the menu', (key) => {
@@ -1681,7 +1676,7 @@ describe('keyboard', () => {
   })
 
   it('keys on a chip or the clear button do not drive the menu', () => {
-    const { q, isOpen, focusedOption } = setupKeys({ defaultValue: 'apple' })
+    const { q, isOpen, focusedOption } = setupKeys({ defaultValue: ['apple'] })
     press(q('.msl-chip-delete'), 'ArrowDown')
     press(q('.msl-clear-btn'), 'a')
     press(q('.msl-chip'), 'Backspace')

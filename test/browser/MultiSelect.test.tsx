@@ -165,7 +165,7 @@ it('a rich paste lands as plain text and filters', async () => {
 
 it('Tab skips the arrow and the options', async () => {
   const { root, outside, menuHeight, focused } = await setup({
-    defaultValue: 'apple'
+    defaultValue: ['apple']
   })
   outside.focus()
   const order = []
@@ -178,7 +178,9 @@ it('Tab skips the arrow and the options', async () => {
 })
 
 it('chip delete acts on Enter and Space only', async () => {
-  const { q, chips } = await setup({ defaultValue: 'apple,banana,cherry' })
+  const { q, chips } = await setup({
+    defaultValue: ['apple', 'banana', 'cherry']
+  })
   q('.msl-chip-delete').focus()
   await userEvent.keyboard('x')
   expect(chips()).toEqual(['Apple', 'Banana', 'Cherry'])
@@ -192,7 +194,7 @@ it('chip delete acts on Enter and Space only', async () => {
 it('disabled blocks the mouse, leaves the tab order and ignores the keyboard', async () => {
   const { root, outside, menuHeight, chips } = await setup({
     disabled: true,
-    defaultValue: 'apple'
+    defaultValue: ['apple']
   })
   expect(getComputedStyle(root).pointerEvents).toBe('none')
   outside.focus()
@@ -285,7 +287,7 @@ it('picks a highlighted search result with Enter', async () => {
 })
 
 it('Backspace in an empty search field removes the last chip', async () => {
-  const { input, chips } = await setup({ defaultValue: 'apple,banana' })
+  const { input, chips } = await setup({ defaultValue: ['apple', 'banana'] })
   await userEvent.type(input(), 'c')
   await userEvent.keyboard('{Backspace}')
   expect(input().textContent).toBe('')
