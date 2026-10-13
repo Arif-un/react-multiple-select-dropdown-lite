@@ -34,10 +34,7 @@
     "react-dom": "^16.9.0 || ^17 || ^18 || ^19"
   },
   "devDependencies": {
-    "@babel/core": "^7.29.7",
-    "@babel/preset-env": "^7.29.7",
     "@eslint/js": "^9.39.5",
-    "@rollup/plugin-babel": "^7.1.0",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^24.19.2",
@@ -45,7 +42,6 @@
     "@types/react-dom": "^19.3.0",
     "@vitest/browser-playwright": "^5.0.3",
     "@vitest/coverage-v8": "^5.0.3",
-    "acorn": "^8.19.0",
     "eslint": "^9.39.5",
     "eslint-plugin-react": "^7.37.5",
     "globals": "^17.13.0",
@@ -54,7 +50,6 @@
     "playwright": "^1.64.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "terser": "^5.51.2",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.71.1",
     "vite": "^8.3.4",
