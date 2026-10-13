@@ -4,7 +4,7 @@ import MultiSelect from '../../../src/MultiSelect'
 import '../../../src/styles.css'
 
 const App = () => {
-  const [value, setvalue] = useState('rf,test,new')
+  const [value, setvalue] = useState(['rf', 'test', 'new'])
 
   const handleOnchange = (val: any) => {
     setvalue(val)

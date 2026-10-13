@@ -11,12 +11,12 @@ const options = [
 ]
 
 export default function Basic() {
-  const [value, setValue] = useState('')
+  const [value, setValue] = useState<string[]>([])
 
   return (
     <>
       <MultiSelect options={options} onChange={setValue} />
-      <p className='demo-output'>value: "{value}"</p>
+      <p className='demo-output'>value: {JSON.stringify(value)}</p>
     </>
   )
 }

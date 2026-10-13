@@ -14,7 +14,7 @@ export default function Theming() {
     <MultiSelect
       className='dark-msl'
       options={options}
-      defaultValue='ocean'
+      defaultValue={['ocean']}
       placeholder='Theme'
     />
   )

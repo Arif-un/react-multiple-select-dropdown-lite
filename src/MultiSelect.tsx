@@ -1,31 +1,20 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useId } from 'react'
 import Chip from './Chip'
 import CloseIcon from './CloseIcon'
 import DownIcon from './DownIcon'
 import type PublicMultiSelect from './index'
 import type {
-  MultiSelectBaseProps,
   MultiSelectGroup,
-  MultiSelectOption
+  MultiSelectOption,
+  MultiSelectProps
 } from './index'
 import Options from './Options'
 import './styles.css'
 import useComponentVisible from './useComponentVisible'
 
 type Item = MultiSelectOption | MultiSelectGroup
-type DefaultValueItem = Exclude<
-  MultiSelectBaseProps['defaultValue'],
-  string | undefined
->[number]
-
-// both onChange modes in one; the parameter defaults below fill the gaps
-type Props = MultiSelectBaseProps & {
-  jsonValue?: boolean
-  onChange?: (value: string | MultiSelectOption[]) => void
-}
 
 // Defaults as parameter defaults: React 19's jsx runtime ignores defaultProps on function components.
-// Objects live here so their identity is stable (a new options array per render would loop the options effect).
 const noop = () => {}
 const noStyle = {}
 const emptyOptions: readonly Item[] = [
@@ -36,18 +25,6 @@ const emptyOptions: readonly Item[] = [
     style: { textAlign: 'center' }
   }
 ]
-
-// aria ids: useId (React 18+) keeps SSR and hydration in sync. Older React has no
-// SSR-safe id, so a counter sets it after mount: server and first client render both omit it
-let lastId = 0
-/* v8 ignore next -- the counter is for React < 18 (covered by the React 16/17 CI jobs) */
-const useListId: () => string | undefined = React.useId
-  ? () => `msl-listbox${React.useId()}`
-  : () => {
-      const [id, setId] = useState<string>()
-      useEffect(() => setId(`msl-listbox-${++lastId}`), [])
-      return id
-    }
 
 // options in render order, groups unwrapped, the way Options.tsx walks them
 function flatten(items: readonly Item[], out: MultiSelectOption[] = []) {
@@ -67,8 +44,7 @@ function MultiSelect({
   downArrow = true,
   onChange = noop,
   singleSelect = false,
-  jsonValue = false,
-  defaultValue = '',
+  defaultValue,
   value: valueProp,
   className,
   placeholder = 'Select...',
@@ -87,32 +63,45 @@ function MultiSelect({
   chipAlternateText = 'Item Selected',
   closeOnSelect,
   disableSearch = false
-}: Props) {
-  const [value, setValue] = useState<MultiSelectOption[]>([])
-  // values created by customValue, listed after the user's options.
-  // Own state, so a parent passing a new options array doesn't wipe them
-  const [custom, setCustom] = useState<MultiSelectOption[]>([])
+}: MultiSelectProps) {
+  // selected values; defaultValue is initial only, as in an uncontrolled input
+  const [own, setOwn] = useState(() => defaultValue ?? [])
+  // with `value` the parent owns the selection: user changes only call onChange
+  const controlled = valueProp !== undefined
+  const keys = controlled ? valueProp : own
+  // values created by customValue: they stay listed once deselected
+  const [custom, setCustom] = useState<string[]>([])
   const base = userOptions || []
-  const options: readonly Item[] = custom.length
-    ? [...base, { title: 'Custom Values', type: 'group', childs: custom }]
+  const known = flatten(base)
+  // String(): untyped JS often passes numbers
+  const findOpt = (opts: MultiSelectOption[], key: string) =>
+    opts.find((opt) => String(opt.value) === String(key))
+  // listed after the user's options: created values, plus with customValue the selected
+  // ones the options lack. Once the options have one (they may arrive late, #12), it moves there
+  const customOpts = [...custom, ...(customValue ? keys : [])]
+    .filter((key, i, arr) => arr.indexOf(key) === i && !findOpt(known, key))
+    .map((key) => ({ label: key, value: key }))
+  const options: readonly Item[] = customOpts.length
+    ? [...base, { title: 'Custom Values', type: 'group', childs: customOpts }]
     : base
+  const all = [...known, ...customOpts]
+  // looked up at render, so options arriving after mount resolve with no effect
+  const resolved = keys
+    .map((key) => findOpt(all, key))
+    .filter((opt) => opt !== undefined)
+  const value = singleSelect ? resolved.slice(0, 1) : resolved
   const [search, setSearch] = useState<MultiSelectOption[] | null>(null)
   const items = search || options
   // the Create "..." item last offered by the search
   const createOpt = useRef<MultiSelectOption | null>(null)
   const inputFld = useRef<HTMLDivElement>(null)
-  const listId = useListId()
+  const listId = `msl-listbox${useId()}`
   // the keyboard highlighted option: idx tells repeated values apart
   const [active, setActive] = useState<{ value: string; idx: number } | null>(
     null
   )
   // the last keydown belonged to an IME composition: its Enter confirms the text, not a pick
   const composing = useRef(false)
-  // the user changed the value since defaultValue last changed
-  const userChanged = useRef(false)
-  // with `value` the parent owns the selection: user changes only call onChange
-  const controlled = valueProp !== undefined
-  const selected = controlled ? valueProp : defaultValue
   const {
     ref: componentRef,
     isComponentVisible: menuOpen,
@@ -145,106 +134,16 @@ function MultiSelect({
     clearable && downArrow ? 60 : downArrow || clearable ? 40 : 5
   }px)`
 
-  const getValueObjFromOptions = (
-    defaultValue: Props['defaultValue'],
-    options: readonly Item[]
-  ): MultiSelectOption[] => {
-    if (!defaultValue) return []
-    let defaultValArr = defaultValue as DefaultValueItem[]
-    const extraValues: MultiSelectOption[] = []
-    const searchedOptions: MultiSelectOption[] = []
-
-    if (typeof defaultValue === 'string') {
-      defaultValArr = defaultValue.split(',')
-    }
-
-    const setExtraValue = (value: DefaultValueItem) => {
-      if (typeof value === 'string') {
-        extraValues.push({ label: value, value })
-      } else {
-        // a JSX label falls back to title, then value, as in chips
-        const label =
-          typeof value.label === 'string'
-            ? value.label
-            : value.title || value.value
-        extraValues.push({ label, value: value.value })
-      }
-    }
-
-    for (let i = 0; i < defaultValArr.length; i++) {
-      if (typeof defaultValArr[i] === 'string') {
-        const optObject = searchOptions(
-          defaultValArr[i] as string,
-          options,
-          true,
-          'value'
-        )
-        if (optObject.length > 0) {
-          searchedOptions.push(optObject[0])
-        } else if (customValue) {
-          setExtraValue(defaultValArr[i])
-        }
-      } else if (typeof defaultValArr[i] === 'object') {
-        const optObject = searchOptions(
-          (defaultValArr[i] as Exclude<DefaultValueItem, string>).value,
-          options,
-          true,
-          'value'
-        )
-        if (optObject.length > 0) {
-          searchedOptions.push(optObject[0])
-        } else if (customValue) {
-          setExtraValue(defaultValArr[i])
-        }
-      }
-    }
-
-    // created values stay, as without a parent; ones the options now have go (#12)
-    setCustom((prev) =>
-      [...prev, ...extraValues].filter(
-        (opt, i, all) =>
-          all.findIndex((o) => o.value === opt.value) === i &&
-          !flatten(options).some((o) => o.value === opt.value)
-      )
-    )
-    return [...searchedOptions, ...extraValues]
-  }
-
   useEffect(() => {
     if (clearAll && value.length) {
       clearValue()
     }
   }, [clearAll])
 
-  useEffect(() => {
-    userChanged.current = false
-  }, [selected])
-
-  // options too, as they may arrive after mount (#12). Not after a user change:
-  // parents often pass a new options array on every render
-  useEffect(() => {
-    if (userChanged.current) return
-    let preDefinedValue = getValueObjFromOptions(selected, userOptions)
-
-    if (singleSelect && preDefinedValue.length) {
-      preDefinedValue = [preDefinedValue[0]]
-    }
-
-    setValue(preDefinedValue)
-  }, [selected, userOptions])
-
   const setNewValue = (val: MultiSelectOption[]) => {
-    if (!controlled) {
-      userChanged.current = true
-      setValue(val)
-    }
-    if (jsonValue) {
-      onChange(val)
-    } else {
-      let stringvalue = ''
-      stringvalue += val.map((itm) => itm.value)
-      onChange(stringvalue)
-    }
+    const values = val.map((opt) => opt.value)
+    if (!controlled) setOwn(values)
+    onChange(values, val)
   }
 
   const checkValueExist = (
@@ -259,7 +158,7 @@ function MultiSelect({
     // picking Create (click, Enter or comma) adds the typed text as an option
     if (newValObj === createOpt.current) {
       newValObj = { label: newValObj.value, value: newValObj.value }
-      setCustom([...custom, newValObj])
+      setCustom([...custom, newValObj.value])
     }
     let tmp = [...value]
     if (singleSelect) {
@@ -327,41 +226,30 @@ function MultiSelect({
     return false
   }
 
-  const searchOptions = (
-    str: string,
-    options: readonly Item[],
-    exact?: boolean,
-    type?: 'value'
-  ) => {
+  const searchOptions = (str: string, options: readonly Item[]) => {
     const searchedOptions: MultiSelectOption[] = []
     const searchedOptValues: MultiSelectOption[] = []
+    // plain substring match: typed text is not a regex.
+    // String(): untyped JS often passes numbers
+    const needle = str.toLowerCase()
 
     // groups recurse first, so the rest of the loop only sees options
     const searchInOptions = (opt: MultiSelectOption[]) => {
       for (let i = 0; i < opt.length; i++) {
         if (opt[i]?.type === 'group') {
           searchInOptions(opt[i].childs as MultiSelectOption[])
-        } else if (!exact) {
-          // plain substring match: typed text is not a regex.
-          // String(): untyped JS often passes numbers
-          const needle = str.toLowerCase()
-          if (
-            typeof opt[i].label !== 'object' &&
-            String(opt[i].label).toLowerCase().includes(needle)
-          ) {
-            searchedOptions.push(opt[i])
-          } else if (
-            typeof opt[i].label === 'object' &&
-            opt[i]?.title?.toLowerCase().includes(needle)
-          ) {
-            searchedOptions.push(opt[i])
-          } else if (String(opt[i].value).toLowerCase().includes(needle)) {
-            searchedOptValues.push(opt[i])
-          }
-        } else {
-          if (String(opt[i][type!]) === str) {
-            searchedOptions.push(opt[i])
-          }
+        } else if (
+          typeof opt[i].label !== 'object' &&
+          String(opt[i].label).toLowerCase().includes(needle)
+        ) {
+          searchedOptions.push(opt[i])
+        } else if (
+          typeof opt[i].label === 'object' &&
+          opt[i]?.title?.toLowerCase().includes(needle)
+        ) {
+          searchedOptions.push(opt[i])
+        } else if (String(opt[i].value).toLowerCase().includes(needle)) {
+          searchedOptValues.push(opt[i])
         }
         if (typeof opt[i].label === 'object' && !('title' in opt[i])) {
           console.warn(
@@ -389,10 +277,7 @@ function MultiSelect({
       }
       // Enter reads this, not `search`: that is null when text arrived without a keyup (paste, IME)
       const results = searchOptions(textValue, options)
-      if (
-        customValue &&
-        !searchOptions(textValue, options, true, 'value').length
-      ) {
+      if (customValue && !findOpt(all, textValue)) {
         results.push(createOpt.current)
       }
       setSearch(results)
@@ -550,7 +435,11 @@ function MultiSelect({
         disabled ? 'msl-disabled' : ''
       }${limit !== null && value.length >= limit ? ' msl-limit-reached' : ''}`}
     >
-      <input name={name} type='hidden' value={value?.map((itm) => itm.value)} />
+      <input
+        name={name}
+        type='hidden'
+        value={value.map((opt) => opt.value).join(',')}
+      />
       <div data-msl className={`msl ${menuOpen ? getActiveClass() : ''} `}>
         <div
           data-msl
