@@ -2,6 +2,36 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+Breaking release: one value format, React 18+, modern bundles. The bundles are about 20% smaller.
+
+### Upgrade notes
+
+- **`value` and `defaultValue` take an array of option values.** The comma separated string and option object forms are gone.
+- **`onChange(values, options)`** always gets the selected values and their option objects. A created value's option is `{ label: value, value }`. The hidden form input still posts the values joined by commas.
+- **`jsonValue` is removed.** Read the option objects from `onChange`'s second argument.
+- **`defaultValue` is read once, on mount**, like an uncontrolled input. To change the selection later, use `value`, or remount with a new `key`.
+- **React 18 or 19 is required.**
+- **No UMD build and no `dist/index.esm.js`.** Import the package through a bundler. The ES module build is `dist/index.modern.js`, which `module` already points to.
+- **No ES5 build.** The bundles use modern syntax and import `react/jsx-runtime`. Transpile them yourself if you target old browsers.
+- **Types:** `MultiSelectValue`, `MultiSelectBaseProps`, `MultiSelectStringProps` and `MultiSelectJsonProps` are gone. `MultiSelectProps` is a single interface, so `Omit` works on it directly.
+
+```jsx
+// v2
+<MultiSelect options={options} value='apple,banana' onChange={(csv) => ...} />
+<MultiSelect jsonValue options={options} onChange={(opts) => ...} />
+
+// v3
+<MultiSelect options={options} value={['apple', 'banana']} onChange={(values) => ...} />
+<MultiSelect options={options} onChange={(values, opts) => ...} />
+```
+
+### Changed
+
+- Options that arrive after mount resolve the selection when they render. There is no longer an effect that re-resolves it.
+- Values missing from `options` are left out of the display and of `onChange`, unless `customValue` is set. They show up once matching options arrive.
+
 ## [2.1.0] - 2026-10-12
 
 React 19 support, TypeScript types, keyboard and screen reader support, a controlled `value` prop, and a long list of bug fixes. Existing props, events, CSS variables and class names keep working.
