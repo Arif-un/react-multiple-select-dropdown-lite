@@ -1,6 +1,6 @@
 // Public types, shipped as dist/index.d.ts (copied by vite.config.mjs).
 // Hand-written because dist/index.js is `module.exports = MultiSelect`, which only `export =` describes.
-// Sticks to TS 3.x syntax and React types that exist since @types/react 16.9.
+// Written against the React 18 types.
 import * as React from 'react'
 
 declare const MultiSelect: {
@@ -17,7 +17,7 @@ declare namespace MultiSelect {
     style?: React.CSSProperties
     /** extra class names */
     classes?: string
-    /** your own fields ride along, e.g. to read back with `jsonValue` */
+    /** your own fields ride along, e.g. to read back from `onChange`'s options */
     // any, not unknown: interfaces get no implicit index signature, so unknown would reject them
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     [key: string]: any
@@ -32,27 +32,17 @@ declare namespace MultiSelect {
     emptyDataLabel?: string
   }
 
-  type MultiSelectValue =
-    | string
-    | ReadonlyArray<
-        | string
-        | {
-            value: string
-            label?: string | React.ReactElement
-            title?: string
-          }
-      >
-
-  interface MultiSelectBaseProps {
+  interface MultiSelectProps {
     options?: ReadonlyArray<MultiSelectOption | MultiSelectGroup>
     /**
-     * comma separated values, or an array of values / option-like objects.
-     * With `customValue`, values not found in `options` are added under Custom Values.
-     * Follows later changes until the user picks something; use `value` to keep it in sync
+     * initial selection, as option values. Later changes are ignored: use `value`, or a new `key` to reset.
+     * Values missing from `options` show once options have them, or under Custom Values with `customValue`
      */
-    defaultValue?: MultiSelectValue
-    /** controlled selection, in the same forms as `defaultValue`: update it from `onChange` */
-    value?: MultiSelectValue
+    defaultValue?: readonly string[]
+    /** controlled selection, as option values: update it from `onChange` */
+    value?: readonly string[]
+    /** the selected values and their options; a created value's option is `{ label: value, value }` */
+    onChange?: (values: string[], options: MultiSelectOption[]) => void
     singleSelect?: boolean
     clearable?: boolean
     /** clears the value when it turns true */
@@ -65,7 +55,7 @@ declare namespace MultiSelect {
     disableChip?: boolean
     /** with `disableChip`, shown after the count: "2 Item Selected" */
     chipAlternateText?: string
-    /** name of the hidden input, for forms */
+    /** name of the hidden input, for forms: it holds the selected values joined by commas */
     name?: string
     style?: React.CSSProperties
     /**
@@ -93,21 +83,6 @@ declare namespace MultiSelect {
     /** @deprecated no effect since v2.0.1, set the `--input-width` CSS variable instead */
     width?: unknown
   }
-
-  interface MultiSelectStringProps extends MultiSelectBaseProps {
-    jsonValue?: false
-    /** selected values joined by commas */
-    onChange?: (value: string) => void
-  }
-
-  interface MultiSelectJsonProps extends MultiSelectBaseProps {
-    jsonValue: true
-    /** selected options */
-    onChange?: (value: MultiSelectOption[]) => void
-  }
-
-  /** wrappers that Omit props should Omit from one mode's props: Omit over this union merges the two onChange types */
-  type MultiSelectProps = MultiSelectStringProps | MultiSelectJsonProps
 }
 
 export = MultiSelect
