@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
-Breaking release: one value format, React 18+, modern bundles. The bundles are about 20% smaller.
+Breaking release: one value format, React 18+, modern bundles, a native search input. The bundles are about 20% smaller.
 
 ### Upgrade notes
 
@@ -16,6 +16,7 @@ Breaking release: one value format, React 18+, modern bundles. The bundles are a
 - **No UMD build and no `dist/index.esm.js`.** Import the package through a bundler. The ES module build is `dist/index.modern.js`, which `module` already points to.
 - **No ES5 build.** The bundles use modern syntax and import `react/jsx-runtime`. Transpile them yourself if you target old browsers.
 - **Types:** `MultiSelectValue`, `MultiSelectBaseProps`, `MultiSelectStringProps` and `MultiSelectJsonProps` are gone. `MultiSelectProps` is a single interface, so `Omit` works on it directly.
+- **The search field is an `<input>`**, not a `contentEditable` div. Rules on `.msl-input::before` no longer reach its placeholder: set the new `--placeholder-color` variable instead. It fits its text through CSS `field-sizing: content`; browsers without that show it at the default input width.
 
 ```jsx
 // v2
@@ -27,10 +28,15 @@ Breaking release: one value format, React 18+, modern bundles. The bundles are a
 <MultiSelect options={options} onChange={(values, opts) => ...} />
 ```
 
+### Added
+
+- `--placeholder-color` CSS variable, for the search field's placeholder and the static one shown with `disableSearch`.
+
 ### Changed
 
 - Options that arrive after mount resolve the selection when they render. There is no longer an effect that re-resolves it.
 - Values missing from `options` are left out of the display and of `onChange`, unless `customValue` is set. They show up once matching options arrive.
+- Long search text scrolls on one line instead of wrapping, and no longer runs under the clear and arrow buttons. A placeholder too long for the input ends in an ellipsis.
 
 ## [2.1.0] - 2026-10-12
 
