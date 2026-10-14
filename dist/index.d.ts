@@ -44,6 +44,25 @@ declare namespace MultiSelect {
     emptyDataLabel?: string
   }
 
+  interface MultiSelectChipProps<
+    T = MultiSelectOption,
+    C extends boolean = boolean
+  > {
+    /** what `getLabel` returns for the option */
+    label: React.ReactNode
+    value: string
+    /** a created value's option is `{ label: value, value }` */
+    option:
+      | T
+      | ([C] extends [false]
+          ? never
+          : Exclude<{ label: string; value: string }, T>)
+    /** the select is disabled: take delete buttons out of the tab order */
+    disabled: boolean
+    /** removes this value; does nothing while disabled */
+    onDelete: () => void
+  }
+
   interface MultiSelectProps<
     T = MultiSelectOption,
     C extends boolean = boolean
@@ -93,6 +112,16 @@ declare namespace MultiSelect {
     disableChip?: boolean
     /** with `disableChip`, shown after the count: "2 Item Selected" */
     chipAlternateText?: string
+    /**
+     * renders each chip; a render function, not a component, so no hooks in it: render a component that has them,
+     * `(p) => <MyChip key={p.value} {...p} />`. Chips are keyed by position: `key={p.value}` resets a chip's state when
+     * its value moves, instead of handing it to the next value. Clicks and keys inside it don't open the menu.
+     * Default: the `msl-chip` markup
+     */
+    // $$typeof: memo / forwardRef components type as callable but are objects
+    customChip?: ((props: MultiSelectChipProps<T, C>) => React.ReactNode) & {
+      $$typeof?: never
+    }
     /** name of the hidden input, for forms: it holds the selected values joined by commas */
     name?: string
     style?: React.CSSProperties
