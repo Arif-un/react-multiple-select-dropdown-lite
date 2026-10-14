@@ -16,26 +16,32 @@ Breaking release: one value format, React 18+, modern bundles, a native search i
 - **No UMD build and no `dist/index.esm.js`.** Import the package through a bundler. The ES module build is `dist/index.modern.js`, which `module` already points to.
 - **No ES5 build.** The bundles use modern syntax and import `react/jsx-runtime`. Transpile them yourself if you target old browsers.
 - **Types:** `MultiSelectValue`, `MultiSelectBaseProps`, `MultiSelectStringProps` and `MultiSelectJsonProps` are gone. `MultiSelectProps` is a single interface, so `Omit` works on it directly.
+- **`label` is a string, and options lose `title`.** For JSX, pass `getLabel={(opt) => <Jsx />}`. Search and the tooltip then use `label`.
 - **The search field is an `<input>`**, not a `contentEditable` div. Rules on `.msl-input::before` no longer reach its placeholder: set the new `--placeholder-color` variable instead. It fits its text through CSS `field-sizing: content`; browsers without that show it at the default input width.
 
 ```jsx
 // v2
 <MultiSelect options={options} value='apple,banana' onChange={(csv) => ...} />
 <MultiSelect jsonValue options={options} onChange={(opts) => ...} />
+<MultiSelect options={[{ label: <b>Apple</b>, title: 'Apple', value: 'apple' }]} />
 
 // v3
 <MultiSelect options={options} value={['apple', 'banana']} onChange={(values) => ...} />
 <MultiSelect options={options} onChange={(values, opts) => ...} />
+<MultiSelect options={[{ label: 'Apple', value: 'apple' }]} getLabel={(opt) => <b>{opt.label}</b>} />
 ```
 
 ### Added
 
+- `filterOption(option, search)` prop, to replace the search match.
+- `getLabel(option)` and `getValue(option)` props. `getLabel` renders options, chips and the single value. Together they read options of any shape, e.g. `{ id, name }` straight from an API. The types infer the shape from `options`, and require `getLabel` or `getValue` when it has no string `label` or `value`. With `customValue`, `onChange`'s options are typed to also hold created `{ label, value }` options.
 - `--placeholder-color` CSS variable, for the search field's placeholder and the static one shown with `disableSearch`.
 
 ### Changed
 
 - Options that arrive after mount resolve the selection when they render. There is no longer an effect that re-resolves it.
 - Values missing from `options` are left out of the display and of `onChange`, unless `customValue` is set. They show up once matching options arrive.
+- Search results keep option order. Label matches no longer come before value-only matches.
 - Long search text scrolls on one line instead of wrapping, and no longer runs under the clear and arrow buttons. A placeholder too long for the input ends in an ellipsis.
 
 ## [2.1.0] - 2026-10-12
