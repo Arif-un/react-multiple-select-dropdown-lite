@@ -47,7 +47,7 @@ Every demo below runs the code under it.
 
 ## Groups
 
-Groups have `type: 'group'`, a `title` and `childs`, and can nest. `emptyDataLabel` shows when a group has no options. Search looks inside groups.
+Groups have `type: 'group'`, a `title` and `childs`, and can nest. Options themselves can't have `type: 'group'`. `emptyDataLabel` shows when a group has no options. Search looks inside groups.
 
 <Preview code={groupsCode} title='Groups.tsx'>
   <Groups client:visible />
@@ -63,7 +63,7 @@ With `customValue`, typing text that matches no option offers **Create "..."**. 
 
 ## Option objects
 
-`onChange` gets the selected option objects as its second argument, including any extra fields you put on them.
+Options can be any shape: `getLabel` and `getValue` read them. `onChange` gets the selected objects back as its second argument. Values created by `customValue` are always `{ label, value }`. The fields `disabled`, `style`, `classes` and `type` keep their meaning in any shape.
 
 <Preview code={optionObjectsCode} title='OptionObjects.tsx'>
   <OptionObjects client:visible />
@@ -93,9 +93,9 @@ Pass `value` and update it from `onChange` to own the selection, for example to 
   <DisableChip client:visible />
 </Preview>
 
-## JSX labels
+## Custom labels
 
-Labels can be JSX. Give such options a string `title`, which search and chips use.
+`getLabel(option)` renders each option, chip and single value. Return any JSX. Search matches what `getLabel` returns when it is text, else the option's `label`.
 
 <Preview code={jsxLabelsCode} title='JsxLabels.tsx'>
   <JsxLabels client:visible />

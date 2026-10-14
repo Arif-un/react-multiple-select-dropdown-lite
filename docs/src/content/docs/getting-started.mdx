@@ -44,7 +44,7 @@ Import the component and its stylesheet once, pass `options`, and read the selec
   <Basic client:load />
 </Preview>
 
-Each option needs a `label` (string or JSX) and a unique string `value`. Pre-select with `defaultValue`, an array of option values. It only sets the initial selection; to change the selection from outside, pass `value` instead ([controlled value](../examples/#controlled-value)).
+Each option needs a string `label` and a unique string `value`, or any shape with [`getLabel` and `getValue`](../examples/#option-objects). Pre-select with `defaultValue`, an array of option values. It only sets the initial selection; to change the selection from outside, pass `value` instead ([controlled value](../examples/#controlled-value)).
 
 ## TypeScript
 

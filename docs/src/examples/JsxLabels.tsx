@@ -10,25 +10,19 @@ const Status = ({ color, text }: { color: string; text: string }) => (
   </span>
 )
 
-// a JSX label needs a `title`: search and chips use it
+// `label` stays text for search; getLabel decides what shows
 const options = [
-  {
-    label: <Status color='#22c55e' text='Online' />,
-    title: 'Online',
-    value: 'online'
-  },
-  {
-    label: <Status color='#f59e0b' text='Away' />,
-    title: 'Away',
-    value: 'away'
-  },
-  {
-    label: <Status color='#ef4444' text='Busy' />,
-    title: 'Busy',
-    value: 'busy'
-  }
+  { label: 'Online', value: 'online', color: '#22c55e' },
+  { label: 'Away', value: 'away', color: '#f59e0b' },
+  { label: 'Busy', value: 'busy', color: '#ef4444' }
 ]
 
 export default function JsxLabels() {
-  return <MultiSelect options={options} placeholder='Status' />
+  return (
+    <MultiSelect
+      options={options}
+      getLabel={(opt) => <Status color={opt.color} text={opt.label} />}
+      placeholder='Status'
+    />
+  )
 }
