@@ -163,6 +163,29 @@ it('the search field fits its text, and long text scrolls clear of the buttons',
   )
 })
 
+it('the input area ends where the buttons start, whatever size CSS gives them', async () => {
+  const css = document.head.appendChild(document.createElement('style'))
+  css.textContent = '.msl-clear-btn, .msl-arrow-btn { width: 40px }'
+  try {
+    const { q } = await setup({ defaultValue: ['apple'] })
+    expect(q('.msl-clear-btn').getBoundingClientRect().width).toBe(40)
+    expect(q('.msl-input-wrp').getBoundingClientRect().right).toBe(
+      q('.msl-actions').getBoundingClientRect().left
+    )
+  } finally {
+    css.remove()
+  }
+})
+
+it('the arrow flips while the menu is open', async () => {
+  const { root, q, menuHeight } = await setup()
+  const transform = () => getComputedStyle(q('.msl-arrow-btn')).transform
+  expect(transform()).toBe('none')
+  await userEvent.click(root)
+  await expect.poll(menuHeight).toBeGreaterThan(0)
+  expect(transform()).toMatch(/^matrix\(-1, /)
+})
+
 it('a rich paste lands as plain text and filters', async () => {
   const { root, q, input, visibleOptions } = await setup()
   const rich = document.body.appendChild(document.createElement('p'))

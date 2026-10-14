@@ -109,9 +109,8 @@ describe('render', () => {
     expect(input.disabled).toBe(false)
     expect(input.getAttribute('autocomplete')).toBe('off')
     const empty = q('.msl-option')
-    expect(empty.textContent).toBe('Empty')
+    expect(empty.textContent).toBe('No Data Found')
     expect(empty.className).toContain('msl-option-disable')
-    expect(empty.style.textAlign).toBe('center')
     expect(container.querySelector('.msl-arrow-btn')).not.toBeNull()
     expect(container.querySelector('.msl-clear-btn')).toBeNull()
   })
@@ -134,7 +133,7 @@ describe('render', () => {
     const { container, rerender } = render(jsx(MultiSelect, {}))
     const q = (s: string) => container.querySelector(s)!
     expect(q('.msl-input').getAttribute('placeholder')).toBe('Select...')
-    expect(q('.msl-option').textContent).toBe('Empty')
+    expect(q('.msl-option').textContent).toBe('No Data Found')
     rerender(jsx(MultiSelect, { options: opts }))
     fireEvent.click(container.firstChild!)
     container.querySelectorAll('.msl-option').forEach((el) => {
@@ -163,14 +162,17 @@ describe('render', () => {
     expect(input().placeholder).toBe('Pick one')
   })
 
-  it.each([
-    [{}, '60px'],
-    [{ clearable: false }, '40px'],
-    [{ downArrow: false }, '40px'],
-    [{ clearable: false, downArrow: false }, '5px']
-  ])('input width for %o subtracts %s', (props, px) => {
-    const { q } = setup(props)
-    expect(q('.msl-input-wrp').style.width).toBe(`calc(100% - ${px})`)
+  it('leaves layout to the CSS: no inline styles while open, closed or empty', () => {
+    const { root, q, rerender } = setup({ defaultValue: ['apple'] })
+    fireEvent.click(root)
+    expect(q('.msl').className).toContain('msl-active')
+    const styled = () =>
+      [...root.querySelectorAll('[style]')].filter(
+        (el) => el.getAttribute('style') !== 'display: contents;'
+      )
+    expect(styled()).toEqual([])
+    rerender(<MultiSelect />)
+    expect(styled()).toEqual([])
   })
 
   it('hides the actions area when clearable and downArrow are off', () => {
@@ -321,6 +323,8 @@ describe('options', () => {
     expect(q('.msl-options').textContent).toBe('No Data Found')
     rerender(<MultiSelect options={[]} emptyDataLabel='Nothing' />)
     expect(q('.msl-options').textContent).toBe('Nothing')
+    rerender(<MultiSelect options={[]} emptyDataLabel={<b>None</b>} />)
+    expect(q('.msl-options b').textContent).toBe('None')
   })
 
   it('treats falsy options as empty', () => {
@@ -349,9 +353,31 @@ describe('options', () => {
       'No Data Found',
       'Nada'
     ])
-    expect(qa('option.msl-option-disable').map((el) => el.textContent)).toEqual(
-      ['No Data Found', 'Nada']
-    )
+    expect(qa('.msl-option-disable').map((el) => el.textContent)).toEqual([
+      'No Data Found',
+      'Nada'
+    ])
+    expect(error).not.toHaveBeenCalled()
+  })
+
+  it('renders JSX group titles and empty labels, keyed apart', () => {
+    const error = vi.spyOn(console, 'error')
+    const { qa } = setup({
+      options: [
+        { title: <b>A</b>, type: 'group', childs: [opts[0]] },
+        {
+          title: <b>B</b>,
+          type: 'group',
+          childs: [],
+          emptyDataLabel: <i>none</i>
+        }
+      ]
+    })
+    expect(qa('.msl-grp-title b').map((el) => el.textContent)).toEqual([
+      'A',
+      'B'
+    ])
+    expect(qa('.msl-option-disable i')[0].textContent).toBe('none')
     expect(error).not.toHaveBeenCalled()
   })
 
@@ -445,7 +471,7 @@ describe('selecting (multi)', () => {
       defaultValue: ['apple', 'banana', 'cherry']
     })
     expect(qa('.msl-chip-delete')[0].getAttribute('aria-label')).toBe(
-      'delete-value'
+      'Remove Apple'
     )
     fireEvent.click(qa('.msl-chip-delete')[1])
     expect(chips()).toEqual(['Apple', 'Cherry'])
@@ -459,12 +485,32 @@ describe('selecting (multi)', () => {
     expect(isOpen()).toBe(false)
   })
 
+  it('names each delete button after its value, as the tooltip reads it', () => {
+    const name = (props: MultiSelectProps) =>
+      setup({ defaultValue: ['apple'], ...props })
+        .q('.msl-chip-delete')
+        .getAttribute('aria-label')
+    expect(name({ getLabel: () => 7 })).toBe('Remove 7')
+    expect(name({ getLabel: (opt) => <b>{opt.label}</b> })).toBe('Remove Apple')
+    expect(
+      name({
+        // @ts-expect-error label is a string: JSX goes through getLabel (untyped JS, v2 options)
+        options: [{ label: <b>Bold</b>, value: 'apple' }]
+      })
+    ).toBe('Remove')
+  })
+
+  it('names the clear button with clearLabel', () => {
+    const { q } = setup({ defaultValue: ['apple'], clearLabel: 'Effacer' })
+    expect(q('.msl-clear-btn').getAttribute('aria-label')).toBe('Effacer')
+  })
+
   it('clears everything by click, Enter or Space without opening the menu', () => {
     const { q, chips, onChange, isOpen, rerender } = setup({
       defaultValue: ['apple', 'banana']
     })
     const clear = q('.msl-clear-btn')
-    expect(clear.getAttribute('aria-label')).toBe('close-menu')
+    expect(clear.getAttribute('aria-label')).toBe('Clear')
     fireEvent.click(clear)
     expect(chips()).toEqual([])
     expect(q('.msl-clear-btn')).toBeNull()
@@ -610,6 +656,13 @@ describe('disableChip / disableSearch / disabled', () => {
         chipAlternateText: 'picked'
       }).single()
     ).toBe('2 picked')
+    cleanup()
+    const { q } = setup({
+      disableChip: true,
+      defaultValue: ['apple', 'banana'],
+      chipAlternateText: <i>picked</i>
+    })
+    expect(q('.msl-single-value i').textContent).toBe('picked')
   })
 
   it('renders a single value through getLabel', () => {
@@ -1031,6 +1084,21 @@ describe('customValue', () => {
     expect(optionTexts()).toEqual(['Apple'])
   })
 
+  it('names the Create item and the Custom Values group through props', () => {
+    const { input, chips, groupTitles, optionTexts, option, q } = setup({
+      customValue: true,
+      createLabel: (text) => `Ajouter « ${text} »`,
+      customValuesTitle: <em>Ajoutés</em>
+    })
+    type(input(), 'kiwi')
+    expect(optionTexts()).toEqual(['Ajouter « kiwi »'])
+    expect(option('Ajouter « kiwi »').title).toBe('Ajouter « kiwi »')
+    type(input(), 'kiwi', 'Enter')
+    expect(chips()).toEqual(['kiwi'])
+    expect(groupTitles()).toEqual(['Ajoutés'])
+    expect(q('.msl-grp-title em')).not.toBeNull()
+  })
+
   it('Enter or comma creates the value under Custom Values', () => {
     const { input, chips, onChange, groupTitles, optionTexts, option } = setup({
       customValue: true
@@ -1235,7 +1303,9 @@ describe('getLabel / getValue', () => {
     const { container } = render(
       <MultiSelect getLabel={getLabel} getValue={getValue} />
     )
-    expect(container.querySelector('.msl-option')!.textContent).toBe('Empty')
+    expect(container.querySelector('.msl-option')!.textContent).toBe(
+      'No Data Found'
+    )
   })
 
   it('keeps a JSX label without getLabel out of search and the tooltip', () => {
@@ -1338,10 +1408,8 @@ describe('menu open / close', () => {
     const { q, isOpen, onMenuOpen, onMenuClose } = setup()
     fireEvent.click(get(q))
     expect(isOpen()).toBe(true)
-    expect(q('.msl-arrow-btn').style.transform).toBe('rotate(180deg)')
     fireEvent.click(get(q))
     expect(isOpen()).toBe(false)
-    expect(q('.msl-arrow-btn').style.transform).toBe('')
     expect(onMenuOpen).toHaveBeenCalledTimes(1)
     expect(onMenuClose).toHaveBeenCalledTimes(1)
   })
@@ -1842,6 +1910,32 @@ describe('keyboard', () => {
     press(input(), 'ArrowDown')
     expect(isOpen()).toBe(true)
     expect(focusedOption()).toBeUndefined()
+  })
+
+  it('leaves keys on JSX in the menu to it, but not keys on the listbox', () => {
+    const { q, input, chips, focusedOption } = setupKeys({
+      options: [{ title: <button>All</button>, type: 'group', childs: opts }]
+    })
+    press(input(), 'ArrowDown')
+    const all = q('.msl-grp-title button')
+    all.focus()
+    // not prevented, so the browser clicks it; the highlighted Apple stays unpicked
+    expect(press(all, 'Enter')).toBe(true)
+    expect(press(all, ' ')).toBe(true)
+    expect(chips()).toEqual([])
+    expect(document.activeElement).toBe(all)
+    // the listbox takes focus on a click in it outside the options
+    press(q('.msl-options'), 'ArrowDown')
+    expect(focusedOption()).toBe('Banana')
+    cleanup()
+    const { q: q2 } = setupKeys({
+      options: [],
+      emptyDataLabel: <button>Add</button>
+    })
+    const add = q2('.msl-options button')
+    add.focus()
+    expect(press(add, 'Enter')).toBe(true)
+    expect(document.activeElement).toBe(add)
   })
 
   it('arrows step over options that share a value', () => {
