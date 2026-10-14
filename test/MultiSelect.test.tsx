@@ -2,12 +2,16 @@
 // Tests named "current behavior: ..." document known bugs; a fix should update them on purpose.
 import { memo, useState } from 'react'
 import type { ComponentProps } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal, flushSync } from 'react-dom'
 import { renderToString } from 'react-dom/server'
 import { jsx } from 'react/jsx-runtime'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render } from '@testing-library/react'
-import type { MultiSelectOption, MultiSelectProps } from '../src/index'
+import { act, cleanup, fireEvent, render } from '@testing-library/react'
+import type {
+  MultiSelectChipProps,
+  MultiSelectOption,
+  MultiSelectProps
+} from '../src/index'
 import MultiSelect from '../src/MultiSelect'
 
 afterEach(() => {
@@ -646,6 +650,199 @@ describe('disableChip / disableSearch / disabled', () => {
     expect(isOpen()).toBe(false)
     expect(onMenuOpen).not.toHaveBeenCalled()
     expect(chips()).toEqual(['Apple'])
+  })
+})
+
+// a chip whose delete button sits in its own shadow root, as in web component libraries
+const shadowChip: MultiSelectProps['customChip'] = ({ label, onDelete }) => (
+  <span
+    className='my-chip'
+    onClick={onDelete}
+    ref={(el) => {
+      if (el && !el.shadowRoot)
+        el.attachShadow({ mode: 'open' }).innerHTML =
+          '<slot></slot><button>×</button>'
+    }}
+  >
+    {label}
+  </span>
+)
+
+describe('customChip', () => {
+  const customChip = vi.fn(
+    ({ label, value, onDelete }: MultiSelectChipProps) => (
+      <button
+        type='button'
+        className='my-chip'
+        data-value={value}
+        onClick={onDelete}
+      >
+        {label}
+      </button>
+    )
+  )
+
+  it('renders each chip with its label, value, option and onDelete', () => {
+    const { qa, chips, isOpen, onChange } = setup({
+      defaultValue: ['apple', 'banana'],
+      getLabel: (opt) => <b>{opt.label}</b>,
+      customChip
+    })
+    expect(chips()).toEqual([])
+    const buttons = () => qa('.my-chip')
+    expect(buttons().map((el) => el.innerHTML)).toEqual([
+      '<b>Apple</b>',
+      '<b>Banana</b>'
+    ])
+    expect(customChip).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        value: 'banana',
+        option: opts[1],
+        disabled: false
+      })
+    )
+    // a native button's Enter and click are its own: not prevented, no menu
+    expect(press(buttons()[0], 'Enter')).toBe(true)
+    fireEvent.click(buttons()[0])
+    expect(values(onChange)).toEqual([['banana']])
+    expect(isOpen()).toBe(false)
+  })
+
+  it('onDelete does nothing while disabled', () => {
+    const { qa, onChange } = setup({
+      disabled: true,
+      defaultValue: ['apple'],
+      customChip
+    })
+    expect(customChip).toHaveBeenLastCalledWith(
+      expect.objectContaining({ disabled: true })
+    )
+    // a native button stays tabbable: its click still reaches onDelete
+    fireEvent.click(qa('.my-chip')[0])
+    expect(onChange).not.toHaveBeenCalled()
+    expect(qa('.my-chip')).toHaveLength(1)
+  })
+
+  it('onDelete deletes from the latest selection, even from an old render', () => {
+    const deletes: Record<string, () => void> = {}
+    const { onChange } = setup({
+      defaultValue: ['apple', 'banana', 'cherry'],
+      customChip: ({ value, onDelete }) => {
+        deletes[value] = onDelete
+        return value
+      }
+    })
+    const { apple, banana } = deletes
+    // both from the first render, as when an exit animation delays them
+    act(() => {
+      apple()
+      banana()
+    })
+    expect(values(onChange)).toEqual([['banana', 'cherry'], ['cherry']])
+  })
+
+  it('onDelete still deletes after the select unmounts', () => {
+    let del = () => {}
+    const { unmount, onChange } = setup({
+      defaultValue: ['apple'],
+      customChip: ({ onDelete }) => {
+        del = onDelete
+        return null
+      }
+    })
+    unmount()
+    del()
+    expect(values(onChange)).toEqual([[]])
+  })
+
+  it('a keyboard delete that unmounts the focused chip keeps focus in the widget', () => {
+    const { qa, input } = setup({
+      defaultValue: ['apple', 'banana'],
+      // keyed by value: deleting Apple remounts the chip after it
+      customChip: ({ label, value, onDelete }) => (
+        <button
+          key={value}
+          type='button'
+          className='my-chip'
+          onKeyDown={onDelete}
+        >
+          {label}
+        </button>
+      )
+    })
+    qa('.my-chip')[0].focus()
+    press(qa('.my-chip')[0])
+    expect(qa('.my-chip').map((el) => el.textContent)).toEqual(['Banana'])
+    expect(document.activeElement).toBe(input())
+  })
+
+  it('keeps keyboard focus and the menu shut when onChange re-renders synchronously', () => {
+    function Flushing() {
+      const [value, setValue] = useState(['apple', 'banana'])
+      return (
+        <MultiSelect
+          options={opts}
+          value={value}
+          onChange={(v) => flushSync(() => setValue(v))}
+        />
+      )
+    }
+    const { container } = render(<Flushing />)
+    const dels = () => [
+      ...container.querySelectorAll<HTMLElement>('.msl-chip-delete')
+    ]
+    const isOpen = () =>
+      /msl-active/.test(container.querySelector('.msl')!.className)
+    // the last chip unmounts before the event reaches the wrapper
+    dels()[1].focus()
+    press(dels()[1])
+    expect(dels()).toHaveLength(1)
+    expect(document.activeElement).toBe(container.querySelector('.msl-input'))
+    expect(isOpen()).toBe(false)
+    fireEvent.click(dels()[0])
+    expect(container.querySelector('.msl-chip')).toBeNull()
+    expect(isOpen()).toBe(false)
+  })
+
+  it('a chip with its own shadow root deletes from inside it', () => {
+    const { q, onChange } = setup({
+      defaultValue: ['apple'],
+      customChip: shadowChip
+    })
+    const button = q('.my-chip').shadowRoot!.querySelector('button')!
+    button.focus()
+    fireEvent.click(button)
+    expect(values(onChange)).toEqual([[]])
+    // jsdom matches :focus-visible on document.activeElement only, the host here: focus is checked in test/browser
+  })
+
+  it('types the option as T, plus { label, value } with customValue, and rejects memo', () => {
+    const ada = { id: '1', name: 'Ada' }
+    const props = {
+      options: [ada],
+      getLabel: (p: typeof ada) => p.name,
+      getValue: (p: typeof ada) => p.id
+    }
+    const elements = [
+      <MultiSelect
+        key='a'
+        {...props}
+        customChip={({ option }) => option.name}
+      />,
+      <MultiSelect
+        key='b'
+        {...props}
+        customValue
+        // @ts-expect-error a created value's option is { label, value }, not a person
+        customChip={({ option }) => option.name}
+      />,
+      <MultiSelect
+        key='c'
+        // @ts-expect-error a memo component is an object: it can't be called
+        customChip={memo(customChip)}
+      />
+    ]
+    expect(elements).toHaveLength(3)
   })
 })
 
@@ -1353,6 +1550,30 @@ describe('value (controlled)', () => {
     )
     fireEvent.click(getByText('reset'))
     expect(chips()).toEqual([])
+  })
+
+  it('starts the next delete from the parent value, not a change it rejected', () => {
+    const { qa, onChange } = setup({ value: ['apple', 'banana', 'cherry'] })
+    fireEvent.click(qa('.msl-chip-delete')[0])
+    fireEvent.click(qa('.msl-chip-delete')[1])
+    expect(values(onChange)).toEqual([
+      ['banana', 'cherry'],
+      ['apple', 'cherry']
+    ])
+  })
+
+  it('a late commit leaves focus where the user moved it', () => {
+    const { qa, rerender } = setup({ value: ['apple', 'banana'] })
+    const del = qa('.msl-chip-delete')[1]
+    del.focus()
+    press(del)
+    // the parent applies it after the user tabbed on, as after a save
+    const other = document.body.appendChild(document.createElement('button'))
+    other.focus()
+    rerender(<MultiSelect options={opts} value={['apple']} />)
+    expect(qa('.msl-chip')).toHaveLength(1)
+    expect(document.activeElement).toBe(other)
+    other.remove()
   })
 
   it('leaves unknown values out without customValue', () => {

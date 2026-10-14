@@ -208,6 +208,110 @@ it('chip delete acts on Enter and Space only', async () => {
   await expect.poll(chips).toEqual(['Cherry'])
 })
 
+const buttonChip: MultiSelectProps['customChip'] = ({ label, onDelete }) => (
+  <button type='button' className='my-chip' onClick={onDelete}>
+    {label}
+  </button>
+)
+
+it('a custom chip button deletes by Enter, keeping keyboard focus in the widget', async () => {
+  const { q, outside, menuHeight, focused } = await setup({
+    defaultValue: ['apple', 'banana'],
+    customChip: buttonChip
+  })
+  outside.focus()
+  await userEvent.tab()
+  await userEvent.tab()
+  await userEvent.keyboard('{Enter}')
+  // index keys: the focused button now deletes Banana
+  await expect.poll(() => q('.my-chip').textContent).toBe('Banana')
+  await userEvent.keyboard('{Enter}')
+  await expect.poll(focused).toBe('search')
+  expect(q('.my-chip')).toBeNull()
+  expect(menuHeight()).toBe(0)
+})
+
+it('a keyboard delete that unmounts the focused chip keeps focus in the widget', async () => {
+  const { q, outside, focused } = await setup({
+    defaultValue: ['apple', 'banana'],
+    // keyed by value: deleting Apple remounts the chip after it
+    customChip: ({ label, value, onDelete }) => (
+      <button key={value} type='button' className='my-chip' onClick={onDelete}>
+        {label}
+      </button>
+    )
+  })
+  outside.focus()
+  await userEvent.tab()
+  await userEvent.tab()
+  await userEvent.keyboard('{Enter}')
+  await expect.poll(() => q('.my-chip').textContent).toBe('Banana')
+  await expect.poll(focused).toBe('search')
+})
+
+// a chip whose delete button sits in its own shadow root, as in web component libraries
+const shadowChip: MultiSelectProps['customChip'] = ({ label, onDelete }) => (
+  <span
+    className='my-chip'
+    onClick={onDelete}
+    ref={(el) => {
+      if (el && !el.shadowRoot)
+        el.attachShadow({ mode: 'open' }).innerHTML =
+          '<slot></slot><button>×</button>'
+    }}
+  >
+    {label}
+  </span>
+)
+
+it('a keyboard delete inside a chip shadow root keeps focus in the widget', async () => {
+  const { q, outside, focused } = await setup({
+    defaultValue: ['apple'],
+    customChip: shadowChip
+  })
+  outside.focus()
+  await userEvent.tab()
+  await userEvent.tab()
+  // the host has focus, but only the button inside matches :focus-visible
+  expect(q('.my-chip').shadowRoot!.activeElement!.tagName).toBe('BUTTON')
+  await userEvent.keyboard('{Enter}')
+  await expect.poll(() => q('.my-chip')).toBeNull()
+  await expect.poll(focused).toBe('search')
+})
+
+it('a custom chip deleted by mouse leaves focus alone', async () => {
+  const { q, menuHeight, focused } = await setup({
+    defaultValue: ['apple'],
+    customChip: buttonChip
+  })
+  await userEvent.click(q('.my-chip'))
+  await expect.poll(() => q('.my-chip')).toBeNull()
+  // focusing the search would pop up a phone's keyboard
+  expect(focused()).not.toBe('search')
+  expect(menuHeight()).toBe(0)
+})
+
+it('deleting the last chip by keyboard keeps focus in a shadow root', async () => {
+  const host = document.body.appendChild(document.createElement('div'))
+  const shadow = host.attachShadow({ mode: 'open' })
+  const container = shadow.appendChild(document.createElement('div'))
+  try {
+    await render(<MultiSelect options={opts} defaultValue={['apple']} />, {
+      container
+    })
+    container.querySelector<HTMLElement>('.msl-wrp')!.focus()
+    await userEvent.tab()
+    expect(shadow.activeElement!.className).toContain('msl-chip-delete')
+    // document.activeElement is the host here, which never matches :focus-visible
+    await userEvent.keyboard('{Enter}')
+    await expect
+      .poll(() => shadow.activeElement?.className)
+      .toContain('msl-input')
+  } finally {
+    host.remove()
+  }
+})
+
 it('disabled blocks the mouse, leaves the tab order and ignores the keyboard', async () => {
   const { root, outside, menuHeight, chips } = await setup({
     disabled: true,
