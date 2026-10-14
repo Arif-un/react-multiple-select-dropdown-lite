@@ -3,16 +3,28 @@
 // Written against the React 18 types.
 import * as React from 'react'
 
+// T: the option shape, inferred from `options`. A shape without a string label or value requires
+// getLabel or getValue: the defaults would read undefined. [T]: a union of shapes is checked as a whole.
+// C: `customValue`, false when unset, so onChange's options hold created values only when it can be on
 declare const MultiSelect: {
+  <T = MultiSelect.MultiSelectOption, C extends boolean = false>(
+    props: MultiSelect.MultiSelectProps<T, C> &
+      ([T] extends [{ label: string }]
+        ? unknown
+        : { getLabel: (option: T) => React.ReactNode }) &
+      ([T] extends [{ value: string }]
+        ? unknown
+        : { getValue: (option: T) => string })
+  ): React.ReactElement
+  // React.ComponentProps, memo and HOCs read the last signature: from the generic one they get T = unknown
   (props: MultiSelect.MultiSelectProps): React.ReactElement
 }
 
 declare namespace MultiSelect {
   interface MultiSelectOption {
-    /** a JSX label also needs `title`, which search and chips use */
-    label: string | React.ReactElement
+    /** shown, searched and the `title` tooltip, unless `getLabel` says otherwise */
+    label: string
     value: string
-    title?: string
     disabled?: boolean
     style?: React.CSSProperties
     /** extra class names */
@@ -23,17 +35,21 @@ declare namespace MultiSelect {
     [key: string]: any
   }
 
-  interface MultiSelectGroup {
+  interface MultiSelectGroup<T = MultiSelectOption> {
     /** always 'group'; typed string so groups kept in variables (where TS widens it) still compile */
     type: string
     title: string
-    childs: ReadonlyArray<MultiSelectOption | MultiSelectGroup>
+    childs: ReadonlyArray<T | MultiSelectGroup<T>>
     /** shown when `childs` is empty */
     emptyDataLabel?: string
   }
 
-  interface MultiSelectProps {
-    options?: ReadonlyArray<MultiSelectOption | MultiSelectGroup>
+  interface MultiSelectProps<
+    T = MultiSelectOption,
+    C extends boolean = boolean
+  > {
+    /** any shape T, read by `getLabel` and `getValue`; its `disabled`, `style`, `classes` and `type` keep their meaning */
+    options?: ReadonlyArray<T | MultiSelectGroup<T>>
     /**
      * initial selection, as option values. Later changes are ignored: use `value`, or a new `key` to reset.
      * Values missing from `options` show once options have them, or under Custom Values with `customValue`
@@ -42,7 +58,29 @@ declare namespace MultiSelect {
     /** controlled selection, as option values: update it from `onChange` */
     value?: readonly string[]
     /** the selected values and their options; a created value's option is `{ label: value, value }` */
-    onChange?: (values: string[], options: MultiSelectOption[]) => void
+    onChange?: (
+      values: string[],
+      // with customValue, a T that can't hold a created option must be narrowed
+      options: Array<
+        | T
+        | ([C] extends [false]
+            ? never
+            : Exclude<{ label: string; value: string }, T>)
+      >
+    ) => void
+    /**
+     * what an option shows in the menu, chips and single value. Default: its `label`.
+     * Search and the tooltip use it when it returns text, else the option's `label`.
+     * Not called for values created by `customValue`
+     */
+    getLabel?: (option: T) => React.ReactNode
+    /** an option's value, as in `value`, `defaultValue` and `onChange`. Default: its `value`. Not called for created values */
+    getValue?: (option: T) => string
+    /**
+     * whether an option matches the search text (trimmed, commas removed). Default: its label text or value contains it,
+     * ignoring case. Not called for created values
+     */
+    filterOption?: (option: T, search: string) => boolean
     singleSelect?: boolean
     clearable?: boolean
     /** clears the value when it turns true */
@@ -72,7 +110,7 @@ declare namespace MultiSelect {
     limit?: number | null
     emptyDataLabel?: string
     /** create options by typing and pressing Enter or comma */
-    customValue?: boolean
+    customValue?: C
     /** close the menu after picking an option. Unset: closes with `singleSelect`, stays open otherwise */
     closeOnSelect?: boolean
     disableSearch?: boolean

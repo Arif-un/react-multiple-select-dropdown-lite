@@ -1,27 +1,19 @@
+import type { ReactNode } from 'react'
 import CloseIcon from './CloseIcon'
-import type { MultiSelectOption } from './index'
 
 export default function Chip({
-  value,
+  label,
   disabled,
   deleteAction
 }: {
-  value: MultiSelectOption
+  label: ReactNode
   disabled?: boolean
   deleteAction: (byKey?: boolean) => void
 }) {
-  const showChipText = (opt: MultiSelectOption) => {
-    if (typeof opt.label === 'object') {
-      return opt?.title || opt.value
-    } else {
-      return opt.label
-    }
-  }
-
   return (
     // @ts-expect-error clickable is a custom attribute (it stops the menu from opening)
     <div clickable='true' className='msl-chip'>
-      {showChipText(value)}
+      {label}
       <div
         role='button'
         // @ts-expect-error see above

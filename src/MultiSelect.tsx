@@ -16,14 +16,22 @@ type Item = MultiSelectOption | MultiSelectGroup
 
 // Defaults as parameter defaults: React 19's jsx runtime ignores defaultProps on function components.
 const noop = () => {}
+const optLabel = (opt: MultiSelectOption) => opt.label
+const optValue = (opt: MultiSelectOption) => opt.value
 const noStyle = {}
+
+// options we create, { label, value }: the user's getters only know their own shape
+const ours = new WeakSet<MultiSelectOption>()
+const ourOpt = (value: string, label = value) => {
+  const opt = { label, value }
+  ours.add(opt)
+  return opt
+}
 const emptyOptions: readonly Item[] = [
-  {
-    label: 'Empty',
-    value: '',
+  Object.assign(ourOpt('', 'Empty'), {
     disabled: true,
-    style: { textAlign: 'center' }
-  }
+    style: { textAlign: 'center' as const }
+  })
 ]
 
 // options in render order, groups unwrapped, the way Options.tsx walks them
@@ -43,6 +51,9 @@ function MultiSelect({
   clearAll = false,
   downArrow = true,
   onChange = noop,
+  getLabel = optLabel,
+  getValue = optValue,
+  filterOption,
   singleSelect = false,
   defaultValue,
   value: valueProp,
@@ -73,14 +84,23 @@ function MultiSelect({
   const [custom, setCustom] = useState<string[]>([])
   const base = userOptions || []
   const known = flatten(base)
+  const valueOf = (opt: MultiSelectOption) =>
+    ours.has(opt) ? opt.value : getValue(opt)
+  const labelOf = (opt: MultiSelectOption) =>
+    ours.has(opt) ? opt.label : getLabel(opt)
+  // search and the tooltip need text: a JSX label falls back to the label field, if that is text
+  const text = (x: unknown) =>
+    typeof x === 'string' || typeof x === 'number' ? String(x) : null
+  const textOf = (opt: MultiSelectOption, label = labelOf(opt)) =>
+    text(label) ?? text(opt.label) ?? ''
   // String(): untyped JS often passes numbers
   const findOpt = (opts: MultiSelectOption[], key: string) =>
-    opts.find((opt) => String(opt.value) === String(key))
+    opts.find((opt) => String(valueOf(opt)) === String(key))
   // listed after the user's options: created values, plus with customValue the selected
   // ones the options lack. Once the options have one (they may arrive late, #12), it moves there
   const customOpts = [...custom, ...(customValue ? keys : [])]
     .filter((key, i, arr) => arr.indexOf(key) === i && !findOpt(known, key))
-    .map((key) => ({ label: key, value: key }))
+    .map((key) => ourOpt(key))
   const options: readonly Item[] = customOpts.length
     ? [...base, { title: 'Custom Values', type: 'group', childs: customOpts }]
     : base
@@ -115,9 +135,9 @@ function MultiSelect({
   // by value once the list changes under it (search, pick)
   const activeIdx = !active
     ? -1
-    : shown[active.idx]?.value === active.value
+    : shown[active.idx] && valueOf(shown[active.idx]) === active.value
       ? active.idx
-      : shown.findIndex((opt) => opt.value === active.value)
+      : shown.findIndex((opt) => valueOf(opt) === active.value)
 
   useEffect(() => {
     !menuOpen && setActive(null)
@@ -141,41 +161,37 @@ function MultiSelect({
   }, [clearAll])
 
   const setNewValue = (val: MultiSelectOption[]) => {
-    const values = val.map((opt) => opt.value)
+    const values = val.map(valueOf)
     if (!controlled) setOwn(values)
     onChange(values, val)
   }
 
-  const checkValueExist = (
-    value: MultiSelectOption,
-    arr: MultiSelectOption[]
-  ) => {
-    const bool = arr.some((itm) => itm.value === value.value)
-    return bool
-  }
+  // valueOf once per selected value: Options asks this twice for every option
+  const selected = new Set(value.map(valueOf))
+  const checkValueExist = (opt: MultiSelectOption) => selected.has(valueOf(opt))
 
   const addValue = (newValObj: MultiSelectOption) => {
     // picking Create (click, Enter or comma) adds the typed text as an option
     if (newValObj === createOpt.current) {
-      newValObj = { label: newValObj.value, value: newValObj.value }
+      newValObj = ourOpt(newValObj.value)
       setCustom([...custom, newValObj.value])
     }
     let tmp = [...value]
     if (singleSelect) {
-      if (checkValueExist(newValObj, value)) {
+      if (checkValueExist(newValObj)) {
         tmp = []
       } else {
         tmp = [newValObj]
       }
     } else {
-      if (!checkValueExist(newValObj, value)) {
+      if (!checkValueExist(newValObj)) {
         if (limit === null) {
           tmp.push(newValObj)
         } else if (limit > value.length) {
           tmp.push(newValObj)
         }
       } else {
-        tmp = tmp.filter((itm) => itm.value !== newValObj.value)
+        tmp = tmp.filter((itm) => valueOf(itm) !== valueOf(newValObj))
       }
     }
     setNewValue(tmp)
@@ -226,41 +242,14 @@ function MultiSelect({
     return false
   }
 
-  const searchOptions = (str: string, options: readonly Item[]) => {
-    const searchedOptions: MultiSelectOption[] = []
-    const searchedOptValues: MultiSelectOption[] = []
-    // plain substring match: typed text is not a regex.
-    // String(): untyped JS often passes numbers
-    const needle = str.toLowerCase()
-
-    // groups recurse first, so the rest of the loop only sees options
-    const searchInOptions = (opt: MultiSelectOption[]) => {
-      for (let i = 0; i < opt.length; i++) {
-        if (opt[i]?.type === 'group') {
-          searchInOptions(opt[i].childs as MultiSelectOption[])
-        } else if (
-          typeof opt[i].label !== 'object' &&
-          String(opt[i].label).toLowerCase().includes(needle)
-        ) {
-          searchedOptions.push(opt[i])
-        } else if (
-          typeof opt[i].label === 'object' &&
-          opt[i]?.title?.toLowerCase().includes(needle)
-        ) {
-          searchedOptions.push(opt[i])
-        } else if (String(opt[i].value).toLowerCase().includes(needle)) {
-          searchedOptValues.push(opt[i])
-        }
-        if (typeof opt[i].label === 'object' && !('title' in opt[i])) {
-          console.warn(
-            '[multiselect] you must provide a title property as typeof string, if you want to render jsx in option label'
-          )
-        }
-      }
-    }
-    searchInOptions(options as MultiSelectOption[])
-    return [...searchedOptions, ...searchedOptValues]
-  }
+  // plain substring match: typed text is not a regex. Our { label, value } options skip a
+  // user's filterOption, which expects their own shape. String(): untyped JS often passes numbers
+  const matches = (opt: MultiSelectOption, text: string) =>
+    filterOption && !ours.has(opt)
+      ? filterOption(opt, text)
+      : [textOf(opt), valueOf(opt)].some((s) =>
+          String(s).toLowerCase().includes(text.toLowerCase())
+        )
 
   // also runs on input: text can arrive without a keyup (context menu paste, drag and drop)
   const handleSearchAndCustomValue = (
@@ -271,12 +260,9 @@ function MultiSelect({
       .replace(/,+/g, '')
 
     if (textValue) {
-      createOpt.current = {
-        label: `Create "${textValue}"`,
-        value: textValue
-      }
+      createOpt.current = ourOpt(textValue, `Create "${textValue}"`)
       // Enter reads this, not `search`: that is null when text arrived without a keyup (paste, IME)
-      const results = searchOptions(textValue, options)
+      const results = all.filter((opt) => matches(opt, textValue))
       if (customValue && !findOpt(all, textValue)) {
         results.push(createOpt.current)
       }
@@ -346,7 +332,7 @@ function MultiSelect({
           : activeIdx
     for (i += dir; i >= 0 && i < shown.length; i += dir) {
       if (!shown[i].disabled)
-        return setActive({ value: shown[i].value, idx: i })
+        return setActive({ value: valueOf(shown[i]), idx: i })
     }
   }
 
@@ -403,14 +389,6 @@ function MultiSelect({
     'aria-labelledby': attr?.['aria-labelledby']
   } as const
 
-  const showLabel = (optionObj: MultiSelectOption) => {
-    if (typeof optionObj.label === 'object') {
-      return optionObj?.title || optionObj.value
-    } else {
-      return optionObj.label
-    }
-  }
-
   const getActiveClass = () => {
     const el = componentRef.current!
     const rect = el.getBoundingClientRect()
@@ -435,11 +413,7 @@ function MultiSelect({
         disabled ? 'msl-disabled' : ''
       }${limit !== null && value.length >= limit ? ' msl-limit-reached' : ''}`}
     >
-      <input
-        name={name}
-        type='hidden'
-        value={value.map((opt) => opt.value).join(',')}
-      />
+      <input name={name} type='hidden' value={value.map(valueOf).join(',')} />
       <div data-msl className={`msl ${menuOpen ? getActiveClass() : ''} `}>
         <div
           data-msl
@@ -451,7 +425,7 @@ function MultiSelect({
             value.map((val, i) => (
               <Chip
                 key={`msl-chip-${i + 11}`}
-                value={val}
+                label={labelOf(val)}
                 disabled={disabled}
                 deleteAction={(byKey) => {
                   deleteValue(i)
@@ -463,13 +437,13 @@ function MultiSelect({
           {!singleSelect && disableChip && value.length > 0 && (
             <span className='msl-single-value' data-msl>
               {value.length === 1
-                ? showLabel(value[0])
+                ? labelOf(value[0])
                 : `${value.length} ${chipAlternateText}`}
             </span>
           )}
           {singleSelect && value.length === 1 && (
             <span className='msl-single-value' data-msl>
-              {showLabel(value[0])}
+              {labelOf(value[0])}
             </span>
           )}
           {showSearchOption() && (
@@ -548,11 +522,13 @@ function MultiSelect({
               singleSelect,
               addValue,
               checkValueExist,
-              value,
               largeData,
               menuOpen,
               listId,
-              activeIdx
+              activeIdx,
+              valueOf,
+              labelOf,
+              textOf
             }}
           />
         ) : (
