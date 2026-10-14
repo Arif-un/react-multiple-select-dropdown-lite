@@ -1,12 +1,13 @@
 // Characterization tests: they pin the current behavior, quirks included.
 // Tests named "current behavior: ..." document known bugs; a fix should update them on purpose.
-import { useState } from 'react'
+import { memo, useState } from 'react'
+import type { ComponentProps } from 'react'
 import { createPortal } from 'react-dom'
 import { renderToString } from 'react-dom/server'
 import { jsx } from 'react/jsx-runtime'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
-import type { MultiSelectProps } from '../src/index'
+import type { MultiSelectOption, MultiSelectProps } from '../src/index'
 import MultiSelect from '../src/MultiSelect'
 
 afterEach(() => {
@@ -298,20 +299,12 @@ describe('defaultValue', () => {
     expect(chips()).toEqual(['Apple', 'Banana'])
   })
 
-  it('shows value in the chip for JSX labels without title', () => {
-    const { chips } = setup({
-      options: [{ label: <b>Bold</b>, value: 'bold' }],
-      defaultValue: ['bold']
+  it('renders chips through getLabel', () => {
+    const { q } = setup({
+      defaultValue: ['apple'],
+      getLabel: (opt) => <b>{opt.label}!</b>
     })
-    expect(chips()).toEqual(['bold'])
-  })
-
-  it('shows title in the chip for JSX labels with title', () => {
-    const { chips } = setup({
-      options: [{ label: <b>Bold</b>, value: 'bold', title: 'Bold title' }],
-      defaultValue: ['bold']
-    })
-    expect(chips()).toEqual(['Bold title'])
+    expect(q('.msl-chip b').textContent).toBe('Apple!')
   })
 })
 
@@ -366,8 +359,7 @@ describe('options', () => {
           value: 's',
           style: { color: 'blue' },
           classes: 'x y'
-        },
-        { label: <b>Jsx</b>, value: 'j', title: 'Jsx title' }
+        }
       ]
     })
     const styled = option('Styled')
@@ -375,8 +367,6 @@ describe('options', () => {
     expect(styled.getAttribute('class')).toBe('msl-option   x y')
     expect(styled.getAttribute('title')).toBe('Styled')
     expect(styled.getAttribute('value')).toBe('s')
-    expect(option('Jsx').getAttribute('title')).toBe('Jsx title')
-    expect(option('Jsx').getAttribute('class')).toBe('msl-option   ')
   })
 
   it('renders options only while open with largeData', () => {
@@ -618,18 +608,15 @@ describe('disableChip / disableSearch / disabled', () => {
     ).toBe('2 picked')
   })
 
-  it('shows title, else value, for a single JSX label', () => {
-    const options = [
-      { label: <b>A</b>, value: 'a', title: 'A title' },
-      { label: <b>B</b>, value: 'b' }
-    ]
+  it('renders a single value through getLabel', () => {
+    const getLabel = (opt: MultiSelectOption) => `<${opt.label}>`
     expect(
-      setup({ disableChip: true, options, defaultValue: ['a'] }).single()
-    ).toBe('A title')
+      setup({ disableChip: true, getLabel, defaultValue: ['apple'] }).single()
+    ).toBe('<Apple>')
     cleanup()
     expect(
-      setup({ singleSelect: true, options, defaultValue: ['b'] }).single()
-    ).toBe('b')
+      setup({ singleSelect: true, getLabel, defaultValue: ['banana'] }).single()
+    ).toBe('<Banana>')
   })
 
   it('disableSearch keeps a static placeholder until a value exists', () => {
@@ -669,7 +656,7 @@ describe('search', () => {
     expect(optionTexts()).toEqual(['Banana'])
   })
 
-  it('lists label matches before value-only matches', () => {
+  it('matches labels and values, in option order', () => {
     const { input, optionTexts } = setup({
       options: [
         { label: 'Blue', value: 'red_blue' },
@@ -677,7 +664,34 @@ describe('search', () => {
       ]
     })
     type(input(), 'red')
-    expect(optionTexts()).toEqual(['Red', 'Blue'])
+    expect(optionTexts()).toEqual(['Blue', 'Red'])
+  })
+
+  it('filterOption replaces the match, but not for created values', () => {
+    const { input, optionTexts } = setup({
+      options: [
+        { label: 'Apple', value: 'apple', tags: ['fruit', 'red'] },
+        { label: 'Carrot', value: 'carrot', tags: ['veg'] }
+      ],
+      // created values have no tags: calling this on them would throw
+      filterOption: (opt, search) => opt.tags.includes(search),
+      customValue: true,
+      defaultValue: ['fig']
+    })
+    type(input(), 'red')
+    expect(optionTexts()).toEqual(['Apple', 'Create "red"'])
+    type(input(), 'Apple')
+    expect(optionTexts()).toEqual(['Create "Apple"'])
+    type(input(), 'fi')
+    expect(optionTexts()).toEqual(['fig', 'Create "fi"'])
+  })
+
+  it('passes filterOption the search trimmed, commas removed', () => {
+    const filterOption = vi.fn(() => true)
+    const { input } = setup({ filterOption })
+    // pasted text: a typed comma would pick the first result
+    type(input(), ' Doe, J ')
+    expect(filterOption).toHaveBeenLastCalledWith(opts[2], 'Doe J')
   })
 
   it('searches nested groups and flattens results', () => {
@@ -687,20 +701,23 @@ describe('search', () => {
     expect(groupTitles()).toEqual([])
   })
 
-  it('matches JSX labels by title, or by value when title is missing', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const { input, qa } = setup({
-      options: [
-        { label: <b>X</b>, value: 'x1', title: 'Xylophone' },
-        { label: <b>Y</b>, value: 'yak' }
-      ]
+  it('matches label text, not what getLabel renders', () => {
+    const { input, optionTexts } = setup({
+      getLabel: (opt) => <b>{opt.label.toUpperCase()}</b>
     })
-    const titles = () => qa('.msl-option').map((el) => el.getAttribute('value'))
-    type(input(), 'xylo')
-    expect(titles()).toEqual(['x1'])
-    type(input(), 'yak')
-    expect(titles()).toEqual(['yak'])
-    expect(warn).toHaveBeenCalled()
+    type(input(), 'APP')
+    expect(optionTexts()).toEqual(['APPLE'])
+    type(input(), 'zzz')
+    expect(optionTexts()).toEqual(['No Data Found'])
+  })
+
+  it('renders the Create item without getLabel', () => {
+    const { input, optionTexts } = setup({
+      customValue: true,
+      getLabel: (opt) => `[${opt.label}]`
+    })
+    type(input(), 'kiwi')
+    expect(optionTexts()).toEqual(['Create "kiwi"'])
   })
 
   it('shows emptyDataLabel when nothing matches', () => {
@@ -925,6 +942,165 @@ describe('customValue', () => {
   })
 })
 
+describe('getLabel / getValue', () => {
+  const ada = { id: '1', name: 'Ada' }
+  const bob = { id: '2', name: 'Bob' }
+  // any shape: the types infer it from options
+  const people = [ada, { title: 'Team', type: 'group', childs: [bob] }]
+  const qa = (c: HTMLElement, s: string) => [
+    ...c.querySelectorAll<HTMLElement>(s)
+  ]
+
+  it('reads any option shape through getLabel and getValue', () => {
+    const onChange = vi.fn()
+    const { container: c } = render(
+      <MultiSelect
+        options={people}
+        getLabel={(p) => p.name}
+        getValue={(p) => p.id}
+        defaultValue={['2']}
+        onChange={onChange}
+      />
+    )
+    expect(qa(c, '.msl-chip').map((el) => el.textContent)).toEqual(['Bob'])
+    expect(
+      qa(c, '.msl-option').map((el) => [
+        el.getAttribute('value'),
+        el.getAttribute('title'),
+        el.textContent
+      ])
+    ).toEqual([
+      ['1', 'Ada', 'Ada'],
+      ['2', 'Bob', 'Bob']
+    ])
+    fireEvent.click(qa(c, '.msl-option')[0])
+    expect(onChange).toHaveBeenLastCalledWith(['2', '1'], [bob, ada])
+    expect(
+      c.querySelector<HTMLInputElement>('input[type="hidden"]')!.value
+    ).toBe('2,1')
+    fireEvent.click(qa(c, '.msl-option')[0])
+    expect(onChange).toHaveBeenLastCalledWith(['2'], [bob])
+    // the label first, then the value
+    const input = c.querySelector('input.msl-input')!
+    type(input, 'ad')
+    expect(qa(c, '.msl-option').map((el) => el.textContent)).toEqual(['Ada'])
+    type(input, '2')
+    expect(qa(c, '.msl-option').map((el) => el.textContent)).toEqual(['Bob'])
+  })
+
+  it('searches a number label, and only values for JSX without a label field', () => {
+    const years = [
+      { id: 'a', year: 1999 },
+      { id: 'b', year: 2024 }
+    ]
+    const props = { options: years, getValue: (y: (typeof years)[0]) => y.id }
+    const texts = () =>
+      qa(c, '.msl-options .msl-option').map((el) => el.textContent)
+    const { container: c, rerender } = render(
+      <MultiSelect {...props} getLabel={(y) => y.year} />
+    )
+    type(c.querySelector('input.msl-input')!, '99')
+    expect(texts()).toEqual(['1999'])
+    rerender(<MultiSelect {...props} getLabel={(y) => <b>{y.year}</b>} />)
+    type(c.querySelector('input.msl-input')!, '99')
+    expect(texts()).toEqual(['No Data Found'])
+    type(c.querySelector('input.msl-input')!, 'b')
+    expect(texts()).toEqual(['2024'])
+  })
+
+  it('keeps created values and the Empty option out of the getters', () => {
+    const getLabel = (opt: MultiSelectOption) => `${opt.label}!`
+    const getValue = (opt: MultiSelectOption) => opt.value.toUpperCase()
+    const { input, chips, optionTexts, onChange } = setup({
+      customValue: true,
+      defaultValue: ['APPLE', 'fig'],
+      getLabel,
+      getValue
+    })
+    expect(chips()).toEqual(['Apple!', 'fig'])
+    type(input(), 'kiwi', 'Enter')
+    expect(onChange).toHaveBeenLastCalledWith(
+      ['APPLE', 'fig', 'kiwi'],
+      [
+        opts[0],
+        { label: 'fig', value: 'fig' },
+        { label: 'kiwi', value: 'kiwi' }
+      ]
+    )
+    expect(optionTexts()).toEqual([
+      'Apple!',
+      'Banana!',
+      'Cherry!',
+      'kiwi',
+      'fig'
+    ])
+    cleanup()
+    const { container } = render(
+      <MultiSelect getLabel={getLabel} getValue={getValue} />
+    )
+    expect(container.querySelector('.msl-option')!.textContent).toBe('Empty')
+  })
+
+  it('keeps a JSX label without getLabel out of search and the tooltip', () => {
+    const { input, option, optionTexts } = setup({
+      // @ts-expect-error label is a string: JSX goes through getLabel (untyped JS, v2 options)
+      options: [{ label: <b>Bold</b>, value: 'bold' }]
+    })
+    expect(option('Bold').getAttribute('title')).toBe('')
+    // not '[object Object]'
+    type(input(), 'obj')
+    expect(optionTexts()).toEqual(['No Data Found'])
+  })
+
+  it('calls getLabel once per option for both its content and its tooltip', () => {
+    const getLabel = vi.fn((p: typeof ada) => <b>{p.name}</b>)
+    const { container: c } = render(
+      <MultiSelect
+        options={[ada, bob]}
+        getLabel={getLabel}
+        getValue={(p) => p.id}
+      />
+    )
+    expect(getLabel.mock.calls.map(([p]) => p.name)).toEqual(['Ada', 'Bob'])
+    expect(qa(c, '.msl-option').map((el) => el.textContent)).toEqual([
+      'Ada',
+      'Bob'
+    ])
+  })
+
+  it('types require getLabel and getValue for shapes without them', () => {
+    const elements = [
+      // @ts-expect-error people have no `value`: getValue is required
+      <MultiSelect key='a' options={people} getLabel={(p) => p.name} />,
+      // @ts-expect-error people have no `label`: getLabel is required
+      <MultiSelect key='b' options={people} getValue={(p) => p.id} />
+    ]
+    // checked by pnpm typecheck: at runtime these are plain elements
+    expect(elements).toHaveLength(2)
+  })
+
+  it('types keep wrappers on the default shape, and created values off T', () => {
+    const Wrapper = (p: ComponentProps<typeof MultiSelect>) => (
+      <MultiSelect {...p} />
+    )
+    const Memo = memo(MultiSelect)
+    const props = {
+      options: [ada, bob],
+      getLabel: (p: typeof ada) => p.name,
+      getValue: (p: typeof ada) => p.id,
+      onChange: (_: string[], sel: { name: string }[]) => sel.map((p) => p.name)
+    }
+    const elements = [
+      <Wrapper key='a' options={opts} />,
+      <Memo key='b' options={opts} />,
+      <MultiSelect key='c' {...props} />,
+      // @ts-expect-error with customValue, onChange can get { label, value }, not a person
+      <MultiSelect key='d' {...props} customValue />
+    ]
+    expect(elements).toHaveLength(4)
+  })
+})
+
 describe('menu open / close', () => {
   it('opens on click, focuses search, and computes direction', () => {
     const focus = vi.spyOn(HTMLElement.prototype, 'focus')
@@ -1057,13 +1233,10 @@ describe('menu open / close', () => {
     const errors = vi.fn((e: Event) => e.preventDefault())
     window.addEventListener('error', errors)
     const { root, isOpen } = setup({
-      options: [
-        {
-          label: <b>{createPortal(<i className='portal' />, document.body)}</b>,
-          title: 'Portal',
-          value: 'p'
-        }
-      ]
+      options: [{ label: 'Portal', value: 'p' }],
+      getLabel: () => (
+        <b>{createPortal(<i className='portal' />, document.body)}</b>
+      )
     })
     fireEvent.click(root)
     // React bubbles it to the wrapper; climbing from it ends at the document

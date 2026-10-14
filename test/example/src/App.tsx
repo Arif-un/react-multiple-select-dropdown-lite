@@ -16,7 +16,7 @@ const App = () => {
 
   const [options, setOptions] = useState({
     opt: [
-      { label: <div style={customStyle}><h6>Title</h6><span role="img" aria-label="agun">🔥</span></div>, value: 'option_1', title: 'option_1' },
+      { label: 'option_1', value: 'option_1', fire: true },
       { label: 'Option 2', value: '{id: 1}' },
       { label: 'Select...', value: 'option_3' },
       { label: 'Rf', value: 'option_4' },
@@ -52,6 +52,7 @@ const App = () => {
         defaultValue={value}
         width={400}
         onChange={handleOnchange}
+        getLabel={(opt) => 'fire' in opt ? <div style={customStyle}><h6>Title</h6><span role="img" aria-label="agun">🔥</span></div> : opt.label}
         options={options.opt}
         customValue
         // singleSelect
