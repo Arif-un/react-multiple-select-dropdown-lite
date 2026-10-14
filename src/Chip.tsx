@@ -1,29 +1,27 @@
 import type { ReactNode } from 'react'
 import CloseIcon from './CloseIcon'
 
+// the default customChip: called as a function, so it can't use hooks
 export default function Chip({
   label,
   disabled,
-  deleteAction
+  onDelete
 }: {
   label: ReactNode
-  disabled?: boolean
-  deleteAction: (byKey?: boolean) => void
+  disabled: boolean
+  onDelete: () => void
 }) {
   return (
-    // @ts-expect-error clickable is a custom attribute (it stops the menu from opening)
-    <div clickable='true' className='msl-chip'>
+    <div className='msl-chip'>
       {label}
       <div
         role='button'
-        // @ts-expect-error see above
-        clickable='true'
         aria-label='delete-value'
-        onClick={() => deleteAction()}
+        onClick={onDelete}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
-            deleteAction(true)
+            onDelete()
           }
         }}
         tabIndex={disabled ? -1 : 0}

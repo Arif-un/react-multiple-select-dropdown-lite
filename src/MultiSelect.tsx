@@ -72,6 +72,7 @@ function MultiSelect({
   onMenuClose = noop,
   onClear = noop,
   chipAlternateText = 'Item Selected',
+  customChip = Chip,
   closeOnSelect,
   disableSearch = false
 }: MultiSelectProps) {
@@ -160,9 +161,16 @@ function MultiSelect({
     }
   }, [clearAll])
 
+  // the selection as last set or rendered: a chip's onDelete may run late (after an exit animation)
+  const latest = useRef(value)
+
   const setNewValue = (val: MultiSelectOption[]) => {
     const values = val.map(valueOf)
-    if (!controlled) setOwn(values)
+    // controlled: the parent may reject it, so the next delete starts from what it renders
+    if (!controlled) {
+      latest.current = val
+      setOwn(values)
+    }
     onChange(values, val)
   }
 
@@ -207,11 +215,8 @@ function MultiSelect({
     }
   }
 
-  const deleteValue = (i: number) => {
-    const tmp = [...value]
-    tmp.splice(i, 1)
-    setNewValue(tmp)
-  }
+  const deleteValue = (opt: MultiSelectOption) =>
+    setNewValue(latest.current.filter((itm) => valueOf(itm) !== valueOf(opt)))
 
   const clearValue = () => {
     setNewValue([])
@@ -225,6 +230,32 @@ function MultiSelect({
 
   // a keyboard delete unmounts the focused button: keep focus in the widget
   const refocus = () => (inputFld.current || componentRef.current)!.focus()
+
+  // the element with keyboard focus (focus-visible) when a chip was deleted
+  const lost = useRef<Element | null>(null)
+
+  useEffect(() => {
+    latest.current = value
+    const el = lost.current
+    lost.current = null
+    // the delete unmounted it (the last chip, or a chip keyed by value) and focus fell to the body.
+    // A late commit (async onChange) may find the user moved on: leave their focus alone
+    el &&
+      !el.isConnected &&
+      el.ownerDocument.activeElement === el.ownerDocument.body &&
+      refocus()
+  })
+
+  // Not document.activeElement: in a shadow root that is the host. A focused shadow host only
+  // stands for the element focused inside it, the one that can match :focus-visible.
+  // No ref once unmounted: a late onDelete still deletes
+  const keyboardFocus = () => {
+    const outer = (componentRef.current?.getRootNode() as Document | undefined)
+      ?.activeElement
+    let el = outer
+    while (el?.shadowRoot?.activeElement) el = el.shadowRoot.activeElement
+    return el?.matches(':focus-visible') ? outer! : null
+  }
 
   const showSearchOption = () => {
     if (disableSearch) {
@@ -281,16 +312,15 @@ function MultiSelect({
   }
 
   // the target or an ancestor below the wrapper has attr: any icon depth, and never
-  // climbs past the wrapper (a ShadowRoot or document has no hasAttribute)
+  // climbs past the wrapper (a ShadowRoot or document has no hasAttribute). A target outside
+  // the wrapper's DOM counts too: a portal's, or a chip a sync onChange removed mid-event
   const marked = (target: EventTarget, attr: string) => {
-    for (
-      let el = target as Element | null;
-      el && el !== componentRef.current;
-      el = el.parentNode as Element | null
-    ) {
+    let el = target as Element | null
+    while (el && el !== componentRef.current) {
       if (el.hasAttribute?.(attr)) return true
+      el = el.parentNode as Element | null
     }
-    return false
+    return !el
   }
 
   const focusSearchInput = () => {
@@ -355,7 +385,7 @@ function MultiSelect({
       !inputFld.current.value
     ) {
       // a value next to the search field means chips mode
-      value.length && deleteValue(value.length - 1)
+      value.length && deleteValue(value[value.length - 1])
     } else if (
       /^Arrow(Down|Up)$/.test(key) ||
       // with search text, Home/End move the caret
@@ -420,20 +450,30 @@ function MultiSelect({
           className='msl-input-wrp'
           style={{ width: calculatedWidth }}
         >
-          {!singleSelect &&
-            !disableChip &&
-            value.map((val, i) => (
-              <Chip
-                key={`msl-chip-${i + 11}`}
-                label={labelOf(val)}
-                disabled={disabled}
-                deleteAction={(byKey) => {
-                  deleteValue(i)
-                  // index keys: only the last chip's button goes away
-                  byKey && i === value.length - 1 && refocus()
-                }}
-              />
-            ))}
+          {!singleSelect && !disableChip && (
+            // clickable: clicks and keys on any chip markup are the chip's, not the menu's.
+            // display: contents keeps this box out of the layout, styled or not
+            // @ts-expect-error clickable is a custom attribute
+            <div clickable='true' style={{ display: 'contents' }}>
+              {value.map((val, i) => (
+                <React.Fragment key={i}>
+                  {customChip({
+                    label: labelOf(val),
+                    value: valueOf(val),
+                    option: val,
+                    disabled,
+                    onDelete: () => {
+                      // a custom chip may stay tabbable while disabled
+                      if (disabled) return
+                      // before the delete: an onChange that flushes sync unmounts the chip right away
+                      lost.current = keyboardFocus()
+                      deleteValue(val)
+                    }
+                  })}
+                </React.Fragment>
+              ))}
+            </div>
+          )}
           {!singleSelect && disableChip && value.length > 0 && (
             <span className='msl-single-value' data-msl>
               {value.length === 1
