@@ -10,7 +10,7 @@ A **lightweight** select that has every feature a select/multiselect should have
 2. **Feature complete.** Everything users expect from a select: single and multi select, search, creating values (`customValue`), groups, limit, clear, disabled options, keyboard navigation, form submission (`name`), ARIA combobox/listbox, SSR safe, large lists (`largeData`).
 3. **Convertible.** The same component switches between single and multi (`singleSelect`), controlled and uncontrolled (`value` / `defaultValue`), and works with any option shape (`getLabel` / `getValue`). New features must work in every mode.
 4. **Headless.** Behavior is separate from looks. All styling lives in `src/styles.css`, shipped as `dist/index.css`, which the JS never imports: skip it and the markup is unstyled. Direction: expose state and behavior so users can render their own UI. Don't hard-code visual decisions in TSX.
-5. **Fully customizable.** Every visual is reachable: CSS variables (`--input-width`, `--placeholder-color`, ...), `msl-*` class names, icon props, `getLabel` rendering, `attr` spread. For a visual knob, prefer a CSS variable over a new prop.
+5. **Fully customizable.** Every visual is reachable: CSS variables (`--msl-input-width`, `--msl-placeholder-color`, ...), `msl-*` class names, icon props, `getLabel` rendering, `attr` spread. For a visual knob, prefer a CSS variable over a new prop.
 
 ## Commands
 
