@@ -19,6 +19,7 @@ const noop = () => {}
 const optLabel = (opt: MultiSelectOption) => opt.label
 const optValue = (opt: MultiSelectOption) => opt.value
 const noStyle = {}
+const createText = (text: string) => `Create "${text}"`
 
 // options we create, { label, value }: the user's getters only know their own shape
 const ours = new WeakSet<MultiSelectOption>()
@@ -27,13 +28,6 @@ const ourOpt = (value: string, label = value) => {
   ours.add(opt)
   return opt
 }
-const emptyOptions: readonly Item[] = [
-  Object.assign(ourOpt('', 'Empty'), {
-    disabled: true,
-    style: { textAlign: 'center' as const }
-  })
-]
-
 // options in render order, groups unwrapped, the way Options.tsx walks them
 function flatten(items: readonly Item[], out: MultiSelectOption[] = []) {
   for (const opt of items) {
@@ -44,7 +38,7 @@ function flatten(items: readonly Item[], out: MultiSelectOption[] = []) {
 }
 
 function MultiSelect({
-  options: userOptions = emptyOptions,
+  options: userOptions,
   downArrowIcon,
   closeIcon,
   clearable = true,
@@ -72,6 +66,9 @@ function MultiSelect({
   onMenuClose = noop,
   onClear = noop,
   chipAlternateText = 'Item Selected',
+  clearLabel = 'Clear',
+  createLabel = createText,
+  customValuesTitle = 'Custom Values',
   customChip = Chip,
   closeOnSelect,
   disableSearch = false
@@ -103,7 +100,7 @@ function MultiSelect({
     .filter((key, i, arr) => arr.indexOf(key) === i && !findOpt(known, key))
     .map((key) => ourOpt(key))
   const options: readonly Item[] = customOpts.length
-    ? [...base, { title: 'Custom Values', type: 'group', childs: customOpts }]
+    ? [...base, { title: customValuesTitle, type: 'group', childs: customOpts }]
     : base
   const all = [...known, ...customOpts]
   // looked up at render, so options arriving after mount resolve with no effect
@@ -150,10 +147,6 @@ function MultiSelect({
       .current!.querySelector('.msl-option-focused')
       ?.scrollIntoView?.({ block: 'nearest' })
   }, [activeIdx])
-
-  const calculatedWidth = `calc(100% - ${
-    clearable && downArrow ? 60 : downArrow || clearable ? 40 : 5
-  }px)`
 
   useEffect(() => {
     if (clearAll && value.length) {
@@ -291,7 +284,7 @@ function MultiSelect({
       .replace(/,+/g, '')
 
     if (textValue) {
-      createOpt.current = ourOpt(textValue, `Create "${textValue}"`)
+      createOpt.current = ourOpt(textValue, createLabel(textValue))
       // Enter reads this, not `search`: that is null when text arrived without a keyup (paste, IME)
       const results = all.filter((opt) => matches(opt, textValue))
       if (customValue && !findOpt(all, textValue)) {
@@ -372,8 +365,15 @@ function MultiSelect({
     composing.current = e.nativeEvent.isComposing || e.keyCode === 229
     if (composing.current) return
     const { key, target } = e
-    // chips and the clear button handle their own keys
-    if (disabled || marked(target, 'clickable')) return
+    // our listbox, when the target is JSX in it outside the options: an empty state's button, a group title's
+    const box = (target as Element).closest('[role=option],[role=listbox]')
+    // chips, the clear button and that JSX handle their own keys
+    if (
+      disabled ||
+      marked(target, 'clickable') ||
+      (box?.id === listId && box !== target)
+    )
+      return
     if (key === 'Enter' && activeIdx >= 0) {
       e.preventDefault()
       addValue(shown[activeIdx])
@@ -445,11 +445,7 @@ function MultiSelect({
     >
       <input name={name} type='hidden' value={value.map(valueOf).join(',')} />
       <div data-msl className={`msl ${menuOpen ? getActiveClass() : ''} `}>
-        <div
-          data-msl
-          className='msl-input-wrp'
-          style={{ width: calculatedWidth }}
-        >
+        <div data-msl className='msl-input-wrp'>
           {!singleSelect && !disableChip && (
             // clickable: clicks and keys on any chip markup are the chip's, not the menu's.
             // display: contents keeps this box out of the layout, styled or not
@@ -476,9 +472,13 @@ function MultiSelect({
           )}
           {!singleSelect && disableChip && value.length > 0 && (
             <span className='msl-single-value' data-msl>
-              {value.length === 1
-                ? labelOf(value[0])
-                : `${value.length} ${chipAlternateText}`}
+              {value.length === 1 ? (
+                labelOf(value[0])
+              ) : (
+                <>
+                  {value.length} {chipAlternateText}
+                </>
+              )}
             </span>
           )}
           {singleSelect && value.length === 1 && (
@@ -518,7 +518,7 @@ function MultiSelect({
                 role='button'
                 // @ts-expect-error clickable is a custom attribute (it stops the menu from opening)
                 clickable='true'
-                aria-label='close-menu'
+                aria-label={clearLabel}
                 onClick={clearByUser}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
@@ -539,7 +539,6 @@ function MultiSelect({
                 aria-hidden='true'
                 dropdown-handle='true'
                 className='msl-btn msl-arrow-btn msl-flx'
-                style={{ ...(menuOpen && { transform: 'rotate(180deg)' }) }}
               >
                 {downArrowIcon || <DownIcon />}
               </div>
@@ -572,9 +571,7 @@ function MultiSelect({
             }}
           />
         ) : (
-          <option className='msl-option msl-option-disable'>
-            {emptyDataLabel}
-          </option>
+          <div className='msl-option msl-option-disable'>{emptyDataLabel}</div>
         )}
       </div>
     </div>

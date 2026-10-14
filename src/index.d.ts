@@ -38,10 +38,10 @@ declare namespace MultiSelect {
   interface MultiSelectGroup<T = MultiSelectOption> {
     /** always 'group'; typed string so groups kept in variables (where TS widens it) still compile */
     type: string
-    title: string
+    title: React.ReactNode
     childs: ReadonlyArray<T | MultiSelectGroup<T>>
     /** shown when `childs` is empty */
-    emptyDataLabel?: string
+    emptyDataLabel?: React.ReactNode
   }
 
   interface MultiSelectChipProps<
@@ -111,7 +111,7 @@ declare namespace MultiSelect {
     placeholder?: string
     disableChip?: boolean
     /** with `disableChip`, shown after the count: "2 Item Selected" */
-    chipAlternateText?: string
+    chipAlternateText?: React.ReactNode
     /**
      * renders each chip; a render function, not a component, so no hooks in it: render a component that has them,
      * `(p) => <MyChip key={p.value} {...p} />`. Chips are keyed by position: `key={p.value}` resets a chip's state when
@@ -137,9 +137,16 @@ declare namespace MultiSelect {
     disabled?: boolean
     /** max selected values, `null` for no limit. The wrapper gets `msl-limit-reached` once hit */
     limit?: number | null
-    emptyDataLabel?: string
+    /** shown when there are no options or no search results */
+    emptyDataLabel?: React.ReactNode
     /** create options by typing and pressing Enter or comma */
     customValue?: C
+    /** the label of the option that creates the typed text. Default: `Create "text"` */
+    createLabel?: (text: string) => string
+    /** title of the group listing created values. Default: `'Custom Values'` */
+    customValuesTitle?: React.ReactNode
+    /** the clear button's `aria-label`. Default: `'Clear'` */
+    clearLabel?: string
     /** close the menu after picking an option. Unset: closes with `singleSelect`, stays open otherwise */
     closeOnSelect?: boolean
     disableSearch?: boolean
@@ -147,7 +154,7 @@ declare namespace MultiSelect {
     onMenuClose?: () => void
     /** after the clear button empties the value (not for `clearAll`) */
     onClear?: () => void
-    /** @deprecated no effect since v2.0.1, set the `--input-width` CSS variable instead */
+    /** @deprecated no effect since v2.0.1, set the `--msl-input-width` CSS variable instead */
     width?: unknown
   }
 }

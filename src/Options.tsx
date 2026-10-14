@@ -53,16 +53,13 @@ function Options({
           addInArr(opt.childs as Item[], childs)
         } else {
           childs.push(
-            <option
-              key='msl-grp-empty'
-              className='msl-option msl-option-disable'
-            >
+            <div key='msl-grp-empty' className='msl-option msl-option-disable'>
               {opt.emptyDataLabel || 'No Data Found'}
-            </option>
+            </div>
           )
         }
         out.push(
-          <div key={opt.title + i} role='group' aria-labelledby={titleId}>
+          <div key={titleId} role='group' aria-labelledby={titleId}>
             {childs}
           </div>
         )
