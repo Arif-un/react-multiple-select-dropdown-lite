@@ -17,8 +17,13 @@ Breaking release: one value format, React 18+, modern bundles, a native search i
 - **No ES5 build.** The bundles use modern syntax and import `react/jsx-runtime`. Transpile them yourself if you target old browsers. Even then, chip delete needs `:focus-visible`: Chrome 86, Firefox 85, Safari 15.4.
 - **Types:** `MultiSelectValue`, `MultiSelectBaseProps`, `MultiSelectStringProps` and `MultiSelectJsonProps` are gone. `MultiSelectProps` is a single interface, so `Omit` works on it directly.
 - **`label` is a string, and options lose `title`.** For JSX, pass `getLabel={(opt) => <Jsx />}`. Search and the tooltip then use `label`.
-- **The search field is an `<input>`**, not a `contentEditable` div. Rules on `.msl-input::before` no longer reach its placeholder: set the new `--placeholder-color` variable instead. It fits its text through CSS `field-sizing: content`; browsers without that show it at the default input width.
+- **CSS variables start with `--msl-`**, so they can't clash with an app's own `--border-radius` or `--font-size`: `--input-width` is `--msl-input-width`, and so on for all of them. Rename them in your CSS.
+- **The search field is an `<input>`**, not a `contentEditable` div. Rules on `.msl-input::before` no longer reach its placeholder: set the new `--msl-placeholder-color` variable instead. It fits its text through CSS `field-sizing: content`; browsers without that show it at the default input width.
 - **Chips render inside a `<div clickable="true" style="display: contents">`**, so DOM snapshots change. It takes no layout room. `.msl-chip` and `.msl-chip-delete` keep their classes, but the `clickable` attribute moves from them to the wrapper, and chips are no longer children of `.msl-input-wrp`: use `.msl-input-wrp .msl-chip`, not `>`.
+- **Layout and the arrow flip live in the CSS**, not in inline styles (the chip wrapper's `display: contents` is the one left). `.msl` is a flex row: `.msl-input-wrp` takes the free space (it had an inline `width: calc(100% - 60px)`) and `.msl-actions` sits in the flow instead of `position: absolute`. Recheck custom CSS that sizes `.msl-input-wrp` or positions `.msl-actions`. The open arrow turns through `.msl-active .msl-arrow-btn`, not an inline `transform`, so without the stylesheet it no longer flips.
+- **No "Empty" option.** Without `options`, the menu shows `emptyDataLabel`, as it does for `[]`.
+- **Empty states are `<div>`s, not `<option>`s**, so they can hold JSX. Use `.msl-option-disable`, not `option.msl-option-disable`.
+- **ARIA labels:** the clear button is `Clear` (was `close-menu`), set it with `clearLabel`. The default chip's delete button is `Remove Apple` for an `Apple` chip (was `delete-value`), or `Remove` when the label has no text; translate it through `customChip`. Update tests that query these labels.
 
 ```jsx
 // v2
@@ -34,16 +39,21 @@ Breaking release: one value format, React 18+, modern bundles, a native search i
 
 ### Added
 
+- `clearLabel`, `createLabel(text)` and `customValuesTitle` props, so no built-in text is left untranslatable: ``createLabel={(text) => `Ajouter « ${text} »`}``.
+- `emptyDataLabel`, `chipAlternateText` and a group's `title` and `emptyDataLabel` take JSX.
+- CSS variables for every color and the menu stacking: `--msl-border-color`, `--msl-hover-border-color`, `--msl-disabled-background`, `--msl-chip-background`, `--msl-chip-delete-background`, `--msl-chip-delete-color`, `--msl-button-hover-background`, `--msl-option-hover-background`, `--msl-option-active-background`, `--msl-option-active-color`, `--msl-option-disabled-color`, `--msl-group-title-background`, `--msl-focus-color`, `--msl-menu-z-index`, `--msl-background` (the closed box) and `--msl-scrollbar-color`. A dark theme is one rule.
 - `customChip(props)` prop, to render chips yourself: `customChip={({ label, onDelete }) => <button type='button' onClick={onDelete}>{label} ×</button>}`. It gets `label`, `value`, `option`, `disabled` and `onDelete`, typed as `MultiSelectChipProps`. It is a render function, not a component, so it can't use hooks: return `<MyChip {...props} />` for that.
 - `filterOption(option, search)` prop, to replace the search match.
 - `getLabel(option)` and `getValue(option)` props. `getLabel` renders options, chips and the single value. Together they read options of any shape, e.g. `{ id, name }` straight from an API. The types infer the shape from `options`, and require `getLabel` or `getValue` when it has no string `label` or `value`. With `customValue`, `onChange`'s options are typed to also hold created `{ label, value }` options.
-- `--placeholder-color` CSS variable, for the search field's placeholder and the static one shown with `disableSearch`.
+- `--msl-placeholder-color` CSS variable, for the search field's placeholder and the static one shown with `disableSearch`.
 
 ### Changed
 
 - Options that arrive after mount resolve the selection when they render. There is no longer an effect that re-resolves it.
 - Values missing from `options` are left out of the display and of `onChange`, unless `customValue` is set. They show up once matching options arrive.
 - Search results keep option order. Label matches no longer come before value-only matches.
+- The menu's scrollbar thumb no longer darkens on hover in Safari, matching Chrome and Firefox.
+- Keys pressed on focusable JSX in the menu, such as a button in `emptyDataLabel` or a group `title`, are left to it: Enter no longer picks the highlighted option or refocuses the search field.
 - Long search text scrolls on one line instead of wrapping, and no longer runs under the clear and arrow buttons. A placeholder too long for the input ends in an ellipsis.
 
 ## [2.1.0] - 2026-10-12
