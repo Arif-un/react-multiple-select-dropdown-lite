@@ -8,16 +8,9 @@
     "type": "git",
     "url": "https://github.com/Arif-un/react-multiple-select-dropdown-lite.git"
   },
-  "publishConfig": {
-    "registry": "https://registry.npmjs.org"
-  },
   "main": "dist/index.js",
   "module": "dist/index.modern.js",
   "types": "dist/index.d.ts",
-  "source": "src/MultiSelect.tsx",
-  "engines": {
-    "node": ">=12"
-  },
   "scripts": {
     "build": "vite build",
     "start": "vite build --watch",
