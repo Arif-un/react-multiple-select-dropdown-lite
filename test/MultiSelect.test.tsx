@@ -169,7 +169,7 @@ describe('render', () => {
     expect(
       (MultiSelect as { defaultProps?: object }).defaultProps
     ).toBeUndefined()
-    // jsx(), not the classic createElement this file compiles to (that one still applies defaultProps)
+    // jsx(), the runtime React 19 skips defaultProps in, whatever this file's JSX compiles to
     const { container, rerender } = render(jsx(MultiSelect, {}))
     const q = (s: string) => (plate() ?? container).querySelector(s)!
     expect(q('.msl-input').getAttribute('placeholder')).toBe('Select...')
@@ -567,15 +567,62 @@ describe('selecting (multi)', () => {
     const { option, chips, onChange, root } = setup({ limit: 2 })
     fireEvent.click(option('Apple'))
     expect(root.classList).not.toContain('msl-limit-reached')
+    expect(option('Cherry').getAttribute('aria-disabled')).toBe('false')
     fireEvent.click(option('Banana'))
     expect(root.classList).toContain('msl-limit-reached')
     fireEvent.click(option('Cherry'))
     expect(chips()).toEqual(['Apple', 'Banana'])
+    // a selected one still toggles off
+    fireEvent.click(option('Apple'))
+    expect(chips()).toEqual(['Banana'])
+    expect(root.classList).not.toContain('msl-limit-reached')
     expect(values(onChange)).toEqual([
       ['apple'],
       ['apple', 'banana'],
-      ['apple', 'banana']
+      ['apple', 'banana'],
+      ['banana']
     ])
+  })
+
+  it('past the limit marks unselected options disabled, and the highlight skips them', () => {
+    const { option, input } = setup({
+      limit: 2,
+      defaultValue: ['apple', 'banana']
+    })
+    expect(option('Cherry').getAttribute('aria-disabled')).toBe('true')
+    expect(option('Cherry').className).toContain('msl-option-disable')
+    expect(option('Apple').getAttribute('aria-disabled')).toBe('false')
+    for (let i = 0; i < 3; i++) press(input(), 'ArrowDown')
+    expect(option('Banana').hasAttribute('data-focused')).toBe(true)
+  })
+
+  it('past the limit a pick creates nothing and keeps the search and the menu', () => {
+    const { input, onChange, optionTexts, isOpen } = setup({
+      limit: 1,
+      defaultValue: ['apple'],
+      customValue: true,
+      closeOnSelect: true
+    })
+    type(input(), 'kiwi')
+    type(input(), 'kiwi', 'Enter')
+    expect(onChange).toHaveBeenLastCalledWith(['apple'], [opts[0]])
+    expect(input().value).toBe('kiwi')
+    expect(isOpen()).toBe(true)
+    // still offered, not created: a created value would list as kiwi
+    expect(optionTexts()).toEqual(['Create "kiwi"'])
+  })
+
+  it('single select ignores the limit: a pick replaces the value', () => {
+    const { option, root, onChange } = setup({
+      singleSelect: true,
+      closeOnSelect: false,
+      limit: 1,
+      defaultValue: ['apple']
+    })
+    expect(root.classList).not.toContain('msl-limit-reached')
+    expect(option('Banana').getAttribute('aria-disabled')).toBe('false')
+    fireEvent.click(option('Banana'))
+    expect(onChange).toHaveBeenLastCalledWith(['banana'], [opts[1]])
   })
 
   it('ignores disabled options', () => {
@@ -823,6 +870,8 @@ describe('disableChip / disableSearch / disabled', () => {
     expect(root.tabIndex).toBe(-1)
     expect(q('.msl-chip-delete').tabIndex).toBe(-1)
     expect(q('.msl-clear-btn').tabIndex).toBe(-1)
+    expect(q('.msl-chip-delete').getAttribute('aria-disabled')).toBe('true')
+    expect(q('.msl-clear-btn').getAttribute('aria-disabled')).toBe('true')
     const search = q<HTMLInputElement>('.msl-input')
     expect(search.disabled).toBe(true)
     expect(search.getAttribute('aria-disabled')).toBe('true')
@@ -1144,6 +1193,28 @@ describe('search', () => {
       expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry'])
     }
   )
+
+  it.each(['Enter', ','])('%s skips a disabled first result', (key) => {
+    const { input, chips } = setup({
+      options: [
+        { label: 'Apple', value: 'apple', disabled: true },
+        { label: 'Apricot', value: 'apricot' }
+      ]
+    })
+    type(input(), 'ap')
+    type(input(), 'ap', key)
+    expect(chips()).toEqual(['Apricot'])
+  })
+
+  it('Enter picks nothing when every result is disabled', () => {
+    const { input, chips, onChange } = setup({
+      options: [{ label: 'Apple', value: 'apple', disabled: true }]
+    })
+    type(input(), 'ap')
+    type(input(), 'ap', 'Enter')
+    expect(chips()).toEqual([])
+    expect(onChange).not.toHaveBeenCalled()
+  })
 
   it('Enter picks a match even without a keyup for the text (paste, IME)', () => {
     const { root, input, chips } = setup()
@@ -2522,6 +2593,18 @@ describe('value (controlled)', () => {
     expect(onChange).toHaveBeenLastCalledWith([], [])
     expect(chips()).toEqual(['Apple', 'Banana'])
     rerender(<MultiSelect options={opts} onChange={onChange} value={[]} />)
+    expect(chips()).toEqual([])
+  })
+
+  it('treats value null (untyped JS, useState(null)) as an empty controlled selection', () => {
+    const { chips, option, onChange } = setup({
+      // @ts-expect-error null is not in the types
+      value: null,
+      customValue: true
+    })
+    expect(chips()).toEqual([])
+    fireEvent.click(option('Apple'))
+    expect(onChange).toHaveBeenLastCalledWith(['apple'], [opts[0]])
     expect(chips()).toEqual([])
   })
 
