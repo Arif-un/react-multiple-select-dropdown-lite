@@ -672,12 +672,11 @@ function MultiSelect({
   // rendered twice while open: the hidden wrapper's copy holds the space, the plate's is live
   const control = (plate: boolean) => (
     <div
-      data-msl
       data-open={plate || undefined}
       data-up={(plate && up) || undefined}
       className={`msl ${plate ? (up ? 'msl-active-up' : 'msl-active') : ''} ${cn.control ?? ''}`}
     >
-      <div data-msl className={`msl-input-wrp ${cn.values ?? ''}`}>
+      <div className={`msl-input-wrp ${cn.values ?? ''}`}>
         {!singleSelect && !disableChip && (
           // data-clickable: clicks and keys on any chip markup are the chip's, not the menu's.
           // display: contents keeps this box out of the layout, styled or not
@@ -703,7 +702,7 @@ function MultiSelect({
           </div>
         )}
         {!singleSelect && disableChip && value.length > 0 && (
-          <span className={`msl-single-value ${cn.singleValue ?? ''}`} data-msl>
+          <span className={`msl-single-value ${cn.singleValue ?? ''}`}>
             {value.length === 1 ? (
               labelOf(value[0])
             ) : (
@@ -714,13 +713,12 @@ function MultiSelect({
           </span>
         )}
         {singleSelect && value.length === 1 && (
-          <span className={`msl-single-value ${cn.singleValue ?? ''}`} data-msl>
+          <span className={`msl-single-value ${cn.singleValue ?? ''}`}>
             {labelOf(value[0])}
           </span>
         )}
         {showSearchOption() && (
           <input
-            data-msl
             placeholder={placeholder}
             className={`msl-input ${cn.input ?? ''}`}
             disabled={disabled}
@@ -737,7 +735,6 @@ function MultiSelect({
         )}
         {!showSearchOption() && value.length < 1 && (
           <div
-            data-msl
             data-placeholder={placeholder}
             className={`msl-input ${cn.input ?? ''}`}
           />
@@ -793,7 +790,6 @@ function MultiSelect({
         <Options
           opts={items}
           {...{
-            singleSelect,
             addValue,
             checkValueExist,
             listId,

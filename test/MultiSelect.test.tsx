@@ -322,14 +322,6 @@ describe('render', () => {
     expect(q('.msl-arrow-btn .my-arrow')).not.toBeNull()
     expect(q('.msl-close-icn')).not.toBeNull() // chip delete keeps default icon
   })
-
-  it('marks options as data-msl only in multi select', () => {
-    expect(setup().option('Apple').hasAttribute('data-msl')).toBe(true)
-    cleanup()
-    expect(
-      setup({ singleSelect: true }).option('Apple').hasAttribute('data-msl')
-    ).toBe(false)
-  })
 })
 
 describe('defaultValue', () => {
