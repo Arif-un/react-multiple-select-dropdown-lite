@@ -1,5 +1,9 @@
 import type { ReactElement, ReactNode } from 'react'
-import type { MultiSelectGroup, MultiSelectOption } from './index'
+import type {
+  MultiSelectClassNames,
+  MultiSelectGroup,
+  MultiSelectOption
+} from './index'
 
 // options and groups share one loop, told apart by `type` at runtime
 type Item = MultiSelectOption & MultiSelectGroup
@@ -9,27 +13,24 @@ function Options({
   singleSelect,
   addValue,
   checkValueExist,
-  largeData,
-  menuOpen,
   listId,
   activeIdx,
   valueOf,
   labelOf,
-  textOf
+  textOf,
+  cn
 }: {
   opts: ReadonlyArray<MultiSelectOption | MultiSelectGroup>
   singleSelect?: boolean
   addValue: (opt: MultiSelectOption) => void
   checkValueExist: (opt: MultiSelectOption) => boolean
-  largeData?: boolean
-  menuOpen: boolean
   listId: string
   activeIdx: number
   valueOf: (opt: MultiSelectOption) => string
   labelOf: (opt: MultiSelectOption) => ReactNode
   textOf: (opt: MultiSelectOption, label?: ReactNode) => string
+  cn: MultiSelectClassNames
 }) {
-  if (largeData && !menuOpen) return null
   // counts options only, like MultiSelect's flattened list
   let n = 0
   let g = 0
@@ -44,7 +45,7 @@ function Options({
             id={titleId}
             data-msl
             role='presentation'
-            className='msl-grp-title'
+            className={`msl-grp-title ${cn.groupTitle ?? ''}`}
           >
             {opt.title}
           </div>
@@ -53,13 +54,21 @@ function Options({
           addInArr(opt.childs as Item[], childs)
         } else {
           childs.push(
-            <div key='msl-grp-empty' className='msl-option msl-option-disable'>
+            <div
+              key='msl-grp-empty'
+              className={`msl-option msl-option-disable ${cn.empty ?? ''}`}
+            >
               {opt.emptyDataLabel || 'No Data Found'}
             </div>
           )
         }
         out.push(
-          <div key={titleId} role='group' aria-labelledby={titleId}>
+          <div
+            key={titleId}
+            role='group'
+            aria-labelledby={titleId}
+            className={`msl-grp ${cn.group ?? ''}`}
+          >
             {childs}
           </div>
         )
@@ -76,9 +85,7 @@ function Options({
             tabIndex={-1}
             key={`${i}-${valueOf(opt)}`}
             {...(!singleSelect && { 'data-msl': true })}
-            style={{
-              ...(opt.style && opt.style)
-            }}
+            style={opt.style}
             onClick={() => {
               !opt.disabled && addValue(opt)
             }}
@@ -94,7 +101,8 @@ function Options({
               checkValueExist(opt) ? 'msl-option-active' : ''
             } ${opt.disabled ? 'msl-option-disable' : ''} ${
               opt.classes !== undefined ? opt.classes : ''
-            }${idx === activeIdx ? ' msl-option-focused' : ''}`}
+            }${idx === activeIdx ? ' msl-option-focused' : ''} ${cn.option ?? ''}`}
+            data-focused={idx === activeIdx || undefined}
             // @ts-expect-error value is not a div attribute; kept, users and tests read it
             value={valueOf(opt)}
           >
@@ -105,7 +113,7 @@ function Options({
     }
     return out
   }
-  return <div>{addInArr(opts as Item[], [])}</div>
+  return <>{addInArr(opts as Item[], [])}</>
 }
 
 export default Options

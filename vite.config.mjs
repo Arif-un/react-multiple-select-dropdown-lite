@@ -50,7 +50,7 @@ export default defineConfig({
     lib: { entry: 'src/MultiSelect.tsx' },
     sourcemap: true,
     rolldownOptions: {
-      external: ['react', 'react/jsx-runtime'],
+      external: ['react', 'react-dom', 'react/jsx-runtime'],
       output: [
         // 'use client': Next.js App Router can import it from a Server Component
         {

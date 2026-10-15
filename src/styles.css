@@ -1,296 +1,300 @@
+.msl-vars {
+  /* sizes */
+  --msl-input-width: 300px;
+  --msl-menu-max-height: 400px;
+  --msl-font-size: 14px;
+  --msl-line-height: 1.4;
+  --msl-border-radius: 8px;
+  --msl-menu-z-index: 9999;
+
+  /* the closed box */
+  --msl-background: transparent;
+  --msl-border-color: rgb(156 156 156);
+  --msl-hover-border-color: rgb(80 80 80);
+  --msl-placeholder-color: rgb(146 146 146);
+  --msl-disabled-background: rgb(246 246 246);
+  --msl-focus-color: rgb(0 119 255);
+
+  /* chips and buttons */
+  --msl-chip-background: rgb(238 238 238);
+  --msl-chip-delete-background: transparent;
+  --msl-chip-delete-color: rgb(0 0 0 / 0.6);
+  --msl-button-hover-background: lightgray;
+
+  /* the open menu */
+  --msl-active-menu-background: white;
+  --msl-active-menu-radius: var(--msl-border-radius);
+  --msl-active-menu-shadow:
+    0 0 1px rgb(3 7 18 / 0.02), 0 1px 4px rgb(3 7 18 / 0.04),
+    0 3px 9px rgb(3 7 18 / 0.05), 0 4px 15px rgb(3 7 18 / 0.07),
+    0 7px 24px rgb(3 7 18 / 0.09);
+  --msl-active-menu-border-color: hsl(224deg 5.68% 88.24%);
+  --msl-divider-color: rgb(3 7 18 / 0.08);
+  --msl-option-hover-background: rgb(233 233 233);
+  --msl-option-active-background: hsl(209.49deg 10.01% 93.31%);
+  --msl-option-active-color: #0351ff;
+  --msl-option-disabled-color: rgb(0 0 0 / 0.3);
+  --msl-group-title-background: #fafafa;
+  --msl-group-offset: 12px;
+  --msl-scrollbar-color: rgb(0 0 0 / 0.1);
+}
+
 .msl-flx {
   display: inline-flex;
   align-items: center;
 }
-.msl-vars {
-  --msl-menu-max-height: 400px;
-  --msl-input-width: 300px;
-  --msl-font-size: 16px;
-  --msl-border-radius: 8px 8px 8px 8px;
-  --msl-active-menu-shadow: 0 2px 8px 0px #b1b1b1;
-  --msl-line-height: 1.4;
-  --msl-active-menu-background: white;
-  --msl-active-menu-radius: var(--msl-border-radius);
-  --msl-placeholder-color: rgb(146, 146, 146);
-  --msl-border-color: rgb(156, 156, 156);
-  --msl-hover-border-color: rgb(80, 80, 80);
-  --msl-disabled-background: rgb(246, 246, 246);
-  --msl-chip-background: rgb(238, 238, 238);
-  --msl-chip-delete-background: rgb(218, 218, 218);
-  --msl-chip-delete-color: rgba(0, 0, 0, 0.6);
-  --msl-button-hover-background: lightgray;
-  --msl-option-hover-background: rgb(233, 233, 233);
-  --msl-option-active-background: #e6f4fa;
-  --msl-option-active-color: #0351ff;
-  --msl-option-disabled-color: hsla(0, 0%, 0%, 0.3);
-  --msl-group-title-background: #fafafa;
-  --msl-focus-color: rgb(0, 119, 255);
-  --msl-menu-z-index: 9999;
-  --msl-background: transparent;
-  --msl-scrollbar-color: rgba(0, 0, 0, 0.1);
-}
-
-.msl-wrp * {
-  line-height: var(--msl-line-height);
-}
 
 .msl-wrp {
   width: var(--msl-input-width);
-  outline: none;
-  position: relative;
   border-radius: var(--msl-border-radius);
 }
+
+.msl-wrp,
+.msl-plate {
+  outline: none;
+
+  & * {
+    line-height: var(--msl-line-height);
+  }
+}
+
 .msl-disabled {
   pointer-events: none !important;
 }
-.msl-disabled > .msl {
-  background-color: var(--msl-disabled-background);
-}
+
 .msl {
   display: flex;
-  background: var(--msl-background);
   overflow: hidden;
-  border: 1px solid;
-  border-color: var(--msl-border-color);
+  border: 1px solid var(--msl-border-color);
   border-radius: var(--msl-border-radius);
   outline: none;
+  background: var(--msl-background);
   cursor: text;
-  transition: border-radius 200ms;
+
+  &:not(.msl-active, .msl-active-up):hover {
+    border-color: var(--msl-hover-border-color);
+  }
 }
-.msl:not(.msl-active, .msl-active-up):hover {
-  border-color: var(--msl-hover-border-color);
+
+:where(.msl-disabled) > .msl {
+  background-color: var(--msl-disabled-background);
 }
-.msl-active {
-  background: var(--msl-active-menu-background);
-  box-shadow: var(--msl-active-menu-shadow);
-  z-index: var(--msl-menu-z-index);
-  border-color: transparent;
-  border-radius: var(--msl-active-menu-radius);
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-  border-bottom: 0;
-  transition:
-    border-top-left-radius 400ms,
-    border-top-right-radius 400ms;
-}
-.msl-active-up {
-  background: var(--msl-active-menu-background);
-  box-shadow: var(--msl-active-menu-shadow);
-  z-index: var(--msl-menu-z-index);
-  border-color: transparent;
-  border-radius: var(--msl-active-menu-radius);
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
-  transition:
-    border-bottom-left-radius 400ms,
-    border-bottom-right-radius 400ms;
-}
-.msl-active ~ .msl-options {
-  background: var(--msl-active-menu-background);
-  z-index: var(--msl-menu-z-index);
-  box-shadow: var(--msl-active-menu-shadow);
-  -webkit-clip-path: inset(0px -10px -10px -10px);
-  clip-path: inset(0px -10px -10px -10px);
-  max-height: var(--msl-menu-max-height);
-  border-radius: var(--msl-active-menu-radius);
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
-  transition:
-    border-bottom-left-radius 0.5s ease-in,
-    border-bottom-right-radius 0.5s ease-in;
-}
-.msl-active-up ~ .msl-options {
-  background: var(--msl-active-menu-background);
-  z-index: var(--msl-menu-z-index);
-  bottom: 99%;
-  box-shadow: var(--msl-active-menu-shadow);
-  -webkit-clip-path: inset(-10px -10px 0 -10px);
-  clip-path: inset(-10px -10px 0 -10px);
-  max-height: var(--msl-menu-max-height);
-  border-radius: var(--msl-active-menu-radius);
-  border-bottom: 0;
-  border-bottom-right-radius: 0;
-  border-bottom-left-radius: 0;
-  transition:
-    border-top-left-radius 700ms,
-    border-top-right-radius 700ms;
-}
-.msl-options {
-  position: absolute;
-  width: 100%;
-  max-height: 0;
-  overflow: auto;
-  scrollbar-color: var(--msl-scrollbar-color) transparent;
-  scrollbar-width: thin;
-  border-radius: var(--msl-border-radius);
-}
+
 .msl-input-wrp {
   flex: 1;
-  min-width: 0;
+  min-inline-size: 0;
 }
+
 .msl-input {
   display: inline-block;
   vertical-align: top;
-  outline: none;
+  max-inline-size: calc(100% - 16px);
   margin: 5px;
   padding: 3px;
-  font-size: var(--msl-font-size);
-  font-family: inherit;
-  color: inherit;
   border: 0;
+  outline: none;
   background: none;
-  /* ponytail: without field-sizing (older Safari) the input keeps its default width; a hidden text copy could size it there */
-  field-sizing: content;
-  /* content-box: 100% less the margin and padding */
-  max-width: calc(100% - 16px);
+  color: inherit;
+  font-family: inherit;
+  font-size: var(--msl-font-size);
   text-overflow: ellipsis;
-}
-.msl-input::placeholder {
-  color: var(--msl-placeholder-color);
-  opacity: 1;
+  field-sizing: content;
+
+  &::placeholder {
+    color: var(--msl-placeholder-color);
+    opacity: 1;
+  }
+
+  &::before {
+    color: var(--msl-placeholder-color);
+    line-height: var(--msl-line-height);
+  }
+
+  &[data-placeholder]:not([data-placeholder='']):empty::before {
+    content: attr(data-placeholder);
+  }
 }
 
-.msl-input::before {
-  line-height: var(--msl-line-height);
-  color: var(--msl-placeholder-color);
-}
-.msl-input[data-placeholder]:not([data-placeholder='']):empty::before {
-  content: attr(data-placeholder);
-}
-.msl-chip {
-  background: var(--msl-chip-background);
-  border-radius: 5px;
-  margin: 5px;
-  padding: 3px 3px 3px 6px;
-  white-space: nowrap;
-  font-size: var(--msl-font-size);
-  display: inline-flex;
-  align-items: center;
-  line-break: anywhere;
-  white-space: break-spaces;
-}
 .msl-single-value {
   display: inline-block;
-  margin: 5px;
-  padding: 3px;
   vertical-align: top;
   overflow: hidden;
-  text-overflow: ellipsis;
+  margin: 5px;
+  padding: 3px;
   font-size: var(--msl-font-size);
-  line-break: strict;
   white-space: nowrap;
-}
-.msl-options::-webkit-scrollbar {
-  width: 8px;
-}
-.msl-options::-webkit-scrollbar-track {
-  background: transparent;
+  text-overflow: ellipsis;
+  line-break: strict;
 }
 
-.msl-options::-webkit-scrollbar-thumb {
-  background: var(--msl-scrollbar-color);
-  border-radius: 20px;
-}
-.msl-options .msl-option,
-.msl-grp-title {
-  font-size: var(--msl-font-size);
+.msl-chip {
+  display: inline-flex;
+  align-items: center;
+  margin: 5px;
+  padding-block: 3px;
+  padding-inline: 6px 3px;
   border-radius: 5px;
-  padding: 7px 5px;
-  cursor: pointer;
-  margin: 4px 6px 4px;
-  line-break: anywhere;
-  line-height: var(--msl-line-height);
-  outline: none;
+  background: var(--msl-chip-background);
+  font-size: var(--msl-font-size);
   white-space: break-spaces;
-  transition: background 200ms;
-}
-
-.msl-wrp:focus-visible,
-.msl-option:focus-visible,
-.msl-btn:focus-visible {
-  outline: 2px solid var(--msl-focus-color);
-}
-
-.msl-grp-title {
-  font-size: calc(var(--msl-font-size) - 2px);
-  cursor: default;
-  background: var(--msl-group-title-background);
-  opacity: 0.7;
-}
-
-/* the last option's margin collapses into this, groups or not */
-.msl-options > :last-child {
-  margin-bottom: 5px;
-}
-.msl-options .msl-option:hover,
-.msl-option:focus,
-.msl-options .msl-option-focused {
-  background: var(--msl-option-hover-background);
-}
-.msl-option-active {
-  background: var(--msl-option-active-background);
-  color: var(--msl-option-active-color);
-}
-.msl-option-disable {
-  color: var(--msl-option-disabled-color);
+  line-break: anywhere;
 }
 
 .msl-btn {
-  border-radius: 50%;
-  border: none;
-  outline: none;
-  padding: 0;
   justify-content: center;
-  cursor: pointer;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  outline: none;
   background: transparent;
+  cursor: pointer;
 }
+
 .msl-actions {
   align-self: center;
   margin-inline-end: 5px;
 }
-.msl-arrow-btn,
-.msl-clear-btn {
+
+.msl-clear-btn,
+.msl-arrow-btn {
   width: 25px;
   height: 25px;
+
+  &:hover {
+    background: var(--msl-button-hover-background);
+  }
 }
 
-.msl-clear-btn:hover,
-.msl-arrow-btn:hover {
-  background: var(--msl-button-hover-background);
-}
-.msl-active .msl-arrow-btn,
-.msl-active-up .msl-arrow-btn {
-  transform: rotate(180deg);
-}
-
-.msl-close-icn > line,
-.msl-arrow-icn > line {
-  stroke-width: 1;
-}
-
-.msl-arrow-icn {
-  height: 20px;
-  width: 20px;
+:where(.msl-active, .msl-active-up) .msl-arrow-btn {
+  rotate: 180deg;
 }
 
 .msl-chip-delete {
+  flex: none;
   width: 20px;
   height: 20px;
-  min-width: 20px;
-  min-height: 20px;
-  margin-left: 3px;
+  margin-inline-start: 3px;
   background: var(--msl-chip-delete-background);
   color: var(--msl-chip-delete-color);
-}
-.msl-chip-delete:hover {
-  background: var(--msl-button-hover-background);
+
+  &:hover {
+    background: var(--msl-button-hover-background);
+  }
 }
 
-.msl-chip-delete .msl-close-icn > line {
-  stroke-width: 1;
+.msl-arrow-icn {
+  width: 20px;
+  height: 20px;
 }
 
 .msl-close-icn {
-  height: 10px;
   width: 10px;
+  height: 10px;
+}
+
+.msl-plate {
+  z-index: max(var(--msl-menu-z-index), var(--msl-inherited-z-index) + 1);
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid var(--msl-active-menu-border-color);
+  border-radius: var(--msl-active-menu-radius);
+  background: var(--msl-active-menu-background);
+  box-shadow: var(--msl-active-menu-shadow);
+  color: var(--msl-inherited-color);
+  font-family: var(--msl-inherited-font);
+}
+
+.msl-active,
+.msl-active-up {
+  border: 0 solid var(--msl-divider-color);
+  border-radius: 0;
+  background: none;
+}
+
+.msl-active {
+  border-block-end-width: 1px;
+}
+
+.msl-active-up {
+  border-block-start-width: 1px;
+}
+
+@property --msl-menu-room {
+  syntax: '*';
+  inherits: false;
+}
+
+.msl-options {
+  overflow: auto;
+  overscroll-behavior: contain;
+  max-height: min(var(--msl-menu-max-height), var(--msl-menu-room));
+  padding-block-end: 1px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--msl-scrollbar-color) transparent;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    border-radius: 20px;
+    background: var(--msl-scrollbar-color);
+  }
+}
+
+.msl-option,
+.msl-grp-title {
+  margin: 4px 6px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  outline: none;
+  font-size: var(--msl-font-size);
+  line-height: var(--msl-line-height);
+  white-space: break-spaces;
+  line-break: anywhere;
+  cursor: pointer;
+}
+
+.msl-wrp:focus-visible,
+.msl-plate:focus-visible,
+.msl-btn:focus-visible,
+.msl-option:focus-visible {
+  outline: 2px solid var(--msl-focus-color);
+}
+
+.msl-option {
+  @media (prefers-reduced-motion: no-preference) {
+    transition: background 200ms;
+  }
+}
+
+.msl-option-active {
+  background: var(--msl-option-active-background);
+  color: var(--msl-option-active-color);
+}
+
+.msl-option:hover,
+.msl-option:focus,
+.msl-option-focused {
+  background: var(--msl-option-hover-background);
+}
+
+.msl-option-disable {
+  color: var(--msl-option-disabled-color);
+}
+
+.msl-grp {
+  padding-inline-start: var(--msl-group-offset);
+}
+
+.msl-grp-title {
+  margin-inline-start: calc(6px - var(--msl-group-offset));
+  background: var(--msl-group-title-background);
+  font-size: calc(var(--msl-font-size) - 2px);
+  opacity: 0.7;
+  cursor: default;
 }
