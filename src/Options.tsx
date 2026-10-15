@@ -96,7 +96,7 @@ function Options({
             className={`msl-option ${
               checkValueExist(opt) ? 'msl-option-active' : ''
             } ${opt.disabled ? 'msl-option-disable' : ''} ${
-              opt.classes !== undefined ? opt.classes : ''
+              opt.classes ?? ''
             }${idx === activeIdx ? ' msl-option-focused' : ''} ${cn.option ?? ''}`}
             data-focused={idx === activeIdx || undefined}
             // @ts-expect-error value is not a div attribute; kept, users and tests read it

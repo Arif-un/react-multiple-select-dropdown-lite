@@ -64,7 +64,7 @@ function MultiSelect({
   style = noStyle,
   attr,
   disabled = false,
-  limit = null,
+  limit,
   emptyDataLabel = 'No Data Found',
   customValue = false,
   onMenuOpen = noop,
@@ -114,6 +114,11 @@ function MultiSelect({
     .map((key) => findOpt(all, key))
     .filter((opt) => opt !== undefined)
   const value = singleSelect ? resolved.slice(0, 1) : resolved
+  // no limit (null) is Infinity: one comparison checks it
+  const max = limit ?? Infinity
+  // a search field, unless a value takes its place (single select, disableChip)
+  const showSearch =
+    !disableSearch && (!value.length || (!singleSelect && !disableChip))
   // plain substring match: typed text is not a regex. Our { label, value } options skip a
   // user's filterOption, which expects their own shape. String(): untyped JS often passes numbers
   const matches = (opt: MultiSelectOption, text: string) =>
@@ -424,25 +429,16 @@ function MultiSelect({
       newValObj = ourOpt(newValObj.value)
       setCustom([...custom, newValObj.value])
     }
-    let tmp = [...value]
-    if (singleSelect) {
-      if (checkValueExist(newValObj)) {
-        tmp = []
-      } else {
-        tmp = [newValObj]
-      }
-    } else {
-      if (!checkValueExist(newValObj)) {
-        if (limit === null) {
-          tmp.push(newValObj)
-        } else if (limit > value.length) {
-          tmp.push(newValObj)
-        }
-      } else {
-        tmp = tmp.filter((itm) => valueOf(itm) !== valueOf(newValObj))
-      }
-    }
-    setNewValue(tmp)
+    // a selected one toggles off (single select: to none). Past the limit, the value stays as it is
+    setNewValue(
+      checkValueExist(newValObj)
+        ? value.filter((itm) => valueOf(itm) !== valueOf(newValObj))
+        : singleSelect
+          ? [newValObj]
+          : value.length < max
+            ? [...value, newValObj]
+            : value
+    )
     setQuery('')
     // unset closeOnSelect: single select closes, multi select stays open.
     // The value takes the search field's place, maybe in a later commit: focus the wrapper, not the field.
@@ -509,22 +505,6 @@ function MultiSelect({
     return el?.matches(':focus-visible') ? outer! : null
   }
 
-  const showSearchOption = () => {
-    if (disableSearch) {
-      return false
-    }
-
-    if (!singleSelect && !disableChip) {
-      return true
-    } else if (singleSelect && !value.length) {
-      return true
-    } else if (!singleSelect && disableChip && !value.length) {
-      return true
-    }
-
-    return false
-  }
-
   // the target or an ancestor below the plate or wrapper holding it has attr: any icon depth, never
   // them or above. The plate first: it may sit in the wrapper (slotted into a dialog).
   // A target outside both counts too: a user portal's, or a chip a sync onChange removed mid-event
@@ -536,12 +516,6 @@ function MultiSelect({
     return !box || (el !== box && box.contains(el))
   }
 
-  const focusSearchInput = () => {
-    if (inputFld.current) {
-      inputFld.current.focus()
-    }
-  }
-
   // plate events bubble here through the portal
   const openMenu = ({ target, type }: React.SyntheticEvent) => {
     if (disabled || marked(target, 'data-clickable')) return
@@ -549,7 +523,7 @@ function MultiSelect({
     else if (marked(target, 'data-handle')) closeMenu(true)
     // not a close: an option click bubbles here and must not undo closeOnSelect.
     // Nor a refocus once closed: an onChange may have moved focus out
-    else opened.current && focusSearchInput()
+    else opened.current && inputFld.current?.focus()
   }
 
   // moves the highlight over enabled options, staying put at either end
@@ -666,7 +640,7 @@ function MultiSelect({
 
   // on the wrapper and the plate; className and style only on the wrapper, the plate has classNames.plate
   const state = `${disabled ? 'msl-disabled' : ''}${
-    limit !== null && value.length >= limit ? ' msl-limit-reached' : ''
+    value.length >= max ? ' msl-limit-reached' : ''
   }`
 
   // rendered twice while open: the hidden wrapper's copy holds the space, the plate's is live
@@ -717,7 +691,7 @@ function MultiSelect({
             {labelOf(value[0])}
           </span>
         )}
-        {showSearchOption() && (
+        {showSearch && (
           <input
             placeholder={placeholder}
             className={`msl-input ${cn.input ?? ''}`}
@@ -733,7 +707,7 @@ function MultiSelect({
             {...combobox}
           />
         )}
-        {!showSearchOption() && value.length < 1 && (
+        {!showSearch && value.length < 1 && (
           <div
             data-placeholder={placeholder}
             className={`msl-input ${cn.input ?? ''}`}
@@ -812,7 +786,7 @@ function MultiSelect({
     <div
       ref={componentRef}
       {...attr}
-      {...(!showSearchOption() && combobox)}
+      {...(!showSearch && combobox)}
       onClick={openMenu}
       tabIndex={disabled ? -1 : 0}
       onKeyDown={onKeyDown}
@@ -833,7 +807,7 @@ function MultiSelect({
             />
             <div
               ref={plateRef}
-              {...(!showSearchOption() && combobox)}
+              {...(!showSearch && combobox)}
               tabIndex={0}
               dir={look.dir}
               lang={look.lang}
