@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import CloseIcon from './CloseIcon'
+import { CloseIcon } from './icons'
 import type { MultiSelectClassNames } from './index'
 
 // the default customChip: called as a function, so it can't use hooks

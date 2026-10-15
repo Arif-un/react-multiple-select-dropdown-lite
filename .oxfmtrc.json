@@ -17,7 +17,6 @@
     "dist",
     "coverage",
     "pnpm-lock.yaml",
-    "test/example",
     "docs/dist",
     "docs/.astro"
   ]

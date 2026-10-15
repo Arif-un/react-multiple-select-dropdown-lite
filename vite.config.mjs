@@ -71,7 +71,7 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
-    exclude: ['**/node_modules/**', 'test/example/**'],
+    exclude: ['**/node_modules/**'],
     coverage: {
       include: ['src/**/*.{ts,tsx}'],
       exclude: ['src/**/*.d.ts'],

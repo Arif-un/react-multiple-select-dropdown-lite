@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef, useId } from 'react'
 import { createPortal, flushSync } from 'react-dom'
 import Chip from './Chip'
-import CloseIcon from './CloseIcon'
-import DownIcon from './DownIcon'
+import { CloseIcon, DownIcon } from './icons'
 import type PublicMultiSelect from './index'
 import type {
   MultiSelectGroup,
@@ -48,7 +47,6 @@ function MultiSelect({
   downArrowIcon,
   closeIcon,
   clearable = true,
-  clearAll = false,
   downArrow = true,
   onChange = noop,
   getLabel = optLabel,
@@ -385,12 +383,6 @@ function MultiSelect({
       ?.scrollIntoView?.({ block: 'nearest' })
   }, [activeIdx])
 
-  useEffect(() => {
-    if (clearAll && value.length) {
-      clearValue()
-    }
-  }, [clearAll])
-
   // the selection as last set or rendered: a chip's onDelete may run late (after an exit animation)
   const latest = useRef(value)
   // the element with keyboard focus (focus-visible) when a chip was deleted, or the search field a pick may remove
@@ -454,15 +446,11 @@ function MultiSelect({
   const deleteValue = (opt: MultiSelectOption) =>
     setNewValue(latest.current.filter((itm) => valueOf(itm) !== valueOf(opt)))
 
-  const clearValue = () => {
-    setNewValue([])
-  }
-
-  // the clear button; clearAll clears without onClear
+  // the clear button
   const clearByUser = () => {
     // without the stylesheet's pointer-events: none it is still clickable
     if (disabled) return
-    clearValue()
+    setNewValue([])
     onClear()
   }
 
