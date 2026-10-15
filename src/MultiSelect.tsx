@@ -114,18 +114,34 @@ function MultiSelect({
     .map((key) => findOpt(all, key))
     .filter((opt) => opt !== undefined)
   const value = singleSelect ? resolved.slice(0, 1) : resolved
-  const [search, setSearch] = useState<MultiSelectOption[] | null>(null)
-  const items = search || options
-  // the Create "..." item last offered by the search
-  const createOpt = useRef<MultiSelectOption | null>(null)
+  // plain substring match: typed text is not a regex. Our { label, value } options skip a
+  // user's filterOption, which expects their own shape. String(): untyped JS often passes numbers
+  const matches = (opt: MultiSelectOption, text: string) =>
+    filterOption && !ours.has(opt)
+      ? filterOption(opt, text)
+      : [textOf(opt), valueOf(opt)].some((s) =>
+          String(s).toLowerCase().includes(text.toLowerCase())
+        )
+  // the search text, shared by both copies of the field: text that reaches the closed one (paste, drop, IME) shows in the plate's
+  const [query, setQuery] = useState('')
+  // searched trimmed, commas dropped: a typed comma picks
+  const term = query.trim().replace(/,+/g, '')
+  // the Create "..." item, for text no option has as its value
+  const create =
+    customValue &&
+    term &&
+    !findOpt(all, term) &&
+    ourOpt(term, createLabel(term))
+  const found = term
+    ? all.filter((opt) => matches(opt, term)).concat(create || [])
+    : null
+  const items = found || options
   const inputFld = useRef<HTMLInputElement>(null)
   const listId = `msl-listbox${useId()}`
   // the keyboard highlighted option: idx tells repeated values apart
   const [active, setActive] = useState<{ value: string; idx: number } | null>(
     null
   )
-  // the last keydown belonged to an IME composition: its Enter confirms the text, not a pick
-  const composing = useRef(false)
   const componentRef = useRef<HTMLDivElement>(null)
   // the open menu: one plate, portaled out of clipping parents and placed over the hidden wrapper
   const plateRef = useRef<HTMLDivElement>(null)
@@ -261,7 +277,7 @@ function MultiSelect({
     const close = () => {
       setMenuOpen(false)
       // the plate's search field is gone with its text
-      setSearch(null)
+      setQuery('')
     }
     // flushed only to move focus once the plate is gone: other closes can come mid-commit (an autoFocus)
     back ? flushSync(close) : close()
@@ -364,15 +380,7 @@ function MultiSelect({
   // It runs in the open's commit, so a key that opened the menu types into the plate
   useEffect(() => {
     if (!menuOpen) return
-    // text that reached the closed search field (paste, drop, IME) moves to the plate's
-    const typed =
-      componentRef.current!.querySelector<HTMLInputElement>('input.msl-input')
-    const field = inputFld.current
-    if (typed?.value) {
-      field!.value = typed.value
-      typed.value = ''
-    }
-    ;(field || plateRef.current!).focus()
+    ;(inputFld.current || plateRef.current!).focus()
     // here, not in open(): a click's open isn't committed yet, so the menu is there for both
     onMenuOpen()
   }, [menuOpen])
@@ -412,7 +420,7 @@ function MultiSelect({
 
   const addValue = (newValObj: MultiSelectOption) => {
     // picking Create (click, Enter or comma) adds the typed text as an option
-    if (newValObj === createOpt.current) {
+    if (newValObj === create) {
       newValObj = ourOpt(newValObj.value)
       setCustom([...custom, newValObj.value])
     }
@@ -435,15 +443,12 @@ function MultiSelect({
       }
     }
     setNewValue(tmp)
-    setSearch(null)
-    // clear search input
-    if (inputFld.current) {
-      inputFld.current.value = ''
-    }
+    setQuery('')
     // unset closeOnSelect: single select closes, multi select stays open.
     // The value takes the search field's place, maybe in a later commit: focus the wrapper, not the field.
-    // Left open, focus goes to the plate if the field goes (click, Enter, comma)
-    menuOpen && (closeOnSelect ?? singleSelect)
+    // Left open, focus goes to the plate if the field goes (click, Enter, comma).
+    // opened, not menuOpen: Enter in the closed field opens the menu in this same event
+    opened.current && (closeOnSelect ?? singleSelect)
       ? closeMenu(
           true,
           singleSelect || disableChip ? componentRef.current : null
@@ -520,44 +525,6 @@ function MultiSelect({
     return false
   }
 
-  // plain substring match: typed text is not a regex. Our { label, value } options skip a
-  // user's filterOption, which expects their own shape. String(): untyped JS often passes numbers
-  const matches = (opt: MultiSelectOption, text: string) =>
-    filterOption && !ours.has(opt)
-      ? filterOption(opt, text)
-      : [textOf(opt), valueOf(opt)].some((s) =>
-          String(s).toLowerCase().includes(text.toLowerCase())
-        )
-
-  // also runs on input: text can arrive without a keyup (context menu paste, drag and drop)
-  const handleSearchAndCustomValue = (
-    e: React.SyntheticEvent & { key?: string }
-  ) => {
-    const textValue = (e.target as HTMLInputElement).value
-      .trim()
-      .replace(/,+/g, '')
-
-    if (textValue) {
-      createOpt.current = ourOpt(textValue, createLabel(textValue))
-      // Enter reads this, not `search`: that is null when text arrived without a keyup (paste, IME)
-      const results = all.filter((opt) => matches(opt, textValue))
-      if (customValue && !findOpt(all, textValue)) {
-        results.push(createOpt.current)
-      }
-      setSearch(results)
-
-      if (
-        (e.key === 'Enter' || e.key === ',') &&
-        results.length &&
-        !composing.current
-      ) {
-        addValue(results[0])
-      }
-    } else {
-      setSearch(null)
-    }
-  }
-
   // the target or an ancestor below the wrapper or plate has attr: any icon depth, and never
   // climbs past them (a ShadowRoot or document has no hasAttribute). A target outside
   // their DOM counts too: a user portal's, or a chip a sync onChange removed mid-event
@@ -603,9 +570,9 @@ function MultiSelect({
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     attr?.onKeyDown?.(e)
+    // an IME composition's keys: its Enter confirms the text, not a pick.
     // Safari ends the composition before the keydown, leaving only keyCode 229
-    composing.current = e.nativeEvent.isComposing || e.keyCode === 229
-    if (composing.current) return
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return
     const { key, target } = e
     const inMenu = (el?: Element) =>
       el?.closest('[role=listbox]')?.id === listId
@@ -654,18 +621,19 @@ function MultiSelect({
     if (key === 'Enter' && activeIdx >= 0) {
       e.preventDefault()
       addValue(shown[activeIdx])
-    } else if (
-      key === 'Backspace' &&
-      target === inputFld.current &&
-      !inputFld.current.value
-    ) {
+    } else if ((key === 'Enter' || key === ',') && found?.length) {
+      // the first result. Prevented: no form submit, and the comma stays out of the field.
+      // Opened first, as any key on the closed field opens it (text pasted there)
+      e.preventDefault()
+      openMenu(e)
+      addValue(found[0])
+    } else if (key === 'Backspace' && target === inputFld.current && !query) {
       // a value next to the search field means chips mode
       value.length && deleteValue(value[value.length - 1])
     } else if (
       /^Arrow(Down|Up)$/.test(key) ||
       // with search text, Home/End move the caret
-      (/^(Home|End)$/.test(key) &&
-        !(target === inputFld.current && inputFld.current.value))
+      (/^(Home|End)$/.test(key) && !(target === inputFld.current && query))
     ) {
       e.preventDefault()
       highlight(key)
@@ -760,10 +728,10 @@ function MultiSelect({
             disabled={disabled}
             // the browser's own history list would cover the menu
             autoComplete='off'
-            onKeyUp={handleSearchAndCustomValue}
-            onInput={(e) => {
+            value={query}
+            onChange={(e) => {
               setActive(null)
-              handleSearchAndCustomValue(e)
+              setQuery(e.target.value)
             }}
             ref={plate === menuOpen ? inputFld : undefined}
             {...combobox}
