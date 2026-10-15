@@ -52,14 +52,11 @@
 .msl-wrp,
 .msl-plate {
   outline: none;
-
-  & * {
-    line-height: var(--msl-line-height);
-  }
+  line-height: var(--msl-line-height);
 }
 
 .msl-disabled {
-  pointer-events: none !important;
+  pointer-events: none;
 }
 
 .msl {
@@ -71,7 +68,7 @@
   background: var(--msl-background);
   cursor: text;
 
-  &:not(.msl-active, .msl-active-up):hover {
+  &:where(:not(.msl-active, .msl-active-up)):hover {
     border-color: var(--msl-hover-border-color);
   }
 }
@@ -97,6 +94,7 @@
   color: inherit;
   font-family: inherit;
   font-size: var(--msl-font-size);
+  line-height: inherit;
   text-overflow: ellipsis;
   field-sizing: content;
 
