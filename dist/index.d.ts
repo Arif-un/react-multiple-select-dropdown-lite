@@ -179,7 +179,10 @@ declare namespace MultiSelect {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     attr?: React.HTMLAttributes<HTMLDivElement> & { [key: string]: any }
     disabled?: boolean
-    /** max selected values, `null` for no limit. The wrapper and the open plate get `msl-limit-reached` once hit */
+    /**
+     * max selected values in multi select, `null` for no limit. The wrapper and the open plate get `msl-limit-reached` once hit,
+     * and unselected options `aria-disabled` and `msl-option-disable`; picking one only calls `onChange`, the value unchanged
+     */
     limit?: number | null
     /** shown when there are no options or no search results */
     emptyDataLabel?: React.ReactNode
