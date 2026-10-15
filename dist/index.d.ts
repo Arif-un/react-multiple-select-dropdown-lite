@@ -44,6 +44,44 @@ declare namespace MultiSelect {
     emptyDataLabel?: React.ReactNode
   }
 
+  /**
+   * classes per element, added after its `msl-*` class: style every part with Tailwind or other utility CSS.
+   * State is in attributes: options have `aria-selected`, `aria-disabled` and `data-focused` (the keyboard highlight),
+   * the open menu's control `data-open` and, opening upward, `data-up`, the wrapper `data-disabled`
+   */
+  interface MultiSelectClassNames {
+    /** `msl-plate`: the open menu, the control over the options (or under them, with `data-up`) */
+    plate?: string
+    /** `msl`: the box with the values, the search field and the buttons, closed and in the plate */
+    control?: string
+    /** `msl-input-wrp`: chips, single value and search field */
+    values?: string
+    /** `msl-input`: the search field, or the placeholder when there is none */
+    input?: string
+    /** `msl-single-value`: the value with `singleSelect`, or the count with `disableChip` */
+    singleValue?: string
+    /** `msl-chip`, default chips only */
+    chip?: string
+    /** `msl-chip-delete`, default chips only */
+    chipDelete?: string
+    /** `msl-actions`: the clear and arrow buttons */
+    actions?: string
+    /** `msl-clear-btn` */
+    clearButton?: string
+    /** `msl-arrow-btn` */
+    arrowButton?: string
+    /** `msl-options`: the listbox. Its height is up to you: it gets `--msl-menu-room`, the room the viewport leaves */
+    menu?: string
+    /** `msl-grp`: a group's `role="group"` box, its title and childs */
+    group?: string
+    /** `msl-grp-title` */
+    groupTitle?: string
+    /** `msl-option` */
+    option?: string
+    /** `emptyDataLabel`, and an empty group's */
+    empty?: string
+  }
+
   interface MultiSelectChipProps<
     T = MultiSelectOption,
     C extends boolean = boolean
@@ -59,6 +97,8 @@ declare namespace MultiSelect {
           : Exclude<{ label: string; value: string }, T>)
     /** the select is disabled: take delete buttons out of the tab order */
     disabled: boolean
+    /** the select's `classNames` (`{}` when unset) */
+    classNames: MultiSelectClassNames
     /** removes this value; does nothing while disabled */
     onDelete: () => void
   }
@@ -107,7 +147,13 @@ declare namespace MultiSelect {
     downArrow?: boolean
     downArrowIcon?: React.ReactNode
     closeIcon?: React.ReactNode
+    /**
+     * on the wrapper only. The open menu renders outside it, at the end of `<body>`, or of the dialog, popover or shadow root it sits in: give it classes with `classNames.plate`
+     * (a theme class too), or theme every select through `.msl-vars`
+     */
     className?: string
+    /** classes for each element inside, e.g. Tailwind utilities */
+    classNames?: MultiSelectClassNames
     placeholder?: string
     disableChip?: boolean
     /** with `disableChip`, shown after the count: "2 Item Selected" */
@@ -116,6 +162,7 @@ declare namespace MultiSelect {
      * renders each chip; a render function, not a component, so no hooks in it: render a component that has them,
      * `(p) => <MyChip key={p.value} {...p} />`. Chips are keyed by position: `key={p.value}` resets a chip's state when
      * its value moves, instead of handing it to the next value. Clicks and keys inside it don't open the menu.
+     * While the menu is open each chip renders twice: in the open plate, and in the hidden wrapper that holds its space.
      * Default: the `msl-chip` markup
      */
     // $$typeof: memo / forwardRef components type as callable but are objects
@@ -124,18 +171,17 @@ declare namespace MultiSelect {
     }
     /** name of the hidden input, for forms: it holds the selected values joined by commas */
     name?: string
+    /** on the wrapper only, not the open menu */
     style?: React.CSSProperties
     /**
-     * spread onto the wrapper div, which then sets its own onClick, onKeyDown (after calling yours), tabIndex, style and className,
+     * spread onto the wrapper div, which then sets its own onClick, onKeyDown (after calling yours), tabIndex, style, className and data-disabled,
      * plus the combobox role and aria attributes when there is no search field.
-     * `aria-label` / `aria-labelledby` are also copied to the search field, which is the combobox otherwise
+     * Its `aria-*` attributes are also copied to the search field, which is the combobox otherwise
      */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     attr?: React.HTMLAttributes<HTMLDivElement> & { [key: string]: any }
-    /** render options only while the menu is open */
-    largeData?: boolean
     disabled?: boolean
-    /** max selected values, `null` for no limit. The wrapper gets `msl-limit-reached` once hit */
+    /** max selected values, `null` for no limit. The wrapper and the open plate get `msl-limit-reached` once hit */
     limit?: number | null
     /** shown when there are no options or no search results */
     emptyDataLabel?: React.ReactNode
