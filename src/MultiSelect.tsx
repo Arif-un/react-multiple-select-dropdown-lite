@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef, useId } from 'react'
 import { createPortal, flushSync } from 'react-dom'
 import Chip from './Chip'
-import CloseIcon from './CloseIcon'
-import DownIcon from './DownIcon'
+import { CloseIcon, DownIcon } from './icons'
 import type PublicMultiSelect from './index'
 import type {
   MultiSelectGroup,
