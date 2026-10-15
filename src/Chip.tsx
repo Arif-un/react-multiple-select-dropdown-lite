@@ -26,6 +26,7 @@ export default function Chip({
       <div
         role='button'
         aria-label={text === undefined ? 'Remove' : `Remove ${text}`}
+        aria-disabled={disabled}
         onClick={onDelete}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
@@ -38,7 +39,6 @@ export default function Chip({
       >
         <CloseIcon />
       </div>
-      <span />
     </div>
   )
 }

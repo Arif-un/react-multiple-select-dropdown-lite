@@ -29,7 +29,7 @@ const scaleOf = (drawn: number, size: number) =>
 // options we create, { label, value }: the user's getters only know their own shape
 const ours = new WeakSet<MultiSelectOption>()
 const ourOpt = (value: string, label = value) => {
-  const opt = { label, value }
+  const opt: MultiSelectOption = { label, value }
   ours.add(opt)
   return opt
 }
@@ -81,7 +81,8 @@ function MultiSelect({
   const [own, setOwn] = useState(() => defaultValue ?? [])
   // with `value` the parent owns the selection: user changes only call onChange
   const controlled = valueProp !== undefined
-  const keys = controlled ? valueProp : own
+  // null from untyped JS (useState(null)) is an empty selection, as defaultValue's is
+  const keys = (controlled ? valueProp : own) ?? []
   // values created by customValue: they stay listed once deselected
   const [custom, setCustom] = useState<string[]>([])
   const base = userOptions || []
@@ -414,22 +415,26 @@ function MultiSelect({
   // valueOf once per selected value: Options asks this twice for every option
   const selected = new Set(value.map(valueOf))
   const checkValueExist = (opt: MultiSelectOption) => selected.has(valueOf(opt))
+  // past the limit, unselected options show and announce as disabled. Single select replaces its value, so never
+  const full = !singleSelect && value.length >= max
+  const isDisabled = (opt: MultiSelectOption) =>
+    !!opt.disabled || (full && !checkValueExist(opt))
 
   const addValue = (newValObj: MultiSelectOption) => {
+    // past the limit an unselected pick only calls onChange, the value as it is: no Create, the search and menu stay
+    if (full && !checkValueExist(newValObj)) return setNewValue(value)
     // picking Create (click, Enter or comma) adds the typed text as an option
     if (newValObj === create) {
       newValObj = ourOpt(newValObj.value)
       setCustom([...custom, newValObj.value])
     }
-    // a selected one toggles off (single select: to none). Past the limit, the value stays as it is
+    // a selected one toggles off (single select: to none)
     setNewValue(
       checkValueExist(newValObj)
         ? value.filter((itm) => valueOf(itm) !== valueOf(newValObj))
         : singleSelect
           ? [newValObj]
-          : value.length < max
-            ? [...value, newValObj]
-            : value
+          : [...value, newValObj]
     )
     setQuery('')
     // unset closeOnSelect: single select closes, multi select stays open.
@@ -524,7 +529,7 @@ function MultiSelect({
           ? shown.length
           : activeIdx
     for (i += dir; i >= 0 && i < shown.length; i += dir) {
-      if (!shown[i].disabled)
+      if (!isDisabled(shown[i]))
         return setActive({ value: valueOf(shown[i]), idx: i })
     }
   }
@@ -579,15 +584,17 @@ function MultiSelect({
       (box?.id === listId && box !== target)
     )
       return
+    // the first result a click could pick
+    const first = found?.find((opt) => !opt.disabled)
     if (key === 'Enter' && activeIdx >= 0) {
       e.preventDefault()
       addValue(shown[activeIdx])
-    } else if ((key === 'Enter' || key === ',') && found?.length) {
-      // the first result. Prevented: no form submit, and the comma stays out of the field.
+    } else if ((key === 'Enter' || key === ',') && first) {
+      // Prevented: no form submit, and the comma stays out of the field.
       // Opened first, as any key on the closed field opens it (text pasted there)
       e.preventDefault()
       openMenu(e)
-      addValue(found[0])
+      addValue(first)
     } else if (key === 'Backspace' && target === inputFld.current && !query) {
       // a value next to the search field means chips mode
       value.length && deleteValue(value[value.length - 1])
@@ -628,7 +635,7 @@ function MultiSelect({
 
   // on the wrapper and the plate; className and style only on the wrapper, the plate has classNames.plate
   const state = `${disabled ? 'msl-disabled' : ''}${
-    value.length >= max ? ' msl-limit-reached' : ''
+    full ? ' msl-limit-reached' : ''
   }`
 
   // rendered twice while open: the hidden wrapper's copy holds the space, the plate's is live
@@ -710,6 +717,7 @@ function MultiSelect({
               // it stops the menu from opening
               data-clickable
               aria-label={clearLabel}
+              aria-disabled={disabled}
               onClick={clearByUser}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -754,6 +762,7 @@ function MultiSelect({
           {...{
             addValue,
             checkValueExist,
+            isDisabled,
             listId,
             activeIdx,
             valueOf,

@@ -12,6 +12,7 @@ function Options({
   opts,
   addValue,
   checkValueExist,
+  isDisabled,
   listId,
   activeIdx,
   valueOf,
@@ -22,6 +23,7 @@ function Options({
   opts: ReadonlyArray<MultiSelectOption | MultiSelectGroup>
   addValue: (opt: MultiSelectOption) => void
   checkValueExist: (opt: MultiSelectOption) => boolean
+  isDisabled: (opt: MultiSelectOption) => boolean
   listId: string
   activeIdx: number
   valueOf: (opt: MultiSelectOption) => string
@@ -73,15 +75,17 @@ function Options({
         const idx = n++
         // getLabel once: it may build JSX
         const label = labelOf(opt)
+        const off = isDisabled(opt)
         out.push(
           <div
             id={`${listId}-${idx}`}
             role='option'
             aria-selected={checkValueExist(opt)}
-            aria-disabled={!!opt.disabled}
+            aria-disabled={off}
             tabIndex={-1}
             key={`${i}-${valueOf(opt)}`}
             style={opt.style}
+            // opt.disabled, not off: past the limit a pick still calls onChange, the value unchanged
             onClick={() => {
               !opt.disabled && addValue(opt)
             }}
@@ -95,7 +99,7 @@ function Options({
             title={textOf(opt, label)}
             className={`msl-option ${
               checkValueExist(opt) ? 'msl-option-active' : ''
-            } ${opt.disabled ? 'msl-option-disable' : ''} ${
+            } ${off ? 'msl-option-disable' : ''} ${
               opt.classes ?? ''
             }${idx === activeIdx ? ' msl-option-focused' : ''} ${cn.option ?? ''}`}
             data-focused={idx === activeIdx || undefined}
