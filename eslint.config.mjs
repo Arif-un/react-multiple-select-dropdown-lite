@@ -5,7 +5,7 @@ import tseslint from 'typescript-eslint'
 
 export default [
   // docs: Astro site, type-checked by `astro check`
-  { ignores: ['dist', 'coverage', 'test/example', 'docs'] },
+  { ignores: ['dist', 'coverage', 'docs'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   react.configs.flat.recommended,
