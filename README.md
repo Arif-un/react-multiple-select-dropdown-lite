@@ -114,7 +114,7 @@ Also in the [API docs](https://arif-un.github.io/react-multiple-select-dropdown-
 | chipAlternateText | ReactNode                   | (number) Item Selected           | Show text when chip disabled.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | customChip        | (props) => ReactNode        | `msl-chip` markup                | renders each chip from `{ label, value, option, disabled, classNames, onDelete }` (`classNames` is the select's, `{}` when unset). A render function: no hooks; for state, render `<MyChip key={p.value} {...p} />` (chips are keyed by position: the key resets a moved chip's state). Clicks and keys inside don't open the menu. While the menu is open each chip renders twice (in the plate and the hidden dropdown). e.g. `({ label, onDelete }) => <button type='button' onClick={onDelete}>{label} ×</button>` |
 | closeOnSelect     | bool                        | unset                            | close the menu after a pick. Unset: single select closes, multi select stays open                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| limit             | number \| null              | null                             | max number of selected values, `null` for no limit. The wrapper and the open plate get `msl-limit-reached` once hit                                                                                                                                                                                                                                                                                                                                                                                                    |
+| limit             | number \| null              | null                             | max number of selected values in multi select, `null` for no limit. The wrapper and the open plate get `msl-limit-reached` once hit, and unselected options `aria-disabled` and `msl-option-disable`                                                                                                                                                                                                                                                                                                                   |
 | emptyDataLabel    | ReactNode                   | No Data Found                    | shown when there are no options or no search results                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | disableSearch     | bool                        | false                            | hide the search input                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | style             | object                      | {}                               | inline style for the wrapper, not the open menu                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
@@ -188,17 +188,17 @@ import 'react-multiple-select-dropdown-lite/dist/index.css'
 
 ### Keyboard
 
-| Key             | Action                                                                     |
-| --------------- | -------------------------------------------------------------------------- |
-| Arrow Down / Up | open the menu and move the highlight over enabled options                  |
-| Home / End      | first / last option (in the search field only while it is empty)           |
-| Enter           | pick the highlighted option, else the first search result                  |
-| , (comma)       | pick the first search result, or create the typed value with `customValue` |
-| Backspace       | in an empty search field, remove the last chip                             |
-| Escape          | close the menu, not a surrounding dialog or popover                        |
-| Tab             | close the menu and move on in page order, after any button in the menu     |
-| Enter / Space   | on a chip's delete button or the clear button, press it                    |
-| any character   | on the focused dropdown, open the menu                                     |
+| Key             | Action                                                                                           |
+| --------------- | ------------------------------------------------------------------------------------------------ |
+| Arrow Down / Up | open the menu and move the highlight over enabled options                                        |
+| Home / End      | first / last option (in the search field only while it is empty)                                 |
+| Enter           | pick the highlighted option, else the first search result that isn't `disabled`                  |
+| , (comma)       | pick the first search result that isn't `disabled`, or create the typed value with `customValue` |
+| Backspace       | in an empty search field, remove the last chip                                                   |
+| Escape          | close the menu, not a surrounding dialog or popover                                              |
+| Tab             | close the menu and move on in page order, after any button in the menu                           |
+| Enter / Space   | on a chip's delete button or the clear button, press it                                          |
+| any character   | on the focused dropdown, open the menu                                                           |
 
 ### Accessibility
 
@@ -231,7 +231,7 @@ The defaults live on `.msl-vars`, the wrapper of every dropdown. Override them o
 | --msl-font-size                | 14px                         | Dropdown font size.                              |
 | --msl-border-radius            | 8px                          | Dropdown Border Radius.                          |
 | --msl-active-menu-shadow       | 5 soft layers                | Menu Shadow <br> when active.                    |
-| --msl-line-height              | 1.4                          | fonts line height.                               |
+| --msl-line-height              | 1.4                          | unitless line height.                            |
 | --msl-active-menu-background   | white                        | Dropdown menu <br> background color when active. |
 | --msl-active-menu-radius       | var(--msl-border-radius)     | Dropdown menu border <br> radius when active.    |
 | --msl-active-menu-border-color | hsl(224deg 5.68% 88.24%)     | Border around <br> the open menu.                |
@@ -296,7 +296,7 @@ Without the stylesheet, register `--msl-menu-room` as non-inherited, `@property 
 
 ### Change Log
 
-See [CHANGELOG.md](https://github.com/Arif-un/react-multiple-select-dropdown-lite/blob/master/CHANGELOG.md) or the [docs changelog](https://arif-un.github.io/react-multiple-select-dropdown-lite/changelog/). Upgrading from 2.0.x? Check the [2.1.0 upgrade notes](https://github.com/Arif-un/react-multiple-select-dropdown-lite/blob/master/CHANGELOG.md#upgrade-notes).
+See [CHANGELOG.md](https://github.com/Arif-un/react-multiple-select-dropdown-lite/blob/master/CHANGELOG.md) or the [docs changelog](https://arif-un.github.io/react-multiple-select-dropdown-lite/changelog/). Upgrading from 2.x to 3.0? Check the [3.0 upgrade notes](https://github.com/Arif-un/react-multiple-select-dropdown-lite/blob/master/CHANGELOG.md#upgrade-notes). From 2.0.x to 2.1? The [2.1.0 upgrade notes](https://github.com/Arif-un/react-multiple-select-dropdown-lite/blob/master/CHANGELOG.md#upgrade-notes-1).
 
 <br>
 <br>

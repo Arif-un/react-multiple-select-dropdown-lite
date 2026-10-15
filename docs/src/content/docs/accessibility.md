@@ -5,17 +5,17 @@ description: Keyboard support and ARIA in react-multiple-select-dropdown-lite.
 
 ## Keyboard
 
-| Key             | Action                                                                     |
-| --------------- | -------------------------------------------------------------------------- |
-| Arrow Down / Up | open the menu and move the highlight over enabled options                  |
-| Home / End      | first / last option (in the search field only while it is empty)           |
-| Enter           | pick the highlighted option, else the first search result                  |
-| , (comma)       | pick the first search result, or create the typed value with `customValue` |
-| Backspace       | in an empty search field, remove the last chip                             |
-| Escape          | close the menu, not a surrounding dialog or popover                        |
-| Tab             | close the menu and move on in page order, after any button in the menu     |
-| Enter / Space   | on a chip's delete button or the clear button, press it                    |
-| any character   | on the focused dropdown, open the menu                                     |
+| Key             | Action                                                                                           |
+| --------------- | ------------------------------------------------------------------------------------------------ |
+| Arrow Down / Up | open the menu and move the highlight over enabled options                                        |
+| Home / End      | first / last option (in the search field only while it is empty)                                 |
+| Enter           | pick the highlighted option, else the first search result that isn't `disabled`                  |
+| , (comma)       | pick the first search result that isn't `disabled`, or create the typed value with `customValue` |
+| Backspace       | in an empty search field, remove the last chip                                                   |
+| Escape          | close the menu, not a surrounding dialog or popover                                              |
+| Tab             | close the menu and move on in page order, after any button in the menu                           |
+| Enter / Space   | on a chip's delete button or the clear button, press it                                          |
+| any character   | on the focused dropdown, open the menu                                                           |
 
 Typing with an input method (Chinese, Japanese, Korean) works: the Enter that confirms the composition doesn't pick an option.
 
