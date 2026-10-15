@@ -10,7 +10,6 @@ type Item = MultiSelectOption & MultiSelectGroup
 
 function Options({
   opts,
-  singleSelect,
   addValue,
   checkValueExist,
   listId,
@@ -21,7 +20,6 @@ function Options({
   cn
 }: {
   opts: ReadonlyArray<MultiSelectOption | MultiSelectGroup>
-  singleSelect?: boolean
   addValue: (opt: MultiSelectOption) => void
   checkValueExist: (opt: MultiSelectOption) => boolean
   listId: string
@@ -43,7 +41,6 @@ function Options({
           <div
             key='msl-grp-title'
             id={titleId}
-            data-msl
             role='presentation'
             className={`msl-grp-title ${cn.groupTitle ?? ''}`}
           >
@@ -84,7 +81,6 @@ function Options({
             aria-disabled={!!opt.disabled}
             tabIndex={-1}
             key={`${i}-${valueOf(opt)}`}
-            {...(!singleSelect && { 'data-msl': true })}
             style={opt.style}
             onClick={() => {
               !opt.disabled && addValue(opt)
@@ -100,7 +96,7 @@ function Options({
             className={`msl-option ${
               checkValueExist(opt) ? 'msl-option-active' : ''
             } ${opt.disabled ? 'msl-option-disable' : ''} ${
-              opt.classes !== undefined ? opt.classes : ''
+              opt.classes ?? ''
             }${idx === activeIdx ? ' msl-option-focused' : ''} ${cn.option ?? ''}`}
             data-focused={idx === activeIdx || undefined}
             // @ts-expect-error value is not a div attribute; kept, users and tests read it

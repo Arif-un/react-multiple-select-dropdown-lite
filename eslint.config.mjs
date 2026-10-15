@@ -16,8 +16,6 @@ export default [
     settings: { react: { version: 'detect' } },
     rules: {
       'react/prop-types': 'off',
-      // clickable / dropdown-handle / value are intentional DOM attributes
-      'react/no-unknown-property': 'off',
       // `cond && call()` is how this codebase branches
       '@typescript-eslint/no-unused-expressions': [
         'error',

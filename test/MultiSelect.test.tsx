@@ -108,12 +108,13 @@ function setup(props: MultiSelectProps = {}) {
 
 type Q = ReturnType<typeof setup>['q']
 
-// a real keystroke opens the menu first, which moves the search field into the plate
+// the text reaches the live search field, then the key: it opens the menu (the field moves into the plate),
+// Enter or a comma picks
 const type = (el: Element, text: string, key = text.slice(-1)) => {
+  fireEvent.change(plate()?.querySelector('input.msl-input') ?? el, {
+    target: { value: text }
+  })
   fireEvent.keyDown(el, { key })
-  const field = plate()?.querySelector('input.msl-input') ?? el
-  ;(field as HTMLInputElement).value = text
-  fireEvent.keyUp(field, { key })
 }
 // returns false when the default action was prevented
 const press = (el: Element, key = 'Enter', init = {}) =>
@@ -320,14 +321,6 @@ describe('render', () => {
     expect(q('.msl-clear-btn .my-close')).not.toBeNull()
     expect(q('.msl-arrow-btn .my-arrow')).not.toBeNull()
     expect(q('.msl-close-icn')).not.toBeNull() // chip delete keeps default icon
-  })
-
-  it('marks options as data-msl only in multi select', () => {
-    expect(setup().option('Apple').hasAttribute('data-msl')).toBe(true)
-    cleanup()
-    expect(
-      setup({ singleSelect: true }).option('Apple').hasAttribute('data-msl')
-    ).toBe(false)
   })
 })
 
@@ -1153,15 +1146,16 @@ describe('search', () => {
   )
 
   it('Enter picks a match even without a keyup for the text (paste, IME)', () => {
-    const { input, chips } = setup()
-    type(input(), 'ch', 'Enter')
+    const { root, input, chips } = setup()
+    fireEvent.click(root)
+    fireEvent.input(input(), { target: { value: 'ch' } })
+    press(input())
     expect(chips()).toEqual(['Cherry'])
   })
 
   it('searches on input too: text can arrive without a keyup (context menu paste)', () => {
     const { input, optionTexts } = setup()
-    input().value = 'ch'
-    fireEvent.input(input())
+    fireEvent.input(input(), { target: { value: 'ch' } })
     expect(optionTexts()).toEqual(['Cherry'])
   })
 
@@ -1189,17 +1183,15 @@ describe('search', () => {
       const { input, chips, isOpen, onChange } = setup({ customValue: true })
       fireEvent.click(input())
       press(input(), 'ArrowDown')
+      fireEvent.input(input(), { target: { value: 'ch' } })
       for (const key of ['Enter', ',']) {
-        input().value = 'ch'
         expect(press(input(), key, init)).toBe(true)
-        fireEvent.keyUp(input(), { key })
       }
       expect(chips()).toEqual([])
       expect(onChange).not.toHaveBeenCalled()
       expect(isOpen()).toBe(true)
       // the next, plain Enter picks
       press(input(), 'Enter')
-      fireEvent.keyUp(input(), { key: 'Enter' })
       expect(chips()).toEqual(['Cherry'])
     }
   )
@@ -2310,17 +2302,16 @@ describe('menu open / close', () => {
 
   it('moves text that reached the closed search field (paste, drop, IME) to the plate', () => {
     const { root, input, isOpen, onChange } = setup({ customValue: true })
-    input().value = 'kiwi'
-    fireEvent.input(input())
+    fireEvent.input(input(), { target: { value: 'kiwi' } })
     expect(isOpen()).toBe(false)
-    press(input())
+    fireEvent.click(root)
     expect(input().closest('.msl-plate')).not.toBeNull()
     expect(input().value).toBe('kiwi')
-    expect(root.querySelector<HTMLInputElement>('input.msl-input')!.value).toBe(
-      ''
-    )
-    // the Enter's keyup lands in the plate's field: it creates the pasted text
-    fireEvent.keyUp(input(), { key: 'Enter' })
+    fireEvent.keyDown(document, { key: 'Escape' })
+    // Enter on the closed field opens the menu, as any key does, and creates the pasted text
+    fireEvent.input(input(), { target: { value: 'kiwi' } })
+    press(input())
+    expect(isOpen()).toBe(true)
     expect(onChange).toHaveBeenLastCalledWith(
       ['kiwi'],
       [{ label: 'kiwi', value: 'kiwi' }]
@@ -3097,7 +3088,7 @@ describe('keyboard', () => {
     expect(activeId()).toBeNull()
     press(input(), 'ArrowDown')
     expect(focusedOption()).toBe('Apple')
-    fireEvent.input(input())
+    fireEvent.input(input(), { target: { value: 'a' } })
     expect(focusedOption()).toBeUndefined()
   })
 
@@ -3202,10 +3193,10 @@ describe('keyboard', () => {
     const { root, input, chips, onChange } = setupKeys({
       defaultValue: ['apple', 'banana']
     })
-    input().value = 'x'
+    fireEvent.input(input(), { target: { value: 'x' } })
     press(input(), 'Backspace')
     expect(chips()).toEqual(['Apple', 'Banana'])
-    input().value = ''
+    fireEvent.input(input(), { target: { value: '' } })
     press(root, 'Backspace')
     expect(chips()).toEqual(['Apple', 'Banana'])
     press(input(), 'Backspace')
