@@ -260,7 +260,7 @@ function MultiSelect({
     return i < 0
       ? undefined
       : b[
-          el!.closest('.msl-input-wrp > [clickable]')
+          el!.closest('.msl-input-wrp > [data-clickable]')
             ? i
             : b.length - a.length + i
         ]
@@ -525,16 +525,15 @@ function MultiSelect({
     return false
   }
 
-  // the target or an ancestor below the wrapper or plate has attr: any icon depth, and never
-  // climbs past them (a ShadowRoot or document has no hasAttribute). A target outside
-  // their DOM counts too: a user portal's, or a chip a sync onChange removed mid-event
+  // the target or an ancestor below the plate or wrapper holding it has attr: any icon depth, never
+  // them or above. The plate first: it may sit in the wrapper (slotted into a dialog).
+  // A target outside both counts too: a user portal's, or a chip a sync onChange removed mid-event
   const marked = (target: EventTarget, attr: string) => {
-    let el = target as Element | null
-    while (el && el !== componentRef.current && el !== plateRef.current) {
-      if (el.hasAttribute?.(attr)) return true
-      el = el.parentNode as Element | null
-    }
-    return !el
+    const box = [plateRef.current, componentRef.current].find((el) =>
+      el?.contains(target as Node)
+    )
+    const el = (target as Element).closest(`[${attr}]`)
+    return !box || (el !== box && box.contains(el))
   }
 
   const focusSearchInput = () => {
@@ -545,9 +544,9 @@ function MultiSelect({
 
   // plate events bubble here through the portal
   const openMenu = ({ target, type }: React.SyntheticEvent) => {
-    if (disabled || marked(target, 'clickable')) return
+    if (disabled || marked(target, 'data-clickable')) return
     if (!menuOpen) open(type === 'keydown')
-    else if (marked(target, 'dropdown-handle')) closeMenu(true)
+    else if (marked(target, 'data-handle')) closeMenu(true)
     // not a close: an option click bubbles here and must not undo closeOnSelect.
     // Nor a refocus once closed: an onChange may have moved focus out
     else opened.current && focusSearchInput()
@@ -614,7 +613,7 @@ function MultiSelect({
     // chips, the clear button and that JSX handle their own keys
     if (
       disabled ||
-      marked(target, 'clickable') ||
+      marked(target, 'data-clickable') ||
       (box?.id === listId && box !== target)
     )
       return
@@ -680,10 +679,9 @@ function MultiSelect({
     >
       <div data-msl className={`msl-input-wrp ${cn.values ?? ''}`}>
         {!singleSelect && !disableChip && (
-          // clickable: clicks and keys on any chip markup are the chip's, not the menu's.
+          // data-clickable: clicks and keys on any chip markup are the chip's, not the menu's.
           // display: contents keeps this box out of the layout, styled or not
-          // @ts-expect-error clickable is a custom attribute
-          <div clickable='true' style={{ display: 'contents' }}>
+          <div data-clickable style={{ display: 'contents' }}>
             {value.map((val, i) => (
               <React.Fragment key={i}>
                 {customChip({
@@ -750,8 +748,8 @@ function MultiSelect({
           {clearable && value.length > 0 && (
             <div
               role='button'
-              // @ts-expect-error clickable is a custom attribute (it stops the menu from opening)
-              clickable='true'
+              // it stops the menu from opening
+              data-clickable
               aria-label={clearLabel}
               onClick={clearByUser}
               onKeyDown={(e) => {
@@ -771,7 +769,7 @@ function MultiSelect({
             // decorative: the combobox handles the keyboard
             <div
               aria-hidden='true'
-              dropdown-handle='true'
+              data-handle
               className={`msl-btn msl-arrow-btn msl-flx ${cn.arrowButton ?? ''}`}
             >
               {downArrowIcon || <DownIcon />}
