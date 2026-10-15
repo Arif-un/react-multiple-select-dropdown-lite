@@ -142,8 +142,6 @@ declare namespace MultiSelect {
     filterOption?: (option: T, search: string) => boolean
     singleSelect?: boolean
     clearable?: boolean
-    /** clears the value when it turns true */
-    clearAll?: boolean
     downArrow?: boolean
     downArrowIcon?: React.ReactNode
     closeIcon?: React.ReactNode
@@ -198,7 +196,7 @@ declare namespace MultiSelect {
     disableSearch?: boolean
     onMenuOpen?: () => void
     onMenuClose?: () => void
-    /** after the clear button empties the value (not for `clearAll`) */
+    /** after the clear button empties the value */
     onClear?: () => void
     /** @deprecated no effect since v2.0.1, set the `--msl-input-width` CSS variable instead */
     width?: unknown

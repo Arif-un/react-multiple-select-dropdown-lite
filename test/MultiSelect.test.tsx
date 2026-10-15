@@ -2509,21 +2509,6 @@ describe('menu open / close', () => {
   )
 })
 
-describe('clearAll', () => {
-  it('clears when it turns true and there is a value', () => {
-    const { rerender, chips, onChange } = setup({ defaultValue: ['apple'] })
-    rerender(<MultiSelect options={opts} onChange={onChange} clearAll />)
-    expect(chips()).toEqual([])
-    expect(onChange).toHaveBeenCalledWith([], [])
-  })
-
-  it('does nothing without a value', () => {
-    const { rerender, onChange } = setup()
-    rerender(<MultiSelect options={opts} onChange={onChange} clearAll />)
-    expect(onChange).not.toHaveBeenCalled()
-  })
-})
-
 describe('value (controlled)', () => {
   it('shows value and changes only when the parent passes a new one', () => {
     const { option, chips, onChange, rerender, q } = setup({ value: ['apple'] })
@@ -2635,7 +2620,7 @@ describe('value (controlled)', () => {
 })
 
 describe('onClear', () => {
-  it('fires after the clear button empties the value, not for clearAll', () => {
+  it('fires after the clear button empties the value', () => {
     const onClear = vi.fn()
     const { q, rerender, onChange } = setup({
       defaultValue: ['apple'],
@@ -2654,17 +2639,7 @@ describe('onClear', () => {
     )
     press(q('.msl-clear-btn'), 'Enter')
     expect(onClear).toHaveBeenCalledTimes(2)
-    rerender(
-      <MultiSelect
-        key='c'
-        options={opts}
-        defaultValue={['apple']}
-        onClear={onClear}
-      />
-    )
-    rerender(<MultiSelect key='c' options={opts} onClear={onClear} clearAll />)
     expect(q('.msl-clear-btn')).toBeNull()
-    expect(onClear).toHaveBeenCalledTimes(2)
   })
 })
 
