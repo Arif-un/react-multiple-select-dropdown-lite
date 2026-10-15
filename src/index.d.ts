@@ -198,8 +198,6 @@ declare namespace MultiSelect {
     onMenuClose?: () => void
     /** after the clear button empties the value */
     onClear?: () => void
-    /** @deprecated no effect since v2.0.1, set the `--msl-input-width` CSS variable instead */
-    width?: unknown
   }
 }
 
