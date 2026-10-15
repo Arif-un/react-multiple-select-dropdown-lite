@@ -1,0 +1,11 @@
+/* the docs page has its own styles: Tailwind's theme and utilities only, no preflight, scanning this demo only.
+   In your app this is `@import 'tailwindcss';` */
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities) source(none);
+@source './Tailwind.tsx';
+
+/* set on the options every frame while open: not inherited, a scroll restyles no option */
+@property --msl-menu-room {
+  syntax: '*';
+  inherits: false;
+}

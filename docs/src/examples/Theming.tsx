@@ -13,6 +13,8 @@ export default function Theming() {
   return (
     <MultiSelect
       className='dark-msl'
+      // the open menu renders in <body>, outside the wrapper: it needs the theme class too
+      classNames={{ plate: 'dark-msl' }}
       options={options}
       defaultValue={['ocean']}
       placeholder='Theme'

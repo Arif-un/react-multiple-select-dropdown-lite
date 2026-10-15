@@ -6,6 +6,8 @@
   --msl-background: #1f2430;
   --msl-active-menu-background: #1f2430;
   --msl-active-menu-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+  --msl-active-menu-border-color: #3a4152;
+  --msl-divider-color: rgb(255 255 255 / 0.08);
   --msl-border-color: #3a4152;
   --msl-hover-border-color: #5b6580;
   --msl-chip-background: #343b4d;
