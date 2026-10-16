@@ -6,6 +6,8 @@ import { userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 import type { MultiSelectProps } from '../../src/index'
 import MultiSelect from '../../src/MultiSelect'
+// as users do: the JS never imports it
+import '../../src/styles.css'
 
 const opts = [
   { label: 'Apple', value: 'apple' },

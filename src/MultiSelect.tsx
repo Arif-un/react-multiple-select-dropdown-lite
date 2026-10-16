@@ -8,7 +8,6 @@ import type {
   MultiSelectProps
 } from './index'
 import Options from './Options'
-import './styles.css'
 
 type Item = MultiSelectOption | MultiSelectGroup
 

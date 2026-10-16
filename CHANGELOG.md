@@ -84,6 +84,7 @@ Breaking release: one value format, React 18+, modern bundles, a native search i
 - The menu's scrollbar thumb no longer darkens on hover in Safari, matching Chrome and Firefox.
 - Keys pressed on focusable JSX in the menu, such as a button in `emptyDataLabel` or a group `title`, are left to it: Enter no longer picks the highlighted option or refocuses the search field.
 - Long search text scrolls on one line instead of wrapping, and no longer runs under the clear and arrow buttons. A placeholder too long for the input ends in an ellipsis.
+- `react-dom` is no longer a peer dependency: the component doesn't import it.
 
 ## [2.1.0] - 2026-10-12
 
