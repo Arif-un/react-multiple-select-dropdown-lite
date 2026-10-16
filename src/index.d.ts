@@ -36,18 +36,28 @@ declare namespace MultiSelect {
   }
 
   interface MultiSelectGroup<T = MultiSelectOption> {
-    /** always 'group'; typed string so groups kept in variables (where TS widens it) still compile */
+    /**
+     * `'group'`: `childs` listed under `title`. `'submenu'`: `title` is a row that opens `childs` in a popover beside it,
+     * on hover, click, Enter or Right Arrow. Submenus nest. Typed string so groups kept in variables (where TS widens it) still compile
+     */
     type: string
     title: React.ReactNode
     childs: ReadonlyArray<T | MultiSelectGroup<T>>
     /** shown when `childs` is empty */
     emptyDataLabel?: React.ReactNode
+    /** `'group'` only: the title shows and hides `childs`, on click or Enter */
+    collapsible?: boolean
+    /** with `collapsible`, `childs` start hidden */
+    collapsed?: boolean
   }
 
   /**
    * classes per element, added after its `msl-*` class: style every part with Tailwind or other utility CSS.
    * State is in attributes: options have `aria-selected`, `aria-disabled` and `data-focused` (the keyboard highlight),
-   * the open control `data-open` and, opening upward, `data-up`, the wrapper `data-disabled`
+   * submenu titles (options too) and collapsible group titles `aria-expanded` and `data-focused`,
+   * the open control `data-open` and, opening upward, `data-up`, the wrapper `data-disabled`.
+   * What closes has `data-closing` until the CSS animations and transitions that starts end: the control,
+   * still `data-open`, a closed submenu's inert copy, and the inert copy of a collapsed group's rows
    */
   interface MultiSelectClassNames {
     /**
@@ -77,10 +87,20 @@ declare namespace MultiSelect {
     menu?: string
     /** `msl-grp`: a group's `role="group"` box, its title and childs */
     group?: string
-    /** `msl-grp-title` */
+    /** `msl-grp-title`. A collapsible group's has `aria-expanded` */
     groupTitle?: string
-    /** `msl-option` */
+    /**
+     * `msl-grp-body`: a collapsible group's childs, after its title, in one inner `<div>`: a grid row of that
+     * from `0fr` to `1fr` animates the height. Collapsing, an inert copy with `data-closing` takes its place
+     */
+    groupBody?: string
+    /** `msl-option`, and a submenu's title, which has `aria-expanded` */
     option?: string
+    /**
+     * `msl-submenu`: a submenu's `role="group"` box, a popover in the top layer. The stylesheet places it beside its title
+     * with CSS anchor positioning (the title is its `position-anchor`), flipping to the other side where there is no room
+     */
+    submenu?: string
     /** `emptyDataLabel`, and an empty group's */
     empty?: string
   }

@@ -192,7 +192,8 @@
   inherits: false;
 }
 
-.msl-options {
+.msl-options,
+.msl-submenu {
   grid-column: 1 / -1;
   overflow: auto;
   overscroll-behavior: contain;
@@ -214,6 +215,40 @@
   &::-webkit-scrollbar-thumb {
     border-radius: 20px;
     background: var(--msl-scrollbar-color);
+  }
+}
+
+@position-try --msl-over {
+  inset: auto;
+  top: anchor(top);
+  left: anchor(left);
+}
+
+.msl-submenu {
+  inset: auto;
+  top: anchor(top);
+  left: anchor(right);
+  width: max-content;
+  min-width: 120px;
+  max-width: var(--msl-input-width);
+  max-height: var(--msl-menu-max-height);
+  margin: -5px 0 0;
+  padding: 0 0 1px;
+  border: 1px solid var(--msl-active-menu-border-color);
+  border-radius: var(--msl-active-menu-radius);
+  background: var(--msl-active-menu-background);
+  color: inherit;
+  box-shadow: var(--msl-active-menu-shadow);
+  position-try-fallbacks:
+    flip-inline,
+    flip-block,
+    flip-block flip-inline,
+    --msl-over,
+    --msl-over flip-block;
+
+  &:dir(rtl) {
+    left: auto;
+    right: anchor(left);
   }
 }
 
@@ -243,6 +278,27 @@
   white-space: break-spaces;
   line-break: anywhere;
   cursor: pointer;
+
+  &[aria-expanded] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  &[aria-expanded]::after {
+    content: '';
+    flex: none;
+    width: 5px;
+    height: 5px;
+    margin-inline: 8px 2px;
+    border: solid;
+    border-width: 0 1.5px 1.5px 0;
+    rotate: -45deg;
+  }
+
+  &[aria-expanded]:dir(rtl)::after {
+    rotate: 135deg;
+  }
 }
 
 :where(.msl-wrp:focus-visible) .msl,
@@ -254,6 +310,10 @@
 .msl-option {
   @media (prefers-reduced-motion: no-preference) {
     transition: background 200ms;
+  }
+
+  &[aria-expanded='true'] {
+    background: var(--msl-option-hover-background);
   }
 }
 
@@ -282,4 +342,17 @@
   font-size: calc(var(--msl-font-size) - 2px);
   opacity: 0.7;
   cursor: default;
+
+  &[aria-expanded] {
+    cursor: pointer;
+  }
+
+  &[aria-expanded]:hover,
+  &[data-focused] {
+    background: var(--msl-option-hover-background);
+  }
+
+  &[aria-expanded='true']::after {
+    rotate: 45deg;
+  }
 }
