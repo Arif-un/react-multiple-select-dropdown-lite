@@ -11,7 +11,7 @@ description: Keyboard support and ARIA in react-multiple-select-dropdown-lite.
 | Home / End      | first / last option (in the search field only while it is empty)                                 |
 | Enter           | pick the highlighted option, else the first search result that isn't `disabled`                  |
 | , (comma)       | pick the first search result that isn't `disabled`, or create the typed value with `customValue` |
-| Backspace       | in an empty search field, remove the last chip                                                   |
+| Backspace       | in an empty search field, remove the last chip (unless `deleteOnBackspace={false}`)              |
 | Escape          | close the menu, not a surrounding dialog or popover                                              |
 | Tab             | close the menu and move on in page order, after any button in the menu                           |
 | Enter / Space   | on a chip's delete button or the clear button, press it                                          |
@@ -21,7 +21,7 @@ Typing with an input method (Chinese, Japanese, Korean) works: the Enter that co
 
 ## ARIA
 
-The search field, or the dropdown itself when there is no search field, is a [combobox](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/) that controls a listbox:
+The search field, or the dropdown itself when there is no search field, is a [combobox](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/) that controls a listbox. With `searchInMenu`, the dropdown is the combobox while closed, and the search field atop the open menu while open:
 
 - `aria-expanded`, `aria-haspopup="listbox"` and, while open, `aria-controls` on the combobox
 - the `aria-*` from `attr` (`aria-describedby`, `aria-invalid`, `aria-required`, ...) on the combobox too, so an error stays announced while the menu is open

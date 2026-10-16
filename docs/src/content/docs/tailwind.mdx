@@ -21,6 +21,7 @@ Skip `dist/index.css` and pass Tailwind classes for each part through `className
 | `control`     | `msl`: the box with the values and buttons; open, the options too, in the top layer |
 | `values`      | `msl-input-wrp`: chips, single value and search field                               |
 | `input`       | `msl-input`: the search field, or the placeholder when there is none                |
+| `search`      | `msl-search`: the box around the search field with `searchInMenu`, atop the options |
 | `singleValue` | `msl-single-value`: the value with `singleSelect`, the count with `disableChip`     |
 | `chip`        | `msl-chip` (default chips; a `customChip` gets `classNames` in its props)           |
 | `chipDelete`  | `msl-chip-delete`                                                                   |
@@ -50,7 +51,7 @@ State is in attributes, so Tailwind's variants reach it:
 
 - Open, the control holds the options and shows in the top layer, over the wrapper. Give it a background (`data-open:bg-white`): nothing is behind it. A grid with the options across both columns (`col-span-full`) puts them under the values and buttons.
 - It stays in place in the DOM, so it inherits the text color and font around the select, and needs no z-index.
-- Opening upward, the options come before the values in the DOM. A divider on the options' `first:border-b last:border-t` lands next to the control either way.
+- Opening upward, the options come before the values in the DOM, and the control gets `data-up`. A divider on the options' `border-t in-data-up:border-t-0 in-data-up:border-b` lands next to the control either way. With `searchInMenu`, the search field's box (`search`) heads the options, on the side away from the control when opening upward, and takes the same divider.
 - `--msl-menu-room` on the options (`classNames.menu`) is the room the viewport leaves on the menu's side. Cap the options with it: `max-h-[min(400px,var(--msl-menu-room))]`. Register it as non-inherited, as the example's CSS does, so a scroll restyles the listbox, not every option:
 
 ```css

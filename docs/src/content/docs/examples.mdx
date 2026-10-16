@@ -18,6 +18,10 @@ import Controlled from '../../examples/Controlled'
 import controlledCode from '../../examples/Controlled.tsx?raw'
 import Limit from '../../examples/Limit'
 import limitCode from '../../examples/Limit.tsx?raw'
+import SearchInMenu from '../../examples/SearchInMenu'
+import searchInMenuCode from '../../examples/SearchInMenu.tsx?raw'
+import DeleteOnBackspace from '../../examples/DeleteOnBackspace'
+import deleteOnBackspaceCode from '../../examples/DeleteOnBackspace.tsx?raw'
 import DisableChip from '../../examples/DisableChip'
 import disableChipCode from '../../examples/DisableChip.tsx?raw'
 import JsxLabels from '../../examples/JsxLabels'
@@ -83,6 +87,22 @@ Pass `value` and update it from `onChange` to own the selection, for example to 
 
 <Preview code={limitCode} title='Limit.tsx'>
   <Limit client:visible />
+</Preview>
+
+## Search in the menu
+
+`searchInMenu` puts the search field at the top of the open menu. The closed control shows only the values, or `placeholder` when there are none, with no search placeholder next to the chips. `searchPlaceholder` labels the field. Single select and `disableChip` can then search with a value selected.
+
+<Preview code={searchInMenuCode} title='SearchInMenu.tsx'>
+  <SearchInMenu client:visible />
+</Preview>
+
+## Delete chips with their button only
+
+Backspace in an empty search field removes the last chip. `deleteOnBackspace={false}` turns that off, so only a chip's delete button removes it.
+
+<Preview code={deleteOnBackspaceCode} title='DeleteOnBackspace.tsx'>
+  <DeleteOnBackspace client:visible />
 </Preview>
 
 ## Count instead of chips

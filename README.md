@@ -76,6 +76,8 @@ More in the [examples](https://arif-un.github.io/react-multiple-select-dropdown-
 - [x] [Group](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#groups) <br>
 - [x] [Searchable](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#multi-select) <br>
 - [x] [Custom Creatable Value](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#creatable-values) <br>
+- [x] [Search in the menu](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#search-in-the-menu) <br>
+- [x] [Delete chips with their button only](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#delete-chips-with-their-button-only) <br>
 - [x] [Themeable (using css var)](https://arif-un.github.io/react-multiple-select-dropdown-lite/styling/) <br>
 - [x] [Controlled value](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#controlled-value) <br>
 - [x] [Keyboard navigation](https://arif-un.github.io/react-multiple-select-dropdown-lite/accessibility/#keyboard) <br>
@@ -106,7 +108,7 @@ Also in the [API docs](https://arif-un.github.io/react-multiple-select-dropdown-
 | clearable         | bool                        | true                             | show / hide close icon to clear value                                                                                                                                                                                                                                                                                                                                                                                           |
 | downArrow         | bool                        | true                             | show / hide down icon in dropdown                                                                                                                                                                                                                                                                                                                                                                                               |
 | className         | string                      |                                  | custom class for the wrapper                                                                                                                                                                                                                                                                                                                                                                                                    |
-| classNames        | object                      |                                  | classes for each part, e.g. Tailwind utilities: `{ control: 'rounded-lg border', option: 'px-2 py-1 data-focused:bg-gray-100' }`. Keys: `control`, `values`, `input`, `singleValue`, `chip`, `chipDelete`, `actions`, `clearButton`, `arrowButton`, `menu`, `group`, `groupTitle`, `option`, `empty`. See [Tailwind](#tailwind)                                                                                                 |
+| classNames        | object                      |                                  | classes for each part, e.g. Tailwind utilities: `{ control: 'rounded-lg border', option: 'px-2 py-1 data-focused:bg-gray-100' }`. Keys: `control`, `values`, `input`, `search`, `singleValue`, `chip`, `chipDelete`, `actions`, `clearButton`, `arrowButton`, `menu`, `group`, `groupTitle`, `option`, `empty`. See [Tailwind](#tailwind)                                                                                       |
 | placeholder       | string                      | Select...                        | Input Placeholder                                                                                                                                                                                                                                                                                                                                                                                                               |
 | disableChip       | bool                        | false                            | disable multiple select chips show value or total selected value only                                                                                                                                                                                                                                                                                                                                                           |
 | attr              | object                      |                                  | props for the wrapper div, e.g. `id` or `data-*`. Its `aria-*` (`aria-label`, `aria-labelledby`, `aria-describedby`, `aria-invalid`, ...) also go to whichever element is the combobox                                                                                                                                                                                                                                          |
@@ -119,6 +121,9 @@ Also in the [API docs](https://arif-un.github.io/react-multiple-select-dropdown-
 | limit             | number \| null              | null                             | max number of selected values in multi select, `null` for no limit. The wrapper gets `msl-limit-reached` once hit, and unselected options `aria-disabled` and `msl-option-disable`                                                                                                                                                                                                                                              |
 | emptyDataLabel    | ReactNode                   | No Data Found                    | shown when there are no options or no search results                                                                                                                                                                                                                                                                                                                                                                            |
 | disableSearch     | bool                        | false                            | hide the search input                                                                                                                                                                                                                                                                                                                                                                                                           |
+| searchInMenu      | bool                        | false                            | put the search field at the top of the open menu, not after the values: the closed control shows only the values, or `placeholder`. Single select and `disableChip` can then search with a value selected                                                                                                                                                                                                                       |
+| searchPlaceholder | string                      | Search...                        | the search field's placeholder with `searchInMenu`                                                                                                                                                                                                                                                                                                                                                                              |
+| deleteOnBackspace | bool                        | true                             | Backspace in the empty search field removes the last chip. `false`: only the chip delete buttons remove chips                                                                                                                                                                                                                                                                                                                   |
 | style             | object                      | {}                               | inline style for the wrapper. While the menu is open, it gets the control's height as `min-height`                                                                                                                                                                                                                                                                                                                              |
 
 ### Groups
@@ -196,7 +201,7 @@ import 'react-multiple-select-dropdown-lite/dist/index.css'
 | Home / End      | first / last option (in the search field only while it is empty)                                 |
 | Enter           | pick the highlighted option, else the first search result that isn't `disabled`                  |
 | , (comma)       | pick the first search result that isn't `disabled`, or create the typed value with `customValue` |
-| Backspace       | in an empty search field, remove the last chip                                                   |
+| Backspace       | in an empty search field, remove the last chip (unless `deleteOnBackspace={false}`)              |
 | Escape          | close the menu, not a surrounding dialog or popover                                              |
 | Tab             | close the menu and move on in page order, after any button in the menu                           |
 | Enter / Space   | on a chip's delete button or the clear button, press it                                          |
@@ -204,7 +209,7 @@ import 'react-multiple-select-dropdown-lite/dist/index.css'
 
 ### Accessibility
 
-The search field (or the dropdown itself when there is no search field) is an ARIA combobox that controls a listbox of options, with `aria-expanded`, `aria-activedescendant`, `aria-selected` and `aria-disabled`. Groups are `role="group"`, named by their title. Give it an accessible name through `attr`:
+The search field (or the dropdown itself when there is no search field, and with `searchInMenu` while closed) is an ARIA combobox that controls a listbox of options, with `aria-expanded`, `aria-activedescendant`, `aria-selected` and `aria-disabled`. Groups are `role="group"`, named by their title. Give it an accessible name through `attr`:
 
 ```jsx
 <MultiSelect options={options} attr={{ 'aria-label': 'Fruits' }} />
@@ -269,7 +274,7 @@ State classes to style against:
 | `msl-option-focused`           | option  | highlighted by the keyboard           |
 | `msl-option-disable`           | option  | disabled                              |
 
-Other parts: `msl-wrp` (wrapper), `msl` (the input box; open, it holds the options too, in the top layer over the wrapper), `msl-chip`, `msl-chip-delete`, `msl-single-value`, `msl-input`, `msl-clear-btn`, `msl-arrow-btn`, `msl-options`, `msl-option`, `msl-grp` (a group), `msl-grp-title`.
+Other parts: `msl-wrp` (wrapper), `msl` (the input box; open, it holds the options too, in the top layer over the wrapper), `msl-chip`, `msl-chip-delete`, `msl-single-value`, `msl-input`, `msl-search` (the search field's box with `searchInMenu`), `msl-clear-btn`, `msl-arrow-btn`, `msl-options`, `msl-option`, `msl-grp` (a group), `msl-grp-title`.
 
 ### Tailwind
 
@@ -282,7 +287,7 @@ Skip `dist/index.css` and style each part with `classNames`. State is in attribu
   classNames={{
     control:
       'grid grid-cols-[minmax(0,1fr)_auto] overflow-hidden rounded-lg border border-gray-400 data-open:border-gray-200 data-open:bg-white data-open:shadow-lg',
-    menu: 'col-span-full max-h-[min(400px,var(--msl-menu-room))] overflow-auto border-gray-200 first:border-b last:border-t',
+    menu: 'col-span-full max-h-[min(400px,var(--msl-menu-room))] overflow-auto border-t border-gray-200 in-data-up:border-t-0 in-data-up:border-b',
     option:
       'cursor-pointer px-2 py-1 aria-selected:text-blue-600 data-focused:bg-gray-100'
   }}
