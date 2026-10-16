@@ -1,5 +1,6 @@
 // Real-browser characterization tests: layout, CSS, focus and typing that jsdom fakes.
 // Like test/MultiSelect.test.tsx, "current behavior: ..." pins known quirks.
+import { Suspense } from 'react'
 import { expect, it, vi } from 'vitest'
 import { userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
@@ -12,8 +13,8 @@ const opts = [
   { label: 'Cherry', value: 'cherry' }
 ]
 
-// the open menu: a plate portaled to the body
-const plate = () => document.querySelector<HTMLElement>('.msl-plate')
+// the open menu: the control with the options, in the top layer
+const box = () => document.querySelector<HTMLElement>('.msl[data-open]')
 
 async function setup(props: MultiSelectProps = {}, { offsetTop = 0 } = {}) {
   const screen = await render(
@@ -24,8 +25,7 @@ async function setup(props: MultiSelectProps = {}, { offsetTop = 0 } = {}) {
     </div>
   )
   const c = screen.container
-  // the plate while open: the wrapper's copy is hidden
-  const q = (s: string) => (plate() ?? c).querySelector<HTMLElement>(s)!
+  const q = (s: string) => c.querySelector<HTMLElement>(s)!
   const root = c.querySelector<HTMLElement>('.msl-wrp')!
   return {
     root,
@@ -34,21 +34,20 @@ async function setup(props: MultiSelectProps = {}, { offsetTop = 0 } = {}) {
     after: c.querySelectorAll('button')[1],
     input: () => q('input.msl-input:enabled') as HTMLInputElement,
     menuHeight: () =>
-      plate()?.querySelector('.msl-options')!.getBoundingClientRect().height ??
-      0,
+      box()?.querySelector('.msl-options')!.getBoundingClientRect().height ?? 0,
     chips: () =>
       [...c.querySelectorAll('.msl-chip')].map((el) => el.textContent),
     visibleOptions: () =>
-      [...(plate()?.querySelectorAll('.msl-option') ?? [])].map(
+      [...(box()?.querySelectorAll('.msl-option') ?? [])].map(
         (el) => el.textContent
       ),
     option: (text: string) =>
-      [...plate()!.querySelectorAll<HTMLElement>('.msl-option')].find(
+      [...box()!.querySelectorAll<HTMLElement>('.msl-option')].find(
         (el) => el.textContent === text
       )!,
     focused: () => {
       const el = document.activeElement!
-      if (el === root || el === plate()) return 'wrapper'
+      if (el === root) return 'wrapper'
       if (el.classList.contains('msl-input')) return 'search'
       if (el.classList.contains('msl-arrow-btn')) return 'arrow'
       if (el.classList.contains('msl-clear-btn')) return 'clear'
@@ -58,39 +57,37 @@ async function setup(props: MultiSelectProps = {}, { offsetTop = 0 } = {}) {
   }
 }
 
-it('opens one plate over the hidden wrapper, the menu below the input', async () => {
+it('opens the box over the wrapper in the top layer, the menu below the input', async () => {
   const { root, q, menuHeight } = await setup({ defaultValue: ['apple'] })
   expect(menuHeight()).toBe(0)
   const closed = root.getBoundingClientRect()
+  const values = q('.msl-input-wrp').getBoundingClientRect()
   await userEvent.click(root)
   await expect.poll(menuHeight).toBeGreaterThan(0)
   expect(q('.msl').className).toContain('msl-active')
+  expect(box()!.parentElement!.matches(':popover-open')).toBe(true)
   // the wrapper keeps its space
-  expect(getComputedStyle(root).visibility).toBe('hidden')
   expect(root.getBoundingClientRect()).toEqual(closed)
-  const box = plate()!.getBoundingClientRect()
-  const input = q('.msl').getBoundingClientRect()
+  const open = box()!.getBoundingClientRect()
   const menu = q('.msl-options').getBoundingClientRect()
-  expect([box.left, box.top, box.width]).toEqual([
+  expect([open.left, open.top, open.width]).toEqual([
     closed.left,
     closed.top,
     closed.width
   ])
-  expect(input.bottom).toBe(closed.bottom)
-  expect(menu.top).toBeGreaterThanOrEqual(input.bottom - 1)
-  expect(box.bottom).toBe(menu.bottom + 1)
-  // the values sit exactly where the hidden ones do
-  expect(q('.msl-input-wrp').getBoundingClientRect()).toEqual(
-    root.querySelector('.msl-input-wrp')!.getBoundingClientRect()
-  )
-  // one plate: its shadow and faded border, and a divider between input and menu
-  const plateStyle = getComputedStyle(plate()!)
-  expect(plateStyle.boxShadow).not.toBe('none')
-  expect(plateStyle.borderTopColor).toBe('rgb(223, 224, 227)')
-  const border = getComputedStyle(q('.msl'))
-  expect(border.borderTopWidth).toBe('0px')
-  expect(border.borderBottomWidth).toBe('1px')
-  expect(border.borderBottomColor).toBe('rgba(3, 7, 18, 0.08)')
+  // the values stay exactly where they were
+  expect(q('.msl-input-wrp').getBoundingClientRect()).toEqual(values)
+  expect(menu.top).toBeGreaterThanOrEqual(closed.bottom - 1)
+  expect(open.bottom).toBe(menu.bottom + 1)
+  // one box: its shadow and faded border, and a divider between input and menu
+  const style = getComputedStyle(box()!)
+  expect(style.boxShadow).not.toBe('none')
+  expect(style.borderTopColor).toBe('rgb(223, 224, 227)')
+  expect(style.borderTopWidth).toBe('1px')
+  const divider = getComputedStyle(q('.msl-options'))
+  expect(divider.borderTopWidth).toBe('1px')
+  expect(divider.borderTopColor).toBe('rgba(3, 7, 18, 0.08)')
+  expect(divider.borderBottomWidth).toBe('0px')
 })
 
 it('opens upward near the bottom of the viewport', async () => {
@@ -99,14 +96,16 @@ it('opens upward near the bottom of the viewport', async () => {
     { offsetTop: window.innerHeight - 80 }
   )
   const closed = root.getBoundingClientRect()
+  const values = q('.msl-input-wrp').getBoundingClientRect()
   await userEvent.click(root)
   await expect.poll(menuHeight).toBeGreaterThan(0)
   expect(q('.msl').className).toContain('msl-active-up')
-  const input = q('.msl').getBoundingClientRect()
+  // the values stay put, the box grows upward from the wrapper's bottom
+  expect(q('.msl-input-wrp').getBoundingClientRect()).toEqual(values)
+  expect(box()!.getBoundingClientRect().bottom).toBe(closed.bottom)
   const menu = q('.msl-options').getBoundingClientRect()
-  // above the plate's bottom border
-  expect(input.bottom).toBe(closed.bottom - 1)
-  expect(menu.bottom).toBeLessThanOrEqual(input.top + 1)
+  expect(menu.bottom).toBeLessThanOrEqual(values.top)
+  expect(getComputedStyle(q('.msl-options')).borderBottomWidth).toBe('1px')
   // no taller than the room above
   expect(menu.top).toBeGreaterThanOrEqual(0)
 })
@@ -225,7 +224,7 @@ it('Tab reaches a button in the menu with the menu open, then moves on in page o
   await userEvent.tab()
   await userEvent.keyboard('{Enter}')
   expect(onClick).toHaveBeenCalledOnce()
-  plate()!.querySelector('button')!.focus()
+  box()!.querySelector('button')!.focus()
   await userEvent.tab()
   expect(menuHeight()).toBe(0)
   expect(document.activeElement).toBe(after)
@@ -267,31 +266,58 @@ it('Tab from a clicked option moves on in page order, not from the end of the bo
   expect(focused()).toBe('clear')
 })
 
-it('the key that opens the menu types into the plate', async () => {
-  const { outside, input, menuHeight, visibleOptions } = await setup()
+it('Escape from a clicked option closes and leaves focus in the search field', async () => {
+  const { root, option, menuHeight, focused } = await setup()
+  await userEvent.click(root)
+  await userEvent.click(option('Banana'))
+  // the click left focus on the option
+  option('Cherry').focus()
+  await userEvent.keyboard('{Escape}')
+  expect(menuHeight()).toBe(0)
+  expect(focused()).toBe('search')
+})
+
+it('the key on the wrapper that opens the menu types into the search field', async () => {
+  const { outside, input, menuHeight, visibleOptions, focused } = await setup()
+  const field = input()
   outside.focus()
   await userEvent.tab()
+  expect(focused()).toBe('wrapper')
   await userEvent.keyboard('ch')
   await expect.poll(menuHeight).toBeGreaterThan(0)
-  expect(input().closest('.msl-plate')).not.toBeNull()
+  // the same field, open or closed
+  expect(input()).toBe(field)
   expect(input().value).toBe('ch')
   expect(visibleOptions()).toEqual(['Cherry'])
 })
 
-it('the plate keeps the text color and font of where the dropdown stands', async () => {
+it('the open menu keeps the text color and font of where the dropdown stands, and CSS through its ancestors', async () => {
   document.body.style.color = 'rgb(200, 200, 200)'
+  const css = document.head.appendChild(document.createElement('style'))
+  css.textContent =
+    '.themed .msl-vars { --msl-active-menu-background: rgb(1, 2, 3) } .themed .msl-grp-title { color: rgb(4, 5, 6) }'
   try {
     const screen = await render(
-      <div style={{ color: 'rgb(30, 40, 50)', fontFamily: 'serif' }}>
-        <MultiSelect options={opts} />
+      <div
+        className='themed'
+        style={{ color: 'rgb(30, 40, 50)', fontFamily: 'serif' }}
+      >
+        <MultiSelect
+          options={[{ type: 'group', title: 'All', childs: opts }]}
+        />
       </div>
     )
     await userEvent.click(screen.container.querySelector('.msl-wrp')!)
-    const option = getComputedStyle(plate()!.querySelector('.msl-option')!)
+    const option = getComputedStyle(box()!.querySelector('.msl-option')!)
     expect(option.color).toBe('rgb(30, 40, 50)')
     expect(option.fontFamily).toBe('serif')
+    expect(getComputedStyle(box()!).backgroundColor).toBe('rgb(1, 2, 3)')
+    expect(
+      getComputedStyle(box()!.querySelector('.msl-grp-title')!).color
+    ).toBe('rgb(4, 5, 6)')
   } finally {
     document.body.style.color = ''
+    css.remove()
   }
 })
 
@@ -302,7 +328,7 @@ it('escapes a clipping parent', async () => {
     </div>
   )
   await userEvent.click(screen.container.querySelector('.msl-wrp')!)
-  const cherry = [...plate()!.querySelectorAll('.msl-option')][2]
+  const cherry = [...box()!.querySelectorAll('.msl-option')][2]
   const { left, top, width, height } = cherry.getBoundingClientRect()
   expect(top).toBeGreaterThan(50)
   expect(document.elementFromPoint(left + width / 2, top + height / 2)).toBe(
@@ -323,10 +349,10 @@ it('follows the wrapper as its parent scrolls, and closes once it scrolls out of
   await userEvent.click(root)
   scroller.scrollTop = 30
   await expect
-    .poll(() => plate()!.getBoundingClientRect().top)
+    .poll(() => box()!.getBoundingClientRect().top)
     .toBe(root.getBoundingClientRect().top)
   scroller.scrollTop = 300
-  await expect.poll(plate).toBeNull()
+  await expect.poll(box).toBeNull()
 })
 
 it('moves with a page scroll at once, not a frame later', async () => {
@@ -340,8 +366,8 @@ it('moves with a page scroll at once, not a frame later', async () => {
   try {
     await userEvent.click(root)
     window.scrollBy(0, 40)
-    // no frame in between: absolute in <body>, the page carries it
-    expect(plate()!.getBoundingClientRect().top).toBe(
+    // no frame in between: absolute in page coordinates, the page carries it
+    expect(box()!.getBoundingClientRect().top).toBe(
       root.getBoundingClientRect().top
     )
   } finally {
@@ -366,7 +392,7 @@ it('a key on the dropdown scrolled out of view scrolls it back and opens', async
   await userEvent.keyboard('{ArrowDown}')
   // past the IntersectionObserver's first report, which closes it while out of view
   for (let i = 0; i < 3; i++) await new Promise(requestAnimationFrame)
-  expect(plate()).not.toBeNull()
+  expect(box()).not.toBeNull()
   expect(scroller.scrollTop).toBeLessThan(300)
 })
 
@@ -381,12 +407,18 @@ it('works in a modal dialog, which makes the page around it inert', async () => 
   dialog.showModal()
   try {
     await userEvent.click(dialog.querySelector('.msl-wrp')!)
-    expect(plate()!.parentElement).toBe(dialog)
-    await userEvent.click(plate()!.querySelector('.msl-option')!)
+    // past the dialog's bottom: on top, not clipped by it
+    const cherry = [...box()!.querySelectorAll('.msl-option')][2]
+    const { left, top, width, height } = cherry.getBoundingClientRect()
+    expect(top).toBeGreaterThan(dialog.getBoundingClientRect().bottom)
+    expect(document.elementFromPoint(left + width / 2, top + height / 2)).toBe(
+      cherry
+    )
+    await userEvent.click(box()!.querySelector('.msl-option')!)
     expect(onChange).toHaveBeenCalledWith(['apple'], [opts[0]])
     // Escape closes the menu, not the dialog too; with the menu closed, it closes the dialog
     await userEvent.keyboard('{Escape}')
-    expect(plate()).toBeNull()
+    expect(box()).toBeNull()
     expect(dialog.open).toBe(true)
     await userEvent.keyboard('{Escape}')
     expect(dialog.open).toBe(false)
@@ -408,7 +440,7 @@ it('works slotted into a component whose shadow root has the modal dialog', asyn
       container: host
     })
     await userEvent.click(host.querySelector('.msl-wrp')!)
-    await userEvent.click(plate()!.querySelector('.msl-option')!)
+    await userEvent.click(box()!.querySelector('.msl-option')!)
     expect(onChange).toHaveBeenCalledWith(['apple'], [opts[0]])
   } finally {
     dialog.close()
@@ -416,7 +448,7 @@ it('works slotted into a component whose shadow root has the modal dialog', asyn
   }
 })
 
-it('lines up over the dropdown in a transformed dialog, its containing block', async () => {
+it('lines up over the dropdown in a transformed dialog', async () => {
   const screen = await render(
     <dialog style={{ transform: 'translateX(0)', paddingBottom: 300 }}>
       <MultiSelect options={opts} />
@@ -428,10 +460,10 @@ it('lines up over the dropdown in a transformed dialog, its containing block', a
     const root = dialog.querySelector<HTMLElement>('.msl-wrp')!
     await userEvent.click(root)
     // right away, not a frame later
-    expect(plate()!.getBoundingClientRect().left).toBeCloseTo(
+    expect(box()!.getBoundingClientRect().left).toBeCloseTo(
       root.getBoundingClientRect().left
     )
-    expect(plate()!.getBoundingClientRect().top).toBeCloseTo(
+    expect(box()!.getBoundingClientRect().top).toBeCloseTo(
       root.getBoundingClientRect().top
     )
   } finally {
@@ -441,7 +473,7 @@ it('lines up over the dropdown in a transformed dialog, its containing block', a
 
 it.each([
   ['a scaled part of the page', false],
-  ['a scaled dialog, its containing block', true]
+  ['a scaled dialog', true]
 ])('lines up over the dropdown, scaled as it is, in %s', async (_, modal) => {
   const Tag = modal ? 'dialog' : 'div'
   const screen = await render(
@@ -455,23 +487,23 @@ it.each([
       <MultiSelect options={opts} />
     </Tag>
   )
-  const box = screen.container.firstElementChild as HTMLDialogElement
-  modal && box.showModal()
+  const parent = screen.container.firstElementChild as HTMLDialogElement
+  modal && parent.showModal()
   try {
-    const root = box.querySelector<HTMLElement>('.msl-wrp')!
-    const closed = root.querySelector('.msl')!.getBoundingClientRect()
+    const root = parent.querySelector<HTMLElement>('.msl-wrp')!
+    const values = root.querySelector('.msl-input-wrp')!.getBoundingClientRect()
     await userEvent.click(root)
     const r = root.getBoundingClientRect()
-    const p = plate()!.getBoundingClientRect()
+    const p = box()!.getBoundingClientRect()
     expect([p.left, p.top, p.width].map(Math.round)).toEqual(
       [r.left, r.top, r.width].map(Math.round)
     )
-    // its control drawn as tall as the hidden one, less the top border the open one lacks
-    expect(
-      plate()!.querySelector('.msl')!.getBoundingClientRect().height
-    ).toBeCloseTo(closed.height - 0.5, 0)
+    // the values drawn where and as large as they were: the top layer drops the ancestor's scale, the box scales itself
+    const open = root.querySelector('.msl-input-wrp')!.getBoundingClientRect()
+    for (const k of ['left', 'top', 'width', 'height'] as const)
+      expect(open[k]).toBeCloseTo(values[k], 0)
   } finally {
-    modal && box.close()
+    modal && parent.close()
   }
 })
 
@@ -482,7 +514,7 @@ it('stacks over a z-indexed overlay it sits in', async () => {
     </div>
   )
   await userEvent.click(screen.container.querySelector('.msl-wrp')!)
-  const option = plate()!.querySelector('.msl-option')!
+  const option = box()!.querySelector('.msl-option')!
   const { left, top, width, height } = option.getBoundingClientRect()
   // the option, not the overlay, is what a pointer there hits
   expect(document.elementFromPoint(left + width / 2, top + height / 2)).toBe(
@@ -490,14 +522,106 @@ it('stacks over a z-indexed overlay it sits in', async () => {
   )
 })
 
-it("a transform on the plate shows: it doesn't count as the containing block's offset", async () => {
-  const css = document.head.appendChild(document.createElement('style'))
-  css.textContent = '.shifted { translate: 0 10px }'
+it('stacks over a higher z-indexed overlay from inside a transformed stacking context', async () => {
+  const screen = await render(
+    <>
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          transform: 'translateX(20px)'
+        }}
+      >
+        <MultiSelect options={opts} />
+      </div>
+      {/* over where the menu opens, not over the dropdown */}
+      <div
+        style={{
+          position: 'fixed',
+          inset: '50px 0 0',
+          zIndex: 2147483647,
+          background: 'gray'
+        }}
+      />
+    </>
+  )
+  const root = screen.container.querySelector<HTMLElement>('.msl-wrp')!
+  await userEvent.click(root)
+  const option = box()!.querySelector('.msl-option:last-child')!
+  const { left, top, width, height } = option.getBoundingClientRect()
+  expect(top).toBeGreaterThan(50)
+  expect(document.elementFromPoint(left + width / 2, top + height / 2)).toBe(
+    option
+  )
+  // over the dropdown, which the transform moved
+  expect(box()!.getBoundingClientRect().left).toBeCloseTo(
+    root.getBoundingClientRect().left
+  )
+})
+
+it('hides while a Suspense boundary shows its fallback, and works after', async () => {
+  let wait = false
+  let resolve!: () => void
+  const pending = new Promise<void>((r) => (resolve = r))
+  const Gate = () => {
+    if (wait) throw pending
+    return null
+  }
+  const onMenuClose = vi.fn()
+  const tree = () => (
+    <Suspense fallback={<p>loading</p>}>
+      <MultiSelect options={opts} onMenuClose={onMenuClose} />
+      <Gate />
+    </Suspense>
+  )
+  const screen = await render(tree())
+  const root = screen.container.querySelector<HTMLElement>('.msl-wrp')!
+  await userEvent.click(root)
+  expect(box()!.getBoundingClientRect().height).toBeGreaterThan(0)
+  wait = true
+  await screen.rerender(tree())
+  await expect.poll(() => screen.container.textContent).toContain('loading')
+  // nothing of it over the fallback
+  expect(box()!.getBoundingClientRect().height).toBe(0)
+  // and the observer sees it gone: it closes, which React shows with the dropdown
+  await expect.poll(() => onMenuClose.mock.calls.length).toBe(1)
+  wait = false
+  resolve()
+  await expect.poll(box).toBeNull()
+  await userEvent.click(root)
+  await expect
+    .poll(() => box()?.getBoundingClientRect().height ?? 0)
+    .toBeGreaterThan(0)
+})
+
+it('a pick in a light-dismiss popover leaves that popover open', async () => {
+  const screen = await render(
+    // spread: @types/react 18 has no popover attribute
+    <div {...{ popover: 'auto' }}>
+      <MultiSelect options={opts} />
+    </div>
+  )
+  const popover = screen.container.querySelector<HTMLElement>('[popover]')!
+  popover.showPopover()
   try {
-    const { root } = await setup({ classNames: { plate: 'shifted' } })
+    await userEvent.click(popover.querySelector('.msl-wrp')!)
+    // the option sits past the popover's own box
+    await userEvent.click(box()!.querySelector('.msl-option')!)
+    expect(popover.matches(':popover-open')).toBe(true)
+    expect(box()).not.toBeNull()
+  } finally {
+    popover.matches(':popover-open') && popover.hidePopover()
+  }
+})
+
+it('a transform on the open box shows, as for an open animation', async () => {
+  const css = document.head.appendChild(document.createElement('style'))
+  css.textContent = '.shifted[data-open] { translate: 0 10px }'
+  try {
+    const { root } = await setup({ classNames: { control: 'shifted' } })
     await userEvent.click(root)
     await new Promise(requestAnimationFrame)
-    expect(plate()!.getBoundingClientRect().top).toBeCloseTo(
+    expect(box()!.getBoundingClientRect().top).toBeCloseTo(
       root.getBoundingClientRect().top + 10
     )
   } finally {
@@ -517,15 +641,14 @@ it('works in a popover, which the top layer paints over <body>', async () => {
   popover.showPopover()
   try {
     await userEvent.click(popover.querySelector('.msl-wrp')!)
-    expect(plate()!.parentElement).toBe(popover)
-    const { left, top, width, height } = plate()!
+    const { left, top, width, height } = box()!
       .querySelector('.msl-option')!
       .getBoundingClientRect()
     // the option, not the popover, is what a pointer there hits
     expect(document.elementFromPoint(left + width / 2, top + height / 2)).toBe(
-      plate()!.querySelector('.msl-option')
+      box()!.querySelector('.msl-option')
     )
-    await userEvent.click(plate()!.querySelector('.msl-option')!)
+    await userEvent.click(box()!.querySelector('.msl-option')!)
     expect(onChange).toHaveBeenCalledWith(['apple'], [opts[0]])
   } finally {
     popover.hidePopover()
@@ -543,7 +666,7 @@ it('takes clicks when a modal library turns off pointer events on <body>', async
       </div>
     )
     await userEvent.click(screen.container.querySelector('.msl-wrp')!)
-    await userEvent.click(plate()!.querySelector('.msl-option')!)
+    await userEvent.click(box()!.querySelector('.msl-option')!)
     expect(onChange).toHaveBeenCalledWith(['apple'], [opts[0]])
   } finally {
     document.body.style.pointerEvents = ''
@@ -557,13 +680,13 @@ it('keeps the right-to-left direction of the section it stands in', async () => 
     </div>
   )
   await userEvent.click(screen.container.querySelector('.msl-wrp')!)
-  expect(plate()!.dir).toBe('rtl')
-  expect(plate()!.lang).toBe('ar')
+  expect(getComputedStyle(box()!).direction).toBe('rtl')
+  expect(box()!.matches(':lang(ar)')).toBe(true)
   // the buttons sit at the inline end: the left in right-to-left
   expect(
-    plate()!.querySelector('.msl-actions')!.getBoundingClientRect().right
+    box()!.querySelector('.msl-actions')!.getBoundingClientRect().right
   ).toBeLessThanOrEqual(
-    plate()!.querySelector('.msl-input-wrp')!.getBoundingClientRect().left
+    box()!.querySelector('.msl-input-wrp')!.getBoundingClientRect().left
   )
 })
 
@@ -626,7 +749,7 @@ it('indents group options a step per level, titles at their group level', async 
   })
   await userEvent.click(root)
   const left = (text: string) =>
-    [...plate()!.querySelectorAll('.msl-option, .msl-grp-title')]
+    [...box()!.querySelectorAll('.msl-option, .msl-grp-title')]
       .find((el) => el.textContent === text)!
       .getBoundingClientRect().left
   const at = left('Any')

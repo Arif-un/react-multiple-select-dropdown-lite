@@ -35,8 +35,10 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-// the open menu: a plate portaled to the body
-const plate = () => document.querySelector<HTMLElement>('.msl-plate')
+// the open menu: the control with the options, in a popover over the wrapper
+const box = () => document.querySelector<HTMLElement>('.msl[data-open]')
+// the popover around it: unstyled, placed over the wrapper
+const pop = () => box()!.parentElement!
 
 const opts = [
   { label: 'Apple', value: 'apple' },
@@ -74,15 +76,13 @@ function setup(props: MultiSelectProps = {}) {
     />
   )
   const c = utils.container
-  // the plate while open: the wrapper's copy is hidden
-  const live = () => plate() ?? c
   const q = <E extends Element = HTMLElement>(s: string) =>
-    live().querySelector<E>(s)!
-  const qa = (s: string) => [...live().querySelectorAll<HTMLElement>(s)]
+    c.querySelector<E>(s)!
+  const qa = (s: string) => [...c.querySelectorAll<HTMLElement>(s)]
   const root = c.firstChild as HTMLElement
   // options exist only while open
   const menu = (s: string) => {
-    plate() || fireEvent.click(root)
+    box() || fireEvent.click(root)
     return qa(s)
   }
   return {
@@ -101,27 +101,24 @@ function setup(props: MultiSelectProps = {}) {
     groupTitles: () => menu('.msl-grp-title').map((el) => el.textContent),
     option: (text: string) =>
       menu('.msl-option').find((el) => el.textContent === text)!,
-    isOpen: () => !!plate(),
+    isOpen: () => !!box(),
     hidden: () => c.querySelector<HTMLInputElement>('input[type="hidden"]')!
   }
 }
 
 type Q = ReturnType<typeof setup>['q']
 
-// the text reaches the live search field, then the key: it opens the menu (the field moves into the plate),
-// Enter or a comma picks
+// the text reaches the search field, then the key: it opens the menu, Enter or a comma picks
 const type = (el: Element, text: string, key = text.slice(-1)) => {
-  fireEvent.change(plate()?.querySelector('input.msl-input') ?? el, {
-    target: { value: text }
-  })
+  fireEvent.change(el, { target: { value: text } })
   fireEvent.keyDown(el, { key })
 }
 // returns false when the default action was prevented
 const press = (el: Element, key = 'Enter', init = {}) =>
   fireEvent.keyDown(el, { key, ...init })
-// highlights the first option in the open plate and picks it
+// highlights the first option in the open menu and picks it
 const pickByKey = () => {
-  const field = plate()!.querySelector('input')!
+  const field = box()!.querySelector('input')!
   press(field, 'ArrowDown')
   press(field)
 }
@@ -148,7 +145,7 @@ describe('render', () => {
     // no menu until it opens
     expect(document.querySelector('.msl-options')).toBeNull()
     fireEvent.click(root)
-    const empty = plate()!.querySelector('.msl-option')!
+    const empty = box()!.querySelector('.msl-option')!
     expect(empty.textContent).toBe('No Data Found')
     expect(empty.className).toContain('msl-option-disable')
     expect(container.querySelector('.msl-arrow-btn')).not.toBeNull()
@@ -157,7 +154,7 @@ describe('render', () => {
 
   it('default callbacks are safe no-ops', () => {
     const { container } = render(<MultiSelect options={opts} />)
-    const q = (s: string) => (plate() ?? container).querySelector(s)!
+    const q = (s: string) => container.querySelector(s)!
     fireEvent.click(container.firstChild!)
     fireEvent.click(q('.msl-option'))
     expect(q('.msl-chip').textContent).toBe('Apple')
@@ -171,12 +168,12 @@ describe('render', () => {
     ).toBeUndefined()
     // jsx(), the runtime React 19 skips defaultProps in, whatever this file's JSX compiles to
     const { container, rerender } = render(jsx(MultiSelect, {}))
-    const q = (s: string) => (plate() ?? container).querySelector(s)!
+    const q = (s: string) => container.querySelector(s)!
     expect(q('.msl-input').getAttribute('placeholder')).toBe('Select...')
     fireEvent.click(container.firstChild!)
     expect(q('.msl-option').textContent).toBe('No Data Found')
     rerender(jsx(MultiSelect, { options: opts }))
-    plate()!
+    box()!
       .querySelectorAll('.msl-option')
       .forEach((el) => {
         fireEvent.click(el)
@@ -202,16 +199,15 @@ describe('render', () => {
     expect(root.getAttribute('data-x')).toBe('1')
     expect(hidden().name).toBe('fruits')
     expect(input().placeholder).toBe('Pick one')
-    // all for the wrapper: the plate has classNames.plate, and no duplicate ids
+    // all for the wrapper: the open menu stays in it, with no class or id of its own
     fireEvent.click(root)
-    expect(plate()!.getAttribute('class')).toBe('msl-plate msl-vars  ')
-    expect(plate()!.style.color).toBe('')
-    expect(plate()!.id).toBe('')
+    expect(root.contains(pop())).toBe(true)
+    expect(pop().hasAttribute('class')).toBe(false)
+    expect(document.querySelectorAll('#ms')).toHaveLength(1)
   })
 
   it('adds classNames to each element, for utility CSS like Tailwind', () => {
     const parts = {
-      plate: '',
       control: '.msl',
       values: '.msl-input-wrp',
       input: '.msl-input',
@@ -244,9 +240,8 @@ describe('render', () => {
       ]
     })
     fireEvent.click(root)
-    has(plate(), 'plate')
     for (const [k, sel] of Object.entries(parts))
-      sel && k !== 'singleValue' && has(plate()!.querySelector(sel), k)
+      k !== 'singleValue' && has(root.querySelector(sel), k)
     unmount()
     const single = setup({
       classNames,
@@ -258,7 +253,7 @@ describe('render', () => {
     // no options at all
     const none = setup({ classNames, options: [] })
     fireEvent.click(none.root)
-    has(plate()!.querySelector(parts.empty), 'empty')
+    has(none.root.querySelector(parts.empty), 'empty')
     none.unmount()
     // custom chips get them too, to style their parts alike
     const customChip = vi.fn(() => null)
@@ -269,7 +264,7 @@ describe('render', () => {
     expect(error).not.toHaveBeenCalled()
   })
 
-  it('leaves layout to the CSS: inline styles only hide the wrapper and place the plate', () => {
+  it("leaves layout to the CSS: inline styles only keep the wrapper's height and place the open menu", () => {
     const { root, q, rerender } = setup({
       defaultValue: ['apple'],
       style: { color: 'red' }
@@ -279,32 +274,50 @@ describe('render', () => {
         (el) => el.getAttribute('style') !== 'display: contents;'
       )
     expect(root.getAttribute('style')).toBe('color: red;')
+    expect(styled(root)).toEqual([])
     fireEvent.click(root)
     expect(q('.msl').className).toContain('msl-active')
-    expect(root.getAttribute('style')).toBe('color: red; visibility: hidden;')
-    const { color, position, left, width, top } = plate()!.style
-    expect([color, position, left, width, top]).toEqual([
-      '',
-      // in <body>: it scrolls with the page
+    // the open menu left the flow: the wrapper keeps the control's height
+    expect(root.getAttribute('style')).toBe('color: red; min-height: 0px;')
+    const { position, left, width, top, margin, color, overflow } = pop().style
+    expect([position, left, width, top]).toEqual([
+      // page coordinates: it scrolls with the page
       'absolute',
       '0px',
       '0px',
       '0px'
     ])
-    // the stylesheet reads them, so a class on the plate can still set its color
-    expect(plate()!.style.getPropertyValue('--msl-inherited-color')).toBe(
-      getComputedStyle(root).color
-    )
-    expect(plate()!.style.getPropertyValue('--msl-inherited-font')).toBe(
-      getComputedStyle(root).fontFamily
-    )
+    // the UA's popover look undone: no box of its own, the text look inherited
+    expect([margin, color, overflow]).toEqual(['0px', 'inherit', 'visible'])
     // on the listbox, its one reader: registered non-inherited, a change restyles no option
-    const menu = plate()!.querySelector<HTMLElement>('.msl-options')!
+    const menu = q('.msl-options')
     expect(menu.getAttribute('style')).toBe('--msl-menu-room: 0px;')
+    expect(styled(root)).toEqual([pop(), menu])
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(root.getAttribute('style')).toBe('color: red;')
     expect(styled(root)).toEqual([])
-    expect(styled(plate()!)).toEqual([menu])
     rerender(<MultiSelect />)
     expect(styled(root)).toEqual([])
+  })
+
+  it('shows the open menu as a manual popover where the browser has the API, a plain element after', () => {
+    const shown: Element[] = []
+    const proto = HTMLElement.prototype as Partial<HTMLElement>
+    proto.showPopover = function (this: HTMLElement) {
+      shown.push(this)
+    }
+    try {
+      const { root } = setup()
+      fireEvent.click(root)
+      expect(shown).toEqual([pop()])
+      // manual: a click outside it is the dropdown's own to handle, not light dismiss
+      expect(pop().getAttribute('popover')).toBe('manual')
+      fireEvent.keyDown(document, { key: 'Escape' })
+      expect(box()).toBeNull()
+      expect(root.querySelector('[popover]')).toBeNull()
+    } finally {
+      delete proto.showPopover
+    }
   })
 
   it('hides the actions area when clearable and downArrow are off', () => {
@@ -529,8 +542,9 @@ describe('options', () => {
     const { root, onMenuClose } = setup()
     expect(document.querySelector('.msl-option')).toBeNull()
     fireEvent.click(root)
-    expect(plate()!.parentElement).toBe(document.body)
-    expect(plate()!.querySelectorAll('.msl-option')).toHaveLength(3)
+    // in place, in the wrapper
+    expect(root.contains(box())).toBe(true)
+    expect(box()!.querySelectorAll('.msl-option')).toHaveLength(3)
     fireEvent.click(document.body)
     expect(onMenuClose).toHaveBeenCalledOnce()
     expect(document.querySelector('.msl-option')).toBeNull()
@@ -794,11 +808,11 @@ describe('singleSelect', () => {
     'closeOnSelect=%s closes the menu when controlled (open: %s)',
     (closeOnSelect, open) => {
       const { container } = render(<Controlled closeOnSelect={closeOnSelect} />)
-      const q = (s: string) => (plate() ?? container).querySelector(s)!
+      const q = (s: string) => (box() ?? container).querySelector(s)!
       fireEvent.click(container.firstChild!)
       fireEvent.click(q('.msl-option'))
       expect(q('.msl-single-value').textContent).toBe('Apple')
-      expect(!!plate()).toBe(open)
+      expect(!!box()).toBe(open)
     }
   )
 
@@ -1027,7 +1041,7 @@ describe('customChip', () => {
     const dels = () => [
       ...container.querySelectorAll<HTMLElement>('.msl-chip-delete')
     ]
-    const isOpen = () => !!plate()
+    const isOpen = () => !!box()
     // the last chip unmounts before the event reaches the wrapper
     dels()[1].focus()
     press(dels()[1])
@@ -1364,7 +1378,7 @@ describe('customValue', () => {
     type(input, 'kiwi')
     type(input, 'kiwi', 'Enter')
     expect(
-      [...plate()!.querySelectorAll('.msl-option')].map((el) => el.textContent)
+      [...box()!.querySelectorAll('.msl-option')].map((el) => el.textContent)
     ).toEqual(['Apple', 'Banana', 'Cherry', 'kiwi'])
   })
 
@@ -1387,8 +1401,8 @@ describe('customValue', () => {
     const { container, getByText } = render(<Parent />)
     // the buttons are outside clicks: they close the menu
     const optionTexts = () => {
-      plate() || fireEvent.click(container.firstChild!)
-      return [...plate()!.querySelectorAll('.msl-option')].map(
+      box() || fireEvent.click(container.firstChild!)
+      return [...box()!.querySelectorAll('.msl-option')].map(
         (el) => el.textContent
       )
     }
@@ -1421,7 +1435,7 @@ describe('getLabel / getValue', () => {
   // any shape: the types infer it from options
   const people = [ada, { title: 'Team', type: 'group', childs: [bob] }]
   const qa = (c: HTMLElement, s: string) => [
-    ...(plate() ?? c).querySelectorAll<HTMLElement>(s)
+    ...(box() ?? c).querySelectorAll<HTMLElement>(s)
   ]
 
   it('reads any option shape through getLabel and getValue', () => {
@@ -1513,7 +1527,7 @@ describe('getLabel / getValue', () => {
       <MultiSelect getLabel={getLabel} getValue={getValue} />
     )
     fireEvent.click(container.firstChild!)
-    expect(plate()!.querySelector('.msl-option')!.textContent).toBe(
+    expect(box()!.querySelector('.msl-option')!.textContent).toBe(
       'No Data Found'
     )
   })
@@ -1600,33 +1614,39 @@ describe('menu open / close', () => {
     fireEvent.click(root)
     expect(q('.msl').getAttribute('class')).toBe('msl msl-active ')
     expect(q('.msl').hasAttribute('data-up')).toBe(false)
-    const order = () => [...plate()!.children].map((el) => el.classList[0])
+    const order = () => [...box()!.children].map((el) => el.classList[0])
     const room = () =>
-      plate()!
-        .querySelector<HTMLElement>('.msl-options')!
-        .style.getPropertyValue('--msl-menu-room')
-    expect(order()).toEqual(['msl', 'msl-options'])
-    expect(plate()!.style.top).toBe('0px')
+      q('.msl-options').style.getPropertyValue('--msl-menu-room')
+    expect(order()).toEqual(['msl-input-wrp', 'msl-actions', 'msl-options'])
+    expect(pop().style.top).toBe('0px')
     expect(room()).toBe('100px')
     fireEvent.click(document.body)
-    vi.spyOn(root, 'getBoundingClientRect').mockReturnValue({
-      top: 60,
-      bottom: 80,
-      left: 5,
-      width: 50
-    } as DOMRect)
-    // the probe beside the plate: the viewport is its containing block
-    vi.spyOn(HTMLDivElement.prototype, 'getBoundingClientRect').mockReturnValue(
-      { left: 0, top: 0, bottom: 100 } as DOMRect
+    // the wrapper 60px down; the open box 120px tall, its options 100px: the control is 20px
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+      function (this: HTMLElement) {
+        return (this === root
+          ? { top: 60, bottom: 80, left: 5, width: 50 }
+          : {
+              height: this.hasAttribute('role') ? 100 : 120
+            }) as unknown as DOMRect
+      }
     )
     fireEvent.click(root)
     expect(q('.msl').getAttribute('class')).toBe('msl msl-active-up ')
     expect(q('.msl').getAttribute('data-up')).toBe('true')
     // stacked by DOM order, not by CSS: right with no stylesheet too
-    expect(order()).toEqual(['msl-options', 'msl'])
-    // anchored by its bottom to the wrapper's, the menu gets the room above
-    const { left, width, top, bottom } = plate()!.style
-    expect([left, width, top, bottom]).toEqual(['5px', '50px', '', '20px'])
+    expect(order()).toEqual(['msl-options', 'msl-input-wrp', 'msl-actions'])
+    // anchored by its bottom to the control's, the menu gets the room above
+    const { left, width, top, bottom, transformOrigin } = pop().style
+    expect([left, width, top, bottom, transformOrigin]).toEqual([
+      '5px',
+      '50px',
+      '',
+      '20px',
+      '0 100%'
+    ])
+    // the box left the flow: the wrapper keeps the control's height
+    expect(root.style.minHeight).toBe('20px')
     expect(room()).toBe('60px')
   })
 
@@ -1647,42 +1667,41 @@ describe('menu open / close', () => {
   })
 
   it.each([
-    ['below', 0, 'top', '0px', '0 0', '160px'],
-    ['above', 60, 'bottom', '20px', '0 100%', '120px']
+    ['below', 0, 'top', '0px', '0 0', '180px'],
+    ['above', 60, 'bottom', '30px', '0 100%', '120px']
   ])(
     'scales as a scaled part of the page scales the dropdown (%s)',
     (_, top, side, at, origin, room) => {
       vi.spyOn(document.documentElement, 'clientHeight', 'get').mockReturnValue(
         100
       )
-      // drawn at half its 200px layout width; the probe's containing block, the viewport, is unscaled
+      // drawn at half its 200px layout width: the top layer drops that scale, so the box scales itself.
+      // Drawn 60px tall, its options 50px: the control is 10px
       vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(200)
-      vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(
-        100
-      )
       vi.spyOn(
         HTMLElement.prototype,
         'getBoundingClientRect'
       ).mockImplementation(function (this: HTMLElement) {
-        return (
-          this.nextElementSibling?.classList.contains('msl-plate')
-            ? { left: 0, top: 0, bottom: 100, width: 0, height: 100.4 }
-            : { left: 10, top, bottom: top + 20, width: 100, height: 20 }
-        ) as DOMRect
+        return (this.classList.contains('msl-wrp')
+          ? { left: 10, top, bottom: top + 10, width: 100 }
+          : {
+              height: this.hasAttribute('role') ? 50 : 60
+            }) as unknown as DOMRect
       })
       const { root } = setup()
       fireEvent.click(root)
-      const { left, width, scale, transformOrigin } = plate()!.style
+      const { left, width, scale, transformOrigin } = pop().style
       expect([left, width, scale, transformOrigin]).toEqual([
         '10px',
         '200px',
         '0.5',
         origin
       ])
-      expect(plate()!.style.getPropertyValue(side)).toBe(at)
-      // in the plate's own pixels
+      expect(pop().style.getPropertyValue(side)).toBe(at)
+      // in the wrapper's own pixels
+      expect(root.style.minHeight).toBe('20px')
       expect(
-        plate()!
+        box()!
           .querySelector<HTMLElement>('.msl-options')!
           .style.getPropertyValue('--msl-menu-room')
       ).toBe(room)
@@ -1699,9 +1718,9 @@ describe('menu open / close', () => {
       width: 90
     } as DOMRect)
     await new Promise(requestAnimationFrame)
-    expect(plate()!.style.top).toBe('30px')
-    expect(plate()!.style.left).toBe('7px')
-    expect(plate()!.style.width).toBe('90px')
+    expect(pop().style.top).toBe('30px')
+    expect(pop().style.left).toBe('7px')
+    expect(pop().style.width).toBe('90px')
   })
 
   it('closes once a scrolling parent clips the wrapper away, focus back in it', () => {
@@ -1746,43 +1765,41 @@ describe('menu open / close', () => {
     expect(isOpen()).toBe(true)
   })
 
-  it('Escape hands focus back to the wrapper; focus moving out stays out', () => {
+  it('Escape leaves focus in the search field; focus moving out stays out', () => {
     const outside = document.body.appendChild(document.createElement('button'))
     try {
       const { root, input } = setup()
       fireEvent.click(root)
-      expect(input().closest('.msl-plate')).not.toBeNull()
       fireEvent.keyDown(document, { key: 'Escape' })
+      expect(box()).toBeNull()
       expect(document.activeElement).toBe(input())
-      expect(input().closest('.msl-plate')).toBeNull()
       fireEvent.click(root)
       act(() => outside.focus())
-      expect(plate()).toBeNull()
+      expect(box()).toBeNull()
       expect(document.activeElement).toBe(outside)
     } finally {
       outside.remove()
     }
   })
 
-  it('Tab closes and hands focus to the same control in the wrapper, which Tab moves on from', () => {
+  it('Tab closes and leaves focus where it is, for the browser to move on from', () => {
     const { root, qa, input, isOpen } = setup({
       defaultValue: ['apple', 'banana']
     })
     fireEvent.click(root)
     const del = qa('.msl-chip-delete')[1]
     del.focus()
-    // not prevented: the browser tabs on from the wrapper's copy
+    // not prevented: the browser tabs on from it
     expect(press(del, 'Tab')).toBe(true)
     expect(isOpen()).toBe(false)
-    expect(document.activeElement).toBe(
-      root.querySelectorAll('.msl-chip-delete')[1]
-    )
+    expect(document.activeElement).toBe(del)
     fireEvent.click(root)
-    press(input(), 'Tab', { shiftKey: true })
-    expect(document.activeElement).toBe(root.querySelector('input.msl-input'))
+    expect(press(input(), 'Tab', { shiftKey: true })).toBe(true)
+    expect(isOpen()).toBe(false)
+    expect(document.activeElement).toBe(input())
   })
 
-  it('closing drops the search text with the plate', () => {
+  it('closing drops the search text', () => {
     const { root, input, optionTexts } = setup()
     type(input(), 'an')
     expect(optionTexts()).toEqual(['Banana'])
@@ -1792,17 +1809,32 @@ describe('menu open / close', () => {
     expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry'])
   })
 
-  it('opens into an open <dialog>, as a modal one makes the page around it inert', () => {
-    const dialog = document.body.appendChild(document.createElement('dialog'))
-    dialog.setAttribute('open', '')
+  it.each([
+    ['an open <dialog>', 'dialog', { open: '' }],
+    ['a popover', 'div', { popover: '' }],
+    [
+      "an aria-modal dialog, a modal library's focus trap",
+      'div',
+      { role: 'dialog', 'aria-modal': 'true' }
+    ],
+    ['a right-to-left section', 'div', { dir: 'rtl', lang: 'ar' }]
+  ])('stays in place in the DOM, in %s', (_, tag, attrs) => {
+    const parent = document.body.appendChild(document.createElement(tag))
+    for (const [k, v] of Object.entries(attrs)) parent.setAttribute(k, v)
     try {
       const { container } = render(<MultiSelect options={opts} />, {
-        container: dialog.appendChild(document.createElement('div'))
+        container: parent.appendChild(document.createElement('div'))
       })
-      fireEvent.click(container.firstChild!)
-      expect(plate()!.parentElement).toBe(dialog)
+      const root = container.firstChild as HTMLElement
+      fireEvent.click(root)
+      // so it keeps the parent's focus trap, direction, language and CSS
+      expect(root.contains(box())).toBe(true)
+      expect(root.contains(document.activeElement)).toBe(
+        // jsdom's UA stylesheet hides a [popover], which it can't show
+        !('popover' in attrs)
+      )
     } finally {
-      dialog.remove()
+      parent.remove()
     }
   })
 
@@ -1891,14 +1923,8 @@ describe('menu open / close', () => {
       render(<MultiSelect options={opts} onChange={onChange} />, {
         container
       })
-      // page CSS can't reach into the shadow root: the plate stays in it
-      const shadowPlate = () =>
-        [...host.shadowRoot!.children].find((el) =>
-          el.classList.contains('msl-plate')
-        )
-      const q = (s: string) =>
-        (shadowPlate() ?? container).querySelector<HTMLElement>(s)!
-      const isOpen = () => !!shadowPlate()
+      const q = (s: string) => container.querySelector<HTMLElement>(s)!
+      const isOpen = () => !!q('.msl[data-open]')
       // the wrapper's ancestors include the ShadowRoot, which has no hasAttribute
       press(container.firstChild as HTMLElement, 'ArrowDown')
       expect(isOpen()).toBe(true)
@@ -2029,8 +2055,8 @@ describe('menu open / close', () => {
     )
     const root = container.querySelector<HTMLElement>('.msl-wrp')!
     fireEvent.click(root)
-    press(plate()!.querySelector('input')!, 'Escape')
-    expect(plate()).toBeNull()
+    press(box()!.querySelector('input')!, 'Escape')
+    expect(box()).toBeNull()
     expect(keys).not.toHaveBeenCalled()
     // closed, Escape is theirs
     press(root, 'Escape')
@@ -2053,7 +2079,7 @@ describe('menu open / close', () => {
       // scrolled away: it closes, no fresh observer takes it for opened out of view
       act(() => seen(false))
       expect(scroll).not.toHaveBeenCalled()
-      expect(plate()).toBeNull()
+      expect(box()).toBeNull()
       expect(onMenuClose).toHaveBeenCalledExactlyOnceWith(2)
     } finally {
       delete (Element.prototype as Partial<Element>).scrollIntoView
@@ -2061,83 +2087,80 @@ describe('menu open / close', () => {
   })
 
   it('a Suspense boundary hiding it while open, then showing it, does not break it', async () => {
-    // missing in jsdom: hidden under React's display: none
-    Element.prototype.checkVisibility = function (this: Element) {
-      return !this.closest('[style*="display: none"]')
-    }
     const pending = new Promise(() => {})
     const Wait = ({ wait }: { wait: boolean }) => {
       if (wait) throw pending
       return null
     }
+    const onChange = vi.fn()
+    const onMenuClose = vi.fn()
     const App = ({ wait }: { wait: boolean }) => (
       <Suspense fallback='loading'>
         <Wait wait={wait} />
-        <MultiSelect options={opts} />
+        <MultiSelect
+          options={opts}
+          onChange={onChange}
+          onMenuClose={onMenuClose}
+        />
       </Suspense>
     )
-    try {
-      const { container, rerender } = render(<App wait={false} />)
-      fireEvent.click(container.querySelector('.msl-wrp')!)
-      // hidden, its refs detached, the menu still open
-      rerender(<App wait />)
-      // React 18 leaves the portal showing: the plate hides with the wrapper
-      await new Promise(requestAnimationFrame)
-      expect(plate()!.style.display).toBe('none')
-      // renders again before React attaches the refs back
-      rerender(<App wait={false} />)
-      expect(plate()).not.toBeNull()
-      await new Promise(requestAnimationFrame)
-      expect(plate()!.style.display).toBe('')
-    } finally {
-      delete (Element.prototype as Partial<Element>).checkVisibility
-    }
+    const { container, rerender } = render(<App wait={false} />)
+    fireEvent.click(container.querySelector('.msl-wrp')!)
+    // hidden under display: none, which hides the top layer box too: its refs detached, the menu still open
+    rerender(<App wait />)
+    await new Promise(requestAnimationFrame)
+    expect(box()).not.toBeNull()
+    // until the observer sees it gone: closed, which React shows with the dropdown
+    seen(true)
+    seen(false)
+    expect(onMenuClose).toHaveBeenCalledOnce()
+    rerender(<App wait={false} />)
+    await new Promise(requestAnimationFrame)
+    expect(box()).toBeNull()
+    fireEvent.click(container.querySelector('.msl-wrp')!)
+    fireEvent.click(box()!.querySelector('.msl-option')!)
+    expect(onChange).toHaveBeenLastCalledWith(['apple'], [opts[0]])
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(box()).toBeNull()
   })
 
   it.each([
-    ['in <body>, scrolling with the page', {}, 'absolute'],
+    ['absolute, scrolling with the page', {}, 'absolute'],
     ['fixed in a fixed part of the page', { position: 'fixed' }, 'fixed'],
     ['fixed in a sticky part of the page', { position: 'sticky' }, 'fixed']
-  ] as const)('places the plate %s', (_, style, pos) => {
+  ] as const)('places the open menu %s', (_, style, pos) => {
     const { container } = render(
       <div style={style}>
         <MultiSelect options={opts} />
       </div>
     )
     fireEvent.click(container.querySelector('.msl-wrp')!)
-    expect(plate()!.style.position).toBe(pos)
-    // the probe measures the same containing block
-    expect(
-      (plate()!.previousElementSibling as HTMLElement).style.position
-    ).toBe(pos)
+    expect(pop().style.position).toBe(pos)
   })
 
-  it.each([
-    ['nothing z-indexed', {}, '0'],
-    ['a z-indexed overlay', { position: 'fixed', zIndex: 100000 }, '100000']
-  ] as const)(
-    'hands the plate the highest z-index around the dropdown, %s',
-    (_, style, z) => {
-      const { container } = render(
-        <div style={style}>
-          <div>
-            <MultiSelect options={opts} />
-          </div>
-        </div>
-      )
-      fireEvent.click(container.querySelector('.msl-wrp')!)
-      // the stylesheet stacks the plate above it
-      expect(plate()!.style.getPropertyValue('--msl-inherited-z-index')).toBe(z)
+  it('places the open menu fixed when slotted into a fixed dialog in a shadow root', () => {
+    // as in <wa-dialog>: the dialog is in its shadow root, the dropdown in its light DOM
+    const host = document.body.appendChild(document.createElement('div'))
+    host.attachShadow({ mode: 'open' }).innerHTML =
+      '<dialog open style="position: fixed"><slot></slot></dialog>'
+    try {
+      render(<MultiSelect options={opts} />, {
+        container: host.appendChild(document.createElement('div'))
+      })
+      fireEvent.click(host.querySelector('.msl-wrp')!)
+      expect(pop().style.position).toBe('fixed')
+    } finally {
+      host.remove()
     }
-  )
+  })
 
   it('onMenuOpen runs once the menu is there and focused, from a click as from a key', () => {
     const at: boolean[][] = []
     const { root } = setup({
       onMenuOpen: () =>
         at.push([
-          !!plate()?.querySelector('[role=listbox]'),
-          !!plate()?.contains(document.activeElement)
+          !!box()?.querySelector('[role=listbox]'),
+          !!box()?.contains(document.activeElement)
         ])
     })
     fireEvent.click(root)
@@ -2149,38 +2172,12 @@ describe('menu open / close', () => {
     ])
   })
 
-  it('hands focus to the same control when a stateful custom chip differs in the plate', () => {
-    function Chip({ label }: MultiSelectChipProps) {
-      const [more, setMore] = useState(false)
-      return (
-        <span>
-          {label}
-          <button type='button' onClick={() => setMore(true)}>
-            more
-          </button>
-          {more && <button type='button'>less</button>}
-        </span>
-      )
-    }
-    const { root, input } = setup({
-      defaultValue: ['apple'],
-      customChip: (p) => <Chip key={p.value} {...p} />
-    })
-    fireEvent.click(root)
-    // the plate's copy grows a control the hidden one hasn't: the search field is 2 in one, 1 in the other
-    fireEvent.click(plate()!.querySelector('button')!)
-    input().focus()
-    press(input(), 'Escape')
-    expect(document.activeElement).toBe(root.querySelector('input.msl-input'))
-  })
-
   it.each([
     ['without a search field', { singleSelect: true, defaultValue: ['apple'] }],
     ['with a search field', {}]
   ])(
-    'opens from a click() in an effect, focus in the plate, with no flushSync warning (%s)',
+    'opens from a click() in an effect, focus in the widget, with no warning (%s)',
     (_, props) => {
-      // a click open doesn't flushSync: React would warn that it can't flush inside its commit
       const error = vi.spyOn(console, 'error')
       const errors = vi.fn((e: Event) => e.preventDefault())
       window.addEventListener('error', errors)
@@ -2200,12 +2197,14 @@ describe('menu open / close', () => {
       window.removeEventListener('error', errors)
       expect(errors).not.toHaveBeenCalled()
       expect(error).not.toHaveBeenCalled()
-      expect(plate()!.contains(document.activeElement)).toBe(true)
+      expect(
+        document.querySelector('.msl-wrp')!.contains(document.activeElement)
+      ).toBe(true)
     }
   )
 
   it.each([
-    ['click', () => fireEvent.click(plate()!.querySelector('.msl-option')!)],
+    ['click', () => fireEvent.click(box()!.querySelector('.msl-option')!)],
     ['Enter', () => pickByKey()]
   ])(
     'a closing pick that reveals an autoFocus field leaves focus there (%s)',
@@ -2226,7 +2225,7 @@ describe('menu open / close', () => {
       const { container } = render(<Other />)
       fireEvent.click(container.querySelector('.msl-wrp')!)
       pick()
-      expect(plate()).toBeNull()
+      expect(box()).toBeNull()
       expect(document.activeElement).toBe(container.querySelector('.other'))
     }
   )
@@ -2291,17 +2290,17 @@ describe('menu open / close', () => {
       window.addEventListener('error', errors)
       const { container } = render(<Form />)
       fireEvent.click(container.querySelector('.msl-wrp')!)
-      pick(plate()!.querySelector<HTMLElement>('.msl-option')!)
+      pick(box()!.querySelector<HTMLElement>('.msl-option')!)
       window.removeEventListener('error', errors)
       expect(errors).not.toHaveBeenCalled()
-      expect(plate()).toBeNull()
+      expect(box()).toBeNull()
       expect(onMenuClose).toHaveBeenCalledOnce()
       expect(document.activeElement).toBe(container.querySelector('.city'))
     }
   )
 
   it.each([
-    ['click', () => fireEvent.click(plate()!.querySelector('.msl-option')!)],
+    ['click', () => fireEvent.click(box()!.querySelector('.msl-option')!)],
     ['Enter', () => pickByKey()]
   ])(
     'a pick whose onChange unmounts the select does not crash (%s)',
@@ -2326,11 +2325,11 @@ describe('menu open / close', () => {
       window.removeEventListener('error', errors)
       expect(errors).not.toHaveBeenCalled()
       expect(container.textContent).toBe('saved')
-      expect(plate()).toBeNull()
+      expect(box()).toBeNull()
     }
   )
 
-  it("a pick that reveals an autoFocus field closes without flushSync inside React's commit", () => {
+  it('a pick that reveals an autoFocus field closes once, with no warning', () => {
     const error = vi.spyOn(console, 'error')
     const onMenuClose = vi.fn()
     function Other() {
@@ -2349,12 +2348,12 @@ describe('menu open / close', () => {
     const { container } = render(<Other />)
     fireEvent.click(container.querySelector('.msl-wrp')!)
     fireEvent.click(
-      [...plate()!.querySelectorAll('.msl-option')].find(
+      [...box()!.querySelectorAll('.msl-option')].find(
         (el) => el.textContent === 'Banana'
       )!
     )
     expect(error).not.toHaveBeenCalled()
-    expect(plate()).toBeNull()
+    expect(box()).toBeNull()
     expect(onMenuClose).toHaveBeenCalledOnce()
     expect(document.activeElement).toBe(container.querySelector('.other'))
   })
@@ -2365,18 +2364,17 @@ describe('menu open / close', () => {
     rerender(<MultiSelect options={opts} onMenuClose={onMenuClose} disabled />)
     expect(isOpen()).toBe(false)
     expect(onMenuClose).toHaveBeenCalledOnce()
-    // not left at the end of <body>, where the plate was: Tab moves on from the dropdown
+    // the disabled field takes no focus: Tab moves on from the dropdown
     expect(document.activeElement).toBe(root)
     rerender(<MultiSelect options={opts} onMenuClose={onMenuClose} />)
     expect(onMenuClose).toHaveBeenCalledOnce()
   })
 
-  it('moves text that reached the closed search field (paste, drop, IME) to the plate', () => {
+  it('keeps text that reached the closed search field (paste, drop, IME) for the open menu', () => {
     const { root, input, isOpen, onChange } = setup({ customValue: true })
     fireEvent.input(input(), { target: { value: 'kiwi' } })
     expect(isOpen()).toBe(false)
     fireEvent.click(root)
-    expect(input().closest('.msl-plate')).not.toBeNull()
     expect(input().value).toBe('kiwi')
     fireEvent.keyDown(document, { key: 'Escape' })
     // Enter on the closed field opens the menu, as any key does, and creates the pasted text
@@ -2388,187 +2386,6 @@ describe('menu open / close', () => {
       [{ label: 'kiwi', value: 'kiwi' }]
     )
   })
-
-  it('opens into an open popover, also in the top layer', () => {
-    const popover = document.body.appendChild(document.createElement('div'))
-    popover.setAttribute('popover', '')
-    try {
-      const { container } = render(<MultiSelect options={opts} />, {
-        container: popover.appendChild(document.createElement('div'))
-      })
-      fireEvent.click(container.firstChild!)
-      expect(plate()!.parentElement).toBe(popover)
-      expect(plate()!.style.position).toBe('fixed')
-    } finally {
-      popover.remove()
-    }
-  })
-
-  it('opens into an aria-modal dialog, inside the focus trap of a modal library', () => {
-    const modal = document.body.appendChild(document.createElement('div'))
-    modal.setAttribute('role', 'dialog')
-    modal.setAttribute('aria-modal', 'true')
-    try {
-      const { container } = render(<MultiSelect options={opts} />, {
-        container: modal.appendChild(document.createElement('div'))
-      })
-      fireEvent.click(container.firstChild!)
-      expect(plate()!.parentElement).toBe(modal)
-      expect(modal.contains(document.activeElement)).toBe(true)
-    } finally {
-      modal.remove()
-    }
-  })
-
-  it('opens into the fullscreen element it sits in, all that shows', () => {
-    const full = document.body.appendChild(document.createElement('div'))
-    Object.defineProperty(document, 'fullscreenElement', {
-      value: full,
-      configurable: true
-    })
-    try {
-      const { container, rerender } = render(<MultiSelect options={opts} />, {
-        container: full.appendChild(document.createElement('div'))
-      })
-      fireEvent.click(container.firstChild!)
-      expect(plate()!.parentElement).toBe(full)
-      // fullscreen ends while open (Esc, which the page never sees): the plate stays, not remounted
-      const p = plate()
-      // @ts-expect-error back to jsdom's
-      delete document.fullscreenElement
-      rerender(<MultiSelect options={opts} placeholder='Pick' />)
-      expect(plate()).toBe(p)
-      expect(p!.parentElement).toBe(full)
-    } finally {
-      // @ts-expect-error back to jsdom's
-      delete document.fullscreenElement
-      full.remove()
-    }
-  })
-
-  it('opens into a fullscreen element in its own shadow root, which the document names by the host', () => {
-    const host = document.body.appendChild(document.createElement('div'))
-    const shadow = host.attachShadow({ mode: 'open' })
-    const full = shadow.appendChild(document.createElement('div'))
-    Object.defineProperty(shadow, 'fullscreenElement', { value: full })
-    Object.defineProperty(document, 'fullscreenElement', {
-      value: host,
-      configurable: true
-    })
-    try {
-      const { container } = render(<MultiSelect options={opts} />, {
-        container: full.appendChild(document.createElement('div'))
-      })
-      fireEvent.click(container.firstChild!)
-      expect(shadow.querySelector('.msl-plate')!.parentElement).toBe(full)
-    } finally {
-      // @ts-expect-error back to jsdom's
-      delete document.fullscreenElement
-      host.remove()
-    }
-  })
-
-  it('opens in what is slotted into a dialog in a shadow root, a component in a component too', () => {
-    // a component (<wa-dialog>) whose shadow root has the dialog, and one in it that slots on
-    const outer = document.body.appendChild(document.createElement('div'))
-    outer.attachShadow({ mode: 'open' }).innerHTML =
-      '<dialog open><slot></slot></dialog>'
-    const inner = outer.appendChild(document.createElement('div'))
-    inner.attachShadow({ mode: 'open' }).innerHTML = '<slot></slot>'
-    const slotted = inner.appendChild(document.createElement('div'))
-    try {
-      const { container } = render(<MultiSelect options={opts} />, {
-        container: slotted.appendChild(document.createElement('div'))
-      })
-      fireEvent.click(container.firstChild!)
-      expect(plate()!.parentElement).toBe(slotted)
-      cleanup()
-      // the wrapper itself slotted: the plate goes in it, visible in the hidden wrapper
-      render(<MultiSelect options={opts} />, { container: outer })
-      const root = outer.querySelector<HTMLElement>('.msl-wrp')!
-      fireEvent.click(root)
-      expect(plate()!.parentElement).toBe(root)
-      expect(plate()!.style.visibility).toBe('visible')
-      cleanup()
-      // in a shadow root in a dialog: the plate stays in the shadow root, where its CSS is
-      const dialog = document.body.appendChild(document.createElement('dialog'))
-      dialog.open = true
-      const shadow = dialog
-        .appendChild(document.createElement('div'))
-        .attachShadow({ mode: 'open' })
-      render(<MultiSelect options={opts} />, {
-        container: shadow.appendChild(document.createElement('div'))
-      })
-      fireEvent.click(shadow.querySelector('.msl-wrp')!)
-      expect(shadow.querySelector('.msl-plate')!.parentNode).toBe(shadow)
-      dialog.remove()
-      cleanup()
-      // in a shadow root whose host is slotted into the dialog: the plate stays in that shadow root too
-      const own = outer
-        .appendChild(document.createElement('div'))
-        .attachShadow({ mode: 'open' })
-      render(<MultiSelect options={opts} />, {
-        container: own.appendChild(document.createElement('div'))
-      })
-      fireEvent.click(own.querySelector('.msl-wrp')!)
-      expect(own.querySelector('.msl-plate')!.parentNode).toBe(own)
-    } finally {
-      outer.remove()
-    }
-  })
-
-  it('takes the direction and language of where the dropdown stands', () => {
-    const section = document.body.appendChild(document.createElement('div'))
-    section.lang = 'ar'
-    try {
-      const { container } = render(<MultiSelect options={opts} />, {
-        container: section.appendChild(document.createElement('div'))
-      })
-      const root = container.firstChild as HTMLElement
-      fireEvent.click(root)
-      expect(plate()!.lang).toBe('ar')
-      expect(plate()!.dir).toBe(getComputedStyle(root).direction)
-    } finally {
-      section.remove()
-    }
-  })
-
-  it('takes pointer events, which modal libraries turn off on <body>', () => {
-    const { root } = setup()
-    fireEvent.click(root)
-    expect(plate()!.style.pointerEvents).toBe('auto')
-  })
-
-  it.each([
-    ['below', 10, 'top', '-10px'],
-    ['above', 60, 'bottom', '40px']
-  ])(
-    'shifts by the offset of a containing block other than the viewport (%s)',
-    async (_, top, side, at) => {
-      vi.spyOn(document.documentElement, 'clientHeight', 'get').mockReturnValue(
-        100
-      )
-      // the probe beside the plate: a transformed host 40px right and 20px down, as tall as the viewport
-      vi.spyOn(
-        HTMLElement.prototype,
-        'getBoundingClientRect'
-      ).mockImplementation(function (this: HTMLElement) {
-        return (
-          this.nextElementSibling?.classList.contains('msl-plate')
-            ? { left: 40, top: 20, bottom: 120 }
-            : { left: 100, top, bottom: top + 20, width: 80 }
-        ) as DOMRect
-      })
-      const { root } = setup()
-      fireEvent.click(root)
-      // shifted before the first paint, and it stays put
-      expect(plate()!.style.left).toBe('60px')
-      expect(plate()!.style.getPropertyValue(side)).toBe(at)
-      await new Promise(requestAnimationFrame)
-      expect(plate()!.style.left).toBe('60px')
-      expect(plate()!.style.getPropertyValue(side)).toBe(at)
-    }
-  )
 })
 
 describe('value (controlled)', () => {
@@ -2633,7 +2450,7 @@ describe('value (controlled)', () => {
     type(input, 'kiwi')
     type(input, 'kiwi', 'Enter')
     expect(chips()).toEqual(['Cherry', 'Apple', 'kiwi'])
-    expect(plate()!.querySelector('.msl-grp-title')!.textContent).toBe(
+    expect(box()!.querySelector('.msl-grp-title')!.textContent).toBe(
       'Custom Values'
     )
     fireEvent.click(getByText('reset'))
@@ -2745,11 +2562,11 @@ describe('aria', () => {
     expect(list.getAttribute('role')).toBe('listbox')
     expect(list.getAttribute('aria-multiselectable')).toBe('true')
     expect(list.id).toMatch(/^msl-listbox\S+$/)
-    // the plate's field is the live one
-    expect(input()).not.toBe(combo)
+    // the same field, open or closed
+    expect(input()).toBe(combo)
     expect(input().getAttribute('aria-controls')).toBe(list.id)
     expect(input().getAttribute('aria-expanded')).toBe('true')
-    expect(plate()!.hasAttribute('role')).toBe(false)
+    expect(box()!.hasAttribute('role')).toBe(false)
   })
 
   it('the search field takes its accessible name, description and state from attr', () => {
@@ -2792,13 +2609,15 @@ describe('aria', () => {
       fireEvent.click(root)
       const list = q('.msl-options')
       expect(list.getAttribute('aria-multiselectable')).toBe(multi)
-      expect(plate()!.getAttribute('role')).toBe('combobox')
-      expect(plate()!.getAttribute('aria-controls')).toBe(list.id)
-      expect(plate()!.getAttribute('aria-expanded')).toBe('true')
-      expect(plate()!.getAttribute('aria-label')).toBe('Fruit')
-      // focus moves to the plate: it keeps the error the wrapper announced
-      expect(plate()!.getAttribute('aria-describedby')).toBe('fruit-error')
-      expect(plate()!.getAttribute('aria-invalid')).toBe('true')
+      // focus stays on it, with the error it announced
+      expect(document.activeElement).toBe(root)
+      expect(root.getAttribute('role')).toBe('combobox')
+      expect(root.getAttribute('aria-controls')).toBe(list.id)
+      expect(root.getAttribute('aria-expanded')).toBe('true')
+      expect(root.getAttribute('aria-label')).toBe('Fruit')
+      expect(root.getAttribute('aria-describedby')).toBe('fruit-error')
+      expect(root.getAttribute('aria-invalid')).toBe('true')
+      expect(box()!.hasAttribute('role')).toBe(false)
     }
   )
 
@@ -2870,7 +2689,7 @@ describe('aria', () => {
     // opening one closes the other
     const ids = [...container.querySelectorAll('.msl-wrp')].flatMap((root) => {
       fireEvent.click(root)
-      return [...plate()!.querySelectorAll('[id]')].map((el) => el.id)
+      return [...box()!.querySelectorAll('[id]')].map((el) => el.id)
     })
     expect(ids).toHaveLength(8)
     expect(new Set(ids).size).toBe(8)
@@ -2893,9 +2712,7 @@ describe('keyboard', () => {
     expect(root.hasAttribute('data-disabled')).toBe(false)
     expect(q('.msl').hasAttribute('data-open')).toBe(false)
     press(root, 'ArrowDown')
-    // the plate's control, not the hidden one
     expect(q('.msl').getAttribute('data-open')).toBe('true')
-    expect(root.querySelector('.msl')!.hasAttribute('data-open')).toBe(false)
     expect(qa('[data-focused]').map((el) => el.textContent)).toEqual(['Apple'])
     press(root, 'ArrowDown')
     expect(qa('[data-focused]').map((el) => el.textContent)).toEqual(['Banana'])
@@ -2993,32 +2810,38 @@ describe('keyboard', () => {
     expect(document.activeElement).toBe(add)
   })
 
-  it('Tab moves to and from focusable JSX in the menu, which only the plate has, the menu open', () => {
-    const { q, root, input, isOpen } = setupKeys({
-      options: [],
-      emptyDataLabel: <button>Add</button>
-    })
-    fireEvent.click(root)
-    // not prevented: the browser moves focus on to the button
-    expect(press(input(), 'Tab')).toBe(true)
-    expect(isOpen()).toBe(true)
-    const add = q('.msl-options button')
-    add.focus()
-    expect(press(add, 'Tab', { shiftKey: true })).toBe(true)
-    expect(isOpen()).toBe(true)
-    // past the plate's last stop: it closes, and Tab moves on from the wrapper
-    press(add, 'Tab')
-    expect(isOpen()).toBe(false)
-    expect(document.activeElement).toBe(input())
+  it('Tab moves to and from focusable JSX in the menu, the menu open: focus leaving it closes it', () => {
+    const outside = document.body.appendChild(document.createElement('button'))
+    try {
+      const { q, root, input, isOpen } = setupKeys({
+        options: [],
+        emptyDataLabel: <button>Add</button>
+      })
+      fireEvent.click(root)
+      // not prevented: the browser moves focus on to the button
+      expect(press(input(), 'Tab')).toBe(true)
+      expect(isOpen()).toBe(true)
+      const add = q('.msl-options button')
+      add.focus()
+      expect(press(add, 'Tab', { shiftKey: true })).toBe(true)
+      expect(isOpen()).toBe(true)
+      // past its last stop the browser moves focus out, which closes it
+      expect(press(add, 'Tab')).toBe(true)
+      expect(isOpen()).toBe(true)
+      act(() => outside.focus())
+      expect(isOpen()).toBe(false)
+    } finally {
+      outside.remove()
+    }
   })
 
-  it('with a value, Tab reaches JSX in the menu through the clear button, then moves on past the wrapper', () => {
+  it('with a value, Tab reaches JSX in the menu through the clear button, the menu open', () => {
     const { q, root, input, isOpen } = setupKeys({
       defaultValue: ['apple'],
       options: [{ title: <button>All</button>, type: 'group', childs: opts }]
     })
     fireEvent.click(root)
-    // not prevented: the browser moves focus on through the plate
+    // not prevented: the browser moves focus on through the open box
     expect(press(input(), 'Tab')).toBe(true)
     expect(isOpen()).toBe(true)
     const clear = q('.msl-clear-btn')
@@ -3029,13 +2852,9 @@ describe('keyboard', () => {
     all.focus()
     expect(press(all, 'Tab', { shiftKey: true })).toBe(true)
     expect(isOpen()).toBe(true)
-    // past the plate's last stop: Tab moves on from the wrapper's last control, out of the dropdown
-    expect(press(all, 'Tab')).toBe(true)
-    expect(isOpen()).toBe(false)
-    expect(document.activeElement).toBe(root.querySelector('.msl-clear-btn'))
   })
 
-  it('Tab from an option or the listbox closes past the wrapper, or onto the control before them', () => {
+  it('Tab from an option or the listbox closes, not prevented: the browser moves on from where it was', () => {
     const { q, root, option, isOpen } = setupKeys({
       disableSearch: true,
       defaultValue: ['apple']
@@ -3043,46 +2862,25 @@ describe('keyboard', () => {
     fireEvent.click(root)
     // a click focuses the option, and no search field takes focus back
     option('Banana').focus()
-    // not prevented: the browser moves on from the wrapper's last control, not from the end of the body
     expect(press(option('Banana'), 'Tab')).toBe(true)
     expect(isOpen()).toBe(false)
-    expect(document.activeElement).toBe(root.querySelector('.msl-clear-btn'))
     fireEvent.click(root)
     q('.msl-options').focus()
-    // prevented: focus lands right on the clear button, the stop before the menu
-    expect(press(q('.msl-options'), 'Tab', { shiftKey: true })).toBe(false)
+    expect(press(q('.msl-options'), 'Tab', { shiftKey: true })).toBe(true)
     expect(isOpen()).toBe(false)
-    expect(document.activeElement).toBe(root.querySelector('.msl-clear-btn'))
-    cleanup()
-    // no controls in the wrapper: past the wrapper itself
-    const s = setupKeys({
-      singleSelect: true,
-      clearable: false,
-      defaultValue: ['apple'],
-      closeOnSelect: false
-    })
-    fireEvent.click(s.root)
-    s.option('Banana').focus()
-    press(s.option('Banana'), 'Tab')
-    expect(s.isOpen()).toBe(false)
-    expect(document.activeElement).toBe(s.root)
   })
 
-  it('Tab or Escape from the plate itself hands focus to the wrapper, its twin', () => {
+  it('Tab or Escape from the wrapper itself closes, focus left on it', () => {
     const { root, isOpen } = setupKeys({ defaultValue: ['apple'] })
     fireEvent.click(root)
-    // a click on chip text focuses the plate: the chip is clickable, so focus stays there
-    plate()!.focus()
-    expect(press(plate()!, 'Tab')).toBe(true)
+    // a click on chip text focuses the wrapper: the chip is clickable, so focus stays there
+    root.focus()
+    expect(press(root, 'Tab')).toBe(true)
     expect(isOpen()).toBe(false)
     expect(document.activeElement).toBe(root)
     fireEvent.click(root)
-    plate()!.focus()
-    expect(press(plate()!, 'Tab', { shiftKey: true })).toBe(true)
-    expect(document.activeElement).toBe(root)
-    fireEvent.click(root)
-    plate()!.focus()
-    press(plate()!, 'Escape')
+    root.focus()
+    press(root, 'Escape')
     expect(isOpen()).toBe(false)
     expect(document.activeElement).toBe(root)
   })
@@ -3218,23 +3016,20 @@ describe('keyboard', () => {
       press(input(), 'Enter')
       expect(single()).toBe('Apple')
       expect(input()).toBeNull()
-      // single select closes; disableChip stays open, in the plate
-      expect(document.activeElement).toBe(plate() ?? root)
+      // single select closes; disableChip stays open
+      expect(document.activeElement).toBe(root)
     }
   )
 
   it.each([
-    ['a click', () => fireEvent.click(plate()!.querySelector('.msl-option')!)],
+    ['a click', () => fireEvent.click(box()!.querySelector('.msl-option')!)],
     [
       'typed text and Enter',
-      () => type(plate()!.querySelector('input')!, 'ap', 'Enter')
+      () => type(box()!.querySelector('input')!, 'ap', 'Enter')
     ],
-    [
-      'typed text and comma',
-      () => type(plate()!.querySelector('input')!, 'ap,')
-    ]
+    ['typed text and comma', () => type(box()!.querySelector('input')!, 'ap,')]
   ])(
-    'a pick by %s that removes the search field keeps focus in the open plate',
+    'a pick by %s that removes the search field keeps focus on the wrapper, the menu open',
     (_, pick) => {
       for (const props of [
         { disableChip: true },
@@ -3244,8 +3039,8 @@ describe('keyboard', () => {
         fireEvent.click(root)
         pick()
         expect(single()).toBe('Apple')
-        expect(plate()!.querySelector('input')).toBeNull()
-        expect(document.activeElement).toBe(plate())
+        expect(box()!.querySelector('input')).toBeNull()
+        expect(document.activeElement).toBe(root)
         unmount()
       }
     }
@@ -3257,10 +3052,8 @@ describe('keyboard', () => {
     })
     press(root, 'ArrowDown')
     expect(focusedOption()).toBe('Apple')
-    expect(document.activeElement).toBe(plate())
-    expect(activeId(plate()!)).toBe(
-      plate()!.querySelector('.msl-option-focused')!.id
-    )
+    expect(document.activeElement).toBe(root)
+    expect(activeId(root)).toBe(box()!.querySelector('.msl-option-focused')!.id)
     press(root, 'Enter')
     expect(chips()).toEqual(['Apple'])
   })
