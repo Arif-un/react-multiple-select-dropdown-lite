@@ -1,16 +1,15 @@
 {
-  // type check only: Vite (Oxc) strips the types, Babel compiles the bundles
+  // type check only: Vite (Oxc) strips the types and compiles the bundles
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["DOM", "DOM.Iterable", "ES2022"],
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "jsx": "react",
+    "jsx": "react-jsx",
     "strict": true,
     "noEmit": true,
     "isolatedModules": true,
     "types": ["node", "vite/client"]
   },
-  "include": ["src", "test"],
-  "exclude": ["test/example"]
+  "include": ["src", "test"]
 }

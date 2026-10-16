@@ -1,0 +1,70 @@
+---
+title: Tailwind
+description: Style every part of the select with Tailwind utilities.
+---
+
+import Preview from '../../components/Preview.astro'
+import Tailwind from '../../examples/Tailwind'
+import tailwindCode from '../../examples/Tailwind.tsx?raw'
+
+Skip `dist/index.css` and pass Tailwind classes for each part through `classNames`. Each string goes after the part's `msl-*` class. With no stylesheet the markup is unstyled, and the select still works: opening, the menu above or below, disabled.
+
+<Preview code={tailwindCode} title='Tailwind.tsx'>
+  <Tailwind client:visible />
+</Preview>
+
+## Parts
+
+| Key           | Element                                                                             |
+| ------------- | ----------------------------------------------------------------------------------- |
+| `className`   | the wrapper only (a prop of its own, not in `classNames`)                           |
+| `control`     | `msl`: the box with the values and buttons; open, the options too, in the top layer |
+| `values`      | `msl-input-wrp`: chips, single value and search field                               |
+| `input`       | `msl-input`: the search field, or the placeholder when there is none                |
+| `singleValue` | `msl-single-value`: the value with `singleSelect`, the count with `disableChip`     |
+| `chip`        | `msl-chip` (default chips; a `customChip` gets `classNames` in its props)           |
+| `chipDelete`  | `msl-chip-delete`                                                                   |
+| `actions`     | `msl-actions`: the clear and arrow buttons                                          |
+| `clearButton` | `msl-clear-btn`                                                                     |
+| `arrowButton` | `msl-arrow-btn`                                                                     |
+| `menu`        | `msl-options`: the listbox                                                          |
+| `group`       | `msl-grp`: a group's box                                                            |
+| `groupTitle`  | `msl-grp-title`                                                                     |
+| `option`      | `msl-option`                                                                        |
+| `empty`       | `emptyDataLabel`, and an empty group's                                              |
+
+## State
+
+State is in attributes, so Tailwind's variants reach it:
+
+| Variant             | Matches                                                      |
+| ------------------- | ------------------------------------------------------------ |
+| `aria-selected:`    | a selected option                                            |
+| `aria-disabled:`    | a disabled option                                            |
+| `data-focused:`     | the option highlighted by the keyboard                       |
+| `data-open:`        | the open control; `in-data-open:` for parts inside it        |
+| `data-up:`          | the open control, opened upward                              |
+| `in-data-disabled:` | parts of a disabled select (the wrapper has `data-disabled`) |
+
+## The open menu
+
+- Open, the control holds the options and shows in the top layer, over the wrapper. Give it a background (`data-open:bg-white`): nothing is behind it. A grid with the options across both columns (`col-span-full`) puts them under the values and buttons.
+- It stays in place in the DOM, so it inherits the text color and font around the select, and needs no z-index.
+- Opening upward, the options come before the values in the DOM. A divider on the options' `first:border-b last:border-t` lands next to the control either way.
+- `--msl-menu-room` on the options (`classNames.menu`) is the room the viewport leaves on the menu's side. Cap the options with it: `max-h-[min(400px,var(--msl-menu-room))]`. Register it as non-inherited, as the example's CSS does, so a scroll restyles the listbox, not every option:
+
+```css
+@property --msl-menu-room {
+  syntax: '*';
+  inherits: false;
+}
+```
+
+## With the default stylesheet
+
+To restyle a few parts on top of the default look, import the stylesheet into a cascade layer below Tailwind's utilities, or its rules beat them:
+
+```css
+@import 'tailwindcss';
+@import 'react-multiple-select-dropdown-lite/dist/index.css' layer(components);
+```

@@ -1,6 +1,7 @@
 // @ts-check
 import react from '@astrojs/react'
 import starlight from '@astrojs/starlight'
+import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'astro/config'
 
 const repo = 'https://github.com/Arif-un/react-multiple-select-dropdown-lite'
@@ -21,6 +22,7 @@ export default defineConfig({
         { label: 'Examples', slug: 'examples' },
         { label: 'API', slug: 'api' },
         { label: 'Styling', slug: 'styling' },
+        { label: 'Tailwind', slug: 'tailwind' },
         { label: 'Accessibility', slug: 'accessibility' },
         { label: 'Next.js and SSR', slug: 'ssr' },
         { label: 'Changelog', slug: 'changelog' },
@@ -33,6 +35,7 @@ export default defineConfig({
     react()
   ],
   vite: {
+    plugins: [tailwindcss()],
     // the demos use the repo's dist through `link:..`: one React, and let dev serve files from the repo
     resolve: { dedupe: ['react', 'react-dom'] },
     server: { fs: { allow: ['..'] } }

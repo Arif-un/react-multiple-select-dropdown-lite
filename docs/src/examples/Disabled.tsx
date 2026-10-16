@@ -7,5 +7,5 @@ const options = [
 ]
 
 export default function Disabled() {
-  return <MultiSelect disabled options={options} defaultValue='a,b' />
+  return <MultiSelect disabled options={options} defaultValue={['a', 'b']} />
 }

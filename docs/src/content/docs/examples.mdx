@@ -12,8 +12,8 @@ import Groups from '../../examples/Groups'
 import groupsCode from '../../examples/Groups.tsx?raw'
 import Creatable from '../../examples/Creatable'
 import creatableCode from '../../examples/Creatable.tsx?raw'
-import JsonValue from '../../examples/JsonValue'
-import jsonValueCode from '../../examples/JsonValue.tsx?raw'
+import OptionObjects from '../../examples/OptionObjects'
+import optionObjectsCode from '../../examples/OptionObjects.tsx?raw'
 import Controlled from '../../examples/Controlled'
 import controlledCode from '../../examples/Controlled.tsx?raw'
 import Limit from '../../examples/Limit'
@@ -47,7 +47,7 @@ Every demo below runs the code under it.
 
 ## Groups
 
-Groups have `type: 'group'`, a `title` and `childs`, and can nest. `emptyDataLabel` shows when a group has no options. Search looks inside groups.
+Groups have `type: 'group'`, a `title` and `childs`, and can nest. Options themselves can't have `type: 'group'`. `emptyDataLabel` shows when a group has no options. Search looks inside groups.
 
 <Preview code={groupsCode} title='Groups.tsx'>
   <Groups client:visible />
@@ -61,17 +61,17 @@ With `customValue`, typing text that matches no option offers **Create "..."**. 
   <Creatable client:visible />
 </Preview>
 
-## Option objects (jsonValue)
+## Option objects
 
-`jsonValue` makes `onChange` return the selected option objects, including any extra fields you put on them.
+Options can be any shape: `getLabel` and `getValue` read them. `onChange` gets the selected objects back as its second argument. Values created by `customValue` are always `{ label, value }`. The fields `disabled`, `style`, `classes` and `type` keep their meaning in any shape.
 
-<Preview code={jsonValueCode} title='JsonValue.tsx'>
-  <JsonValue client:visible />
+<Preview code={optionObjectsCode} title='OptionObjects.tsx'>
+  <OptionObjects client:visible />
 </Preview>
 
 ## Controlled value
 
-Pass `value` and update it from `onChange` to own the selection, for example to reset it or set it from elsewhere.
+Pass `value` and update it from `onChange` to own the selection, for example to reset it or set it from elsewhere. `defaultValue` only sets the initial selection.
 
 <Preview code={controlledCode} title='Controlled.tsx'>
   <Controlled client:visible />
@@ -93,9 +93,9 @@ Pass `value` and update it from `onChange` to own the selection, for example to 
   <DisableChip client:visible />
 </Preview>
 
-## JSX labels
+## Custom labels
 
-Labels can be JSX. Give such options a string `title`, which search and chips use.
+`getLabel(option)` renders each option, chip and single value. Return any JSX. Search matches what `getLabel` returns when it is text, else the option's `label`.
 
 <Preview code={jsxLabelsCode} title='JsxLabels.tsx'>
   <JsxLabels client:visible />
@@ -115,7 +115,7 @@ Labels can be JSX. Give such options a string `title`, which search and chips us
 
 ## Large lists
 
-`largeData` renders the options only while the menu is open, which keeps pages with long lists fast.
+Options render only while the menu is open, so long lists don't slow the page down.
 
 <Preview code={largeDataCode} title='LargeData.tsx'>
   <LargeData client:visible />

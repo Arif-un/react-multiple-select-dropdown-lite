@@ -8,5 +8,5 @@ const options = Array.from({ length: 5000 }, (_, i) => ({
 
 // options render only while the menu is open
 export default function LargeData() {
-  return <MultiSelect largeData options={options} placeholder='5000 items' />
+  return <MultiSelect options={options} placeholder='5000 items' />
 }

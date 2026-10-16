@@ -19,37 +19,60 @@ import 'react-multiple-select-dropdown-lite/dist/index.css'
 
 The defaults live on `.msl-vars`, the wrapper of every dropdown. Override them on `.msl-vars` for all dropdowns, or add your own class for one. Keep `.msl-vars` in the selector: a lone class of yours ties with the defaults, so it only wins when its CSS loads later.
 
-| Variable                   | Default                 | Controls                      |
-| -------------------------- | ----------------------- | ----------------------------- |
-| `--input-width`            | `300px`                 | width                         |
-| `--menu-max-height`        | `400px`                 | menu height before it scrolls |
-| `--font-size`              | `16px`                  | font size                     |
-| `--line-height`            | `1.4`                   | line height                   |
-| `--border-radius`          | `8px 8px 8px 8px`       | corner radius                 |
-| `--active-menu-background` | `white`                 | background while open         |
-| `--active-menu-shadow`     | `0 2px 8px 0px #b1b1b1` | shadow while open             |
-| `--active-menu-radius`     | `var(--border-radius)`  | corner radius while open      |
+| Variable                         | Default                        | Controls                                      |
+| -------------------------------- | ------------------------------ | --------------------------------------------- |
+| `--msl-input-width`              | `300px`                        | width                                         |
+| `--msl-menu-max-height`          | `400px`                        | menu height before it scrolls                 |
+| `--msl-font-size`                | `14px`                         | font size                                     |
+| `--msl-line-height`              | `1.4`                          | unitless line height                          |
+| `--msl-border-radius`            | `8px`                          | corner radius                                 |
+| `--msl-active-menu-background`   | `white`                        | background while open                         |
+| `--msl-active-menu-shadow`       | 5 soft layers                  | shadow while open                             |
+| `--msl-active-menu-radius`       | `var(--msl-border-radius)`     | corner radius while open                      |
+| `--msl-active-menu-border-color` | `hsl(224deg 5.68% 88.24%)`     | border while open                             |
+| `--msl-divider-color`            | `rgb(3 7 18 / 0.08)`           | line between the input and the open menu      |
+| `--msl-placeholder-color`        | `rgb(146 146 146)`             | placeholder text color                        |
+| `--msl-border-color`             | `rgb(156 156 156)`             | border                                        |
+| `--msl-hover-border-color`       | `rgb(80 80 80)`                | border on hover                               |
+| `--msl-disabled-background`      | `rgb(246 246 246)`             | background when `disabled`                    |
+| `--msl-chip-background`          | `rgb(238 238 238)`             | chip                                          |
+| `--msl-chip-delete-background`   | `transparent`                  | chip delete button                            |
+| `--msl-chip-delete-color`        | `rgb(0 0 0 / 0.6)`             | chip delete icon                              |
+| `--msl-button-hover-background`  | `lightgray`                    | clear, arrow and chip delete buttons on hover |
+| `--msl-option-hover-background`  | `rgb(233 233 233)`             | option on hover or keyboard highlight         |
+| `--msl-option-active-background` | `hsl(209.49deg 10.01% 93.31%)` | selected option                               |
+| `--msl-option-active-color`      | `#0351ff`                      | selected option text                          |
+| `--msl-option-disabled-color`    | `rgb(0 0 0 / 0.3)`             | disabled option text                          |
+| `--msl-group-title-background`   | `#fafafa`                      | group title                                   |
+| `--msl-group-offset`             | `12px`                         | indent of a group's options, per level        |
+| `--msl-focus-color`              | `rgb(0 119 255)`               | keyboard focus outline                        |
+| `--msl-background`               | `transparent`                  | background while closed                       |
+| `--msl-scrollbar-color`          | `rgb(0 0 0 / 0.1)`             | menu scrollbar thumb                          |
 
 ```css
 /* every dropdown */
 .msl-vars {
-  --input-width: 100%;
+  --msl-input-width: 100%;
 }
 /* one dropdown: <MultiSelect className='compact' /> */
 .msl-vars.compact {
-  --font-size: 14px;
+  --msl-font-size: 12px;
 }
 ```
 
 ## Dark theme
 
-Variables cover sizes and the open menu; target the class names for colors.
+Colors are variables too, so a theme is one rule.
 
 <Preview code={themingCode} title='Theming.tsx' dark>
   <Theming client:visible />
 </Preview>
 
 <Code code={themingCss} lang='css' title='Theming.css' />
+
+## The open menu
+
+The open menu is one box: the input box, `.msl.msl-active` (`.msl-active-up` opening upward), with the options attached. It is a popover over the dropdown, in the top layer, so `overflow: hidden` parents, stacking contexts and z-indexes don't clip or cover it, in a modal `<dialog>` too. It stays in place in the DOM, so your CSS reaches it through its ancestors and it inherits the text color, font and direction there. The dropdown keeps the input box's height. The menu follows the dropdown as the page scrolls, and lines up, scaled as the dropdown is, in a transformed dialog or a scaled part of the page. It is as wide as the dropdown and clips the options: to widen the menu, widen the open box (`.msl-active { min-width: 400px }`).
 
 ## Class names
 
@@ -64,6 +87,8 @@ State classes:
 | `msl-option-focused`           | option  | highlighted by the keyboard           |
 | `msl-option-disable`           | option  | disabled                              |
 
-Parts: `msl-wrp` (wrapper), `msl` (input box), `msl-chip`, `msl-chip-delete`, `msl-single-value`, `msl-input`, `msl-clear-btn`, `msl-arrow-btn`, `msl-options` (menu), `msl-option`, `msl-grp-title`.
+Parts: `msl-wrp` (wrapper), `msl` (input box, and the open menu), `msl-chip`, `msl-chip-delete`, `msl-single-value`, `msl-input`, `msl-clear-btn`, `msl-arrow-btn`, `msl-options` (menu), `msl-option`, `msl-grp` (a group), `msl-grp-title`.
 
-A single option can carry its own `classes` and `style`.
+A single option can carry its own `classes` and `style`. To add classes to every part, Tailwind utilities for example, use the `classNames` prop: see [Tailwind](../tailwind/).
+
+The component's inline styles are behavior, not looks: `display: contents` on the chip wrapper, which keeps that box out of the layout with or without the stylesheet, and, while the menu is open, the dropdown's `min-height` (the open box left the flow) and the popover's `position`, coordinates, width and scale, and a reset of the browser's popover look (`inset`, `margin`, `padding`, `border`, `background`, `color: inherit`, `overflow`), on the unstyled `<div>` around `.msl`. Everything else is in the stylesheet: without it the markup is unstyled, and plain CSS overrides any of its rules.

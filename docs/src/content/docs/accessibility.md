@@ -5,17 +5,17 @@ description: Keyboard support and ARIA in react-multiple-select-dropdown-lite.
 
 ## Keyboard
 
-| Key             | Action                                                                     |
-| --------------- | -------------------------------------------------------------------------- |
-| Arrow Down / Up | open the menu and move the highlight over enabled options                  |
-| Home / End      | first / last option (in the search field only while it is empty)           |
-| Enter           | pick the highlighted option, else the first search result                  |
-| , (comma)       | pick the first search result, or create the typed value with `customValue` |
-| Backspace       | in an empty search field, remove the last chip                             |
-| Escape          | close the menu                                                             |
-| Tab             | move on; the menu closes once focus leaves                                 |
-| Enter / Space   | on a chip's delete button or the clear button, press it                    |
-| any character   | on the focused dropdown, open the menu                                     |
+| Key             | Action                                                                                           |
+| --------------- | ------------------------------------------------------------------------------------------------ |
+| Arrow Down / Up | open the menu and move the highlight over enabled options                                        |
+| Home / End      | first / last option (in the search field only while it is empty)                                 |
+| Enter           | pick the highlighted option, else the first search result that isn't `disabled`                  |
+| , (comma)       | pick the first search result that isn't `disabled`, or create the typed value with `customValue` |
+| Backspace       | in an empty search field, remove the last chip                                                   |
+| Escape          | close the menu, not a surrounding dialog or popover                                              |
+| Tab             | close the menu and move on in page order, after any button in the menu                           |
+| Enter / Space   | on a chip's delete button or the clear button, press it                                          |
+| any character   | on the focused dropdown, open the menu                                                           |
 
 Typing with an input method (Chinese, Japanese, Korean) works: the Enter that confirms the composition doesn't pick an option.
 
@@ -23,7 +23,8 @@ Typing with an input method (Chinese, Japanese, Korean) works: the Enter that co
 
 The search field, or the dropdown itself when there is no search field, is a [combobox](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/) that controls a listbox:
 
-- `aria-expanded`, `aria-haspopup="listbox"` and `aria-controls` on the combobox
+- `aria-expanded`, `aria-haspopup="listbox"` and, while open, `aria-controls` on the combobox
+- the `aria-*` from `attr` (`aria-describedby`, `aria-invalid`, `aria-required`, ...) on the combobox too, so an error stays announced while the menu is open
 - `aria-activedescendant` points at the keyboard-highlighted option
 - options have `role="option"`, `aria-selected` and `aria-disabled`
 - groups are `role="group"`, named by their title

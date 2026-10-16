@@ -9,18 +9,18 @@ const options = [
 ]
 
 export default function Creatable() {
-  const [value, setValue] = useState('react')
+  const [value, setValue] = useState(['react'])
 
   return (
     <>
       <MultiSelect
         customValue
         options={options}
-        defaultValue='react'
+        defaultValue={['react']}
         onChange={setValue}
         placeholder='Type a tag, then Enter or comma'
       />
-      <p className='demo-output'>value: "{value}"</p>
+      <p className='demo-output'>value: {JSON.stringify(value)}</p>
     </>
   )
 }

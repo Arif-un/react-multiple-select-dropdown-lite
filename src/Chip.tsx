@@ -1,46 +1,44 @@
-import React from 'react'
-import CloseIcon from './CloseIcon'
-import type { MultiSelectOption } from './index'
+import type { ReactNode } from 'react'
+import { CloseIcon } from './icons'
+import type { MultiSelectClassNames } from './index'
 
+// the default customChip: called as a function, so it can't use hooks
 export default function Chip({
-  value,
+  label,
+  option,
   disabled,
-  deleteAction
+  classNames,
+  onDelete
 }: {
-  value: MultiSelectOption
-  disabled?: boolean
-  deleteAction: (byKey?: boolean) => void
+  label: ReactNode
+  option: { label?: unknown }
+  disabled: boolean
+  classNames: MultiSelectClassNames
+  onDelete: () => void
 }) {
-  const showChipText = (opt: MultiSelectOption) => {
-    if (typeof opt.label === 'object') {
-      return opt?.title || opt.value
-    } else {
-      return opt.label
-    }
-  }
-
+  // names the value; a JSX label falls back to the label field, as the tooltip does
+  const text = [label, option.label].find(
+    (x) => typeof x === 'string' || typeof x === 'number'
+  )
   return (
-    // @ts-expect-error clickable is a custom attribute (it stops the menu from opening)
-    <div clickable='true' className='msl-chip'>
-      {showChipText(value)}
+    <div className={`msl-chip ${classNames.chip ?? ''}`}>
+      {label}
       <div
         role='button'
-        // @ts-expect-error see above
-        clickable='true'
-        aria-label='delete-value'
-        onClick={() => deleteAction()}
+        aria-label={text === undefined ? 'Remove' : `Remove ${text}`}
+        aria-disabled={disabled}
+        onClick={onDelete}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
-            deleteAction(true)
+            onDelete()
           }
         }}
         tabIndex={disabled ? -1 : 0}
-        className='msl-btn msl-chip-delete msl-flx'
+        className={`msl-btn msl-chip-delete msl-flx ${classNames.chipDelete ?? ''}`}
       >
         <CloseIcon />
       </div>
-      <span />
     </div>
   )
 }

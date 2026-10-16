@@ -1,54 +1,34 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useId } from 'react'
 import Chip from './Chip'
-import CloseIcon from './CloseIcon'
-import DownIcon from './DownIcon'
+import { CloseIcon, DownIcon } from './icons'
 import type PublicMultiSelect from './index'
 import type {
-  MultiSelectBaseProps,
   MultiSelectGroup,
-  MultiSelectOption
+  MultiSelectOption,
+  MultiSelectProps
 } from './index'
 import Options from './Options'
 import './styles.css'
-import useComponentVisible from './useComponentVisible'
 
 type Item = MultiSelectOption | MultiSelectGroup
-type DefaultValueItem = Exclude<
-  MultiSelectBaseProps['defaultValue'],
-  string | undefined
->[number]
-
-// both onChange modes in one; the parameter defaults below fill the gaps
-type Props = MultiSelectBaseProps & {
-  jsonValue?: boolean
-  onChange?: (value: string | MultiSelectOption[]) => void
-}
 
 // Defaults as parameter defaults: React 19's jsx runtime ignores defaultProps on function components.
-// Objects live here so their identity is stable (a new options array per render would loop the options effect).
 const noop = () => {}
+const optLabel = (opt: MultiSelectOption) => opt.label
+const optValue = (opt: MultiSelectOption) => opt.value
 const noStyle = {}
-const emptyOptions: readonly Item[] = [
-  {
-    label: 'Empty',
-    value: '',
-    disabled: true,
-    style: { textAlign: 'center' }
-  }
-]
+const createText = (text: string) => `Create "${text}"`
+// the viewport less a classic scrollbar. innerHeight too: quirks mode makes the root as tall as the page
+const viewHeight = () =>
+  Math.min(innerHeight, document.documentElement.clientHeight)
 
-// aria ids: useId (React 18+) keeps SSR and hydration in sync. Older React has no
-// SSR-safe id, so a counter sets it after mount: server and first client render both omit it
-let lastId = 0
-/* v8 ignore next -- the counter is for React < 18 (covered by the React 16/17 CI jobs) */
-const useListId: () => string | undefined = React.useId
-  ? () => `msl-listbox${React.useId()}`
-  : () => {
-      const [id, setId] = useState<string>()
-      useEffect(() => setId(`msl-listbox-${++lastId}`), [])
-      return id
-    }
-
+// options we create, { label, value }: the user's getters only know their own shape
+const ours = new WeakSet<MultiSelectOption>()
+const ourOpt = (value: string, label = value) => {
+  const opt: MultiSelectOption = { label, value }
+  ours.add(opt)
+  return opt
+}
 // options in render order, groups unwrapped, the way Options.tsx walks them
 function flatten(items: readonly Item[], out: MultiSelectOption[] = []) {
   for (const opt of items) {
@@ -59,16 +39,17 @@ function flatten(items: readonly Item[], out: MultiSelectOption[] = []) {
 }
 
 function MultiSelect({
-  options: userOptions = emptyOptions,
+  options: userOptions,
   downArrowIcon,
   closeIcon,
   clearable = true,
-  clearAll = false,
   downArrow = true,
   onChange = noop,
+  getLabel = optLabel,
+  getValue = optValue,
+  filterOption,
   singleSelect = false,
-  jsonValue = false,
-  defaultValue = '',
+  defaultValue,
   value: valueProp,
   className,
   placeholder = 'Select...',
@@ -76,378 +57,380 @@ function MultiSelect({
   name = '',
   style = noStyle,
   attr,
-  largeData,
   disabled = false,
-  limit = null,
+  limit,
   emptyDataLabel = 'No Data Found',
   customValue = false,
   onMenuOpen = noop,
   onMenuClose = noop,
   onClear = noop,
   chipAlternateText = 'Item Selected',
+  clearLabel = 'Clear',
+  createLabel = createText,
+  customValuesTitle = 'Custom Values',
+  customChip = Chip,
   closeOnSelect,
-  disableSearch = false
-}: Props) {
-  const [value, setValue] = useState<MultiSelectOption[]>([])
-  // values created by customValue, listed after the user's options.
-  // Own state, so a parent passing a new options array doesn't wipe them
-  const [custom, setCustom] = useState<MultiSelectOption[]>([])
+  disableSearch = false,
+  classNames: cn = noStyle
+}: MultiSelectProps) {
+  // selected values; defaultValue is initial only, as in an uncontrolled input
+  const [own, setOwn] = useState(() => defaultValue ?? [])
+  // with `value` the parent owns the selection: user changes only call onChange
+  const controlled = valueProp !== undefined
+  // null from untyped JS (useState(null)) is an empty selection, as defaultValue's is
+  const keys = (controlled ? valueProp : own) ?? []
+  // values created by customValue: they stay listed once deselected
+  const [custom, setCustom] = useState<string[]>([])
   const base = userOptions || []
-  const options: readonly Item[] = custom.length
-    ? [...base, { title: 'Custom Values', type: 'group', childs: custom }]
+  const known = flatten(base)
+  const valueOf = (opt: MultiSelectOption) =>
+    ours.has(opt) ? opt.value : getValue(opt)
+  const labelOf = (opt: MultiSelectOption) =>
+    ours.has(opt) ? opt.label : getLabel(opt)
+  // search and the tooltip need text: a JSX label falls back to the label field, if that is text
+  const text = (x: unknown) =>
+    typeof x === 'string' || typeof x === 'number' ? String(x) : null
+  const textOf = (opt: MultiSelectOption, label = labelOf(opt)) =>
+    text(label) ?? text(opt.label) ?? ''
+  // String(): untyped JS often passes numbers
+  const findOpt = (opts: MultiSelectOption[], key: string) =>
+    opts.find((opt) => String(valueOf(opt)) === String(key))
+  // listed after the user's options: created values, plus with customValue the selected
+  // ones the options lack. Once the options have one (they may arrive late, #12), it moves there
+  const customOpts = [...custom, ...(customValue ? keys : [])]
+    .filter((key, i, arr) => arr.indexOf(key) === i && !findOpt(known, key))
+    .map((key) => ourOpt(key))
+  const options: readonly Item[] = customOpts.length
+    ? [...base, { title: customValuesTitle, type: 'group', childs: customOpts }]
     : base
-  const [search, setSearch] = useState<MultiSelectOption[] | null>(null)
-  const items = search || options
-  // the Create "..." item last offered by the search
-  const createOpt = useRef<MultiSelectOption | null>(null)
-  const inputFld = useRef<HTMLDivElement>(null)
-  const listId = useListId()
+  const all = [...known, ...customOpts]
+  // looked up at render, so options arriving after mount resolve with no effect
+  const resolved = keys
+    .map((key) => findOpt(all, key))
+    .filter((opt) => opt !== undefined)
+  const value = singleSelect ? resolved.slice(0, 1) : resolved
+  // no limit (null) is Infinity: one comparison checks it
+  const max = limit ?? Infinity
+  // a search field, unless a value takes its place (single select, disableChip)
+  const showSearch =
+    !disableSearch && (!value.length || (!singleSelect && !disableChip))
+  // plain substring match: typed text is not a regex. Our { label, value } options skip a
+  // user's filterOption, which expects their own shape. String(): untyped JS often passes numbers
+  const matches = (opt: MultiSelectOption, text: string) =>
+    filterOption && !ours.has(opt)
+      ? filterOption(opt, text)
+      : [textOf(opt), valueOf(opt)].some((s) =>
+          String(s).toLowerCase().includes(text.toLowerCase())
+        )
+  const [query, setQuery] = useState('')
+  // searched trimmed, commas dropped: a typed comma picks
+  const term = query.trim().replace(/,+/g, '')
+  // the Create "..." item, for text no option has as its value
+  const create =
+    customValue &&
+    term &&
+    !findOpt(all, term) &&
+    ourOpt(term, createLabel(term))
+  const found = term
+    ? all.filter((opt) => matches(opt, term)).concat(create || [])
+    : null
+  const items = found || options
+  const inputFld = useRef<HTMLInputElement>(null)
+  const listId = `msl-listbox${useId()}`
   // the keyboard highlighted option: idx tells repeated values apart
   const [active, setActive] = useState<{ value: string; idx: number } | null>(
     null
   )
-  // the last keydown belonged to an IME composition: its Enter confirms the text, not a pick
-  const composing = useRef(false)
-  // the user changed the value since defaultValue last changed
-  const userChanged = useRef(false)
-  // with `value` the parent owns the selection: user changes only call onChange
-  const controlled = valueProp !== undefined
-  const selected = controlled ? valueProp : defaultValue
-  const {
-    ref: componentRef,
-    isComponentVisible: menuOpen,
-    setIsComponentVisible: setMenuOpen
-  } = useComponentVisible({
-    initialIsVisible: false,
-    onClose: onMenuClose
-  })
+  const componentRef = useRef<HTMLDivElement>(null)
+  // holds the control and, while open, the options: then it is a popover, in the top layer over the wrapper
+  const boxRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
+  // picked on open: the menu goes above the input
+  const [up, setUp] = useState(false)
+  // the latest: an inline one would restart the open menu's listeners on every parent render
+  const onClose = useRef(onMenuClose)
+  onClose.current = onMenuClose
 
   const shown = flatten(items)
   // by value once the list changes under it (search, pick)
   const activeIdx = !active
     ? -1
-    : shown[active.idx]?.value === active.value
+    : shown[active.idx] && valueOf(shown[active.idx]) === active.value
       ? active.idx
-      : shown.findIndex((opt) => opt.value === active.value)
+      : shown.findIndex((opt) => valueOf(opt) === active.value)
 
   useEffect(() => {
     !menuOpen && setActive(null)
   }, [menuOpen])
 
+  // once per open: closes can overlap, as when a pick's onChange moves focus out (a close) and the pick closes too
+  const opened = useRef(false)
+  // the selection as last set or rendered: a chip's onDelete may run late (after an exit animation)
+  const latest = useRef(value)
+  // the element with keyboard focus (focus-visible) when a chip was deleted, the search field a pick may remove,
+  // or the element focused when the menu closed (an option)
+  const lost = useRef<Element | null>(null)
+
+  const open = () => {
+    const r = componentRef.current!.getBoundingClientRect()
+    const below = viewHeight() - r.bottom
+    opened.current = true
+    // up only if that has more room: else it goes off the top of the page
+    setUp(below < 200 && r.top > below)
+    setMenuOpen(true)
+  }
+
+  // focus moves to `to` first. back: if the close removes the focused element (an option),
+  // the effect after it brings focus back to the search field or the wrapper.
+  // No ref while a Suspense boundary hides it: focus left with it
+  const closeMenu = (back?: boolean, to?: HTMLElement | null) => {
+    if (!opened.current) return
+    opened.current = false
+    to?.focus({ preventScroll: true })
+    back &&
+      componentRef.current &&
+      (lost.current = (
+        componentRef.current.getRootNode() as Document
+      ).activeElement)
+    setMenuOpen(false)
+    // the search text goes with the menu
+    setQuery('')
+    onClose.current()
+  }
+
+  // listen only while open, so onMenuClose fires once per open -> closed
+  useEffect(() => {
+    if (!menuOpen) return
+    const root = componentRef.current!
+    const box = boxRef.current!
+    const list = listRef.current!
+    // a fixed or sticky dropdown (in a modal <dialog>, a popover) stays put as the page scrolls, as a fixed box does.
+    // Else absolute, in page coordinates: the page carries it with no frame of lag. Up the flat tree: slotted into a dialog
+    let pinned = false
+    for (
+      let el: Element | null | undefined = root;
+      el && !pinned;
+      el =
+        el.assignedSlot ||
+        el.parentElement ||
+        (el.parentNode as ShadowRoot).host
+    )
+      pinned = /fixed|sticky/.test(getComputedStyle(el).position)
+    const minHeight = root.style.minHeight
+    // in the top layer: over clipping parents, stacking contexts and a modal dialog. The attribute only while open:
+    // until shown, a popover is display: none. Shown before it paints: an open is a click or a key, whose effects run at once.
+    // The UA's popover look undone inline, so it inherits and shows nothing of its own: the box inside has the looks
+    box.style.cssText = `position:${pinned ? 'fixed' : 'absolute'};inset:auto;margin:0;padding:0;border:0;background:none;color:inherit;overflow:visible;transform-origin:0 ${up ? '100%' : 0}`
+    // missing in jsdom, whose UA stylesheet would still hide a [popover]: a user's tests couldn't focus or query the menu
+    if (box.showPopover) {
+      box.setAttribute('popover', 'manual')
+      box.showPopover()
+    }
+    // over the wrapper, the menu below (or above) it, as tall as the viewport leaves room for.
+    // Follows the wrapper through scrolls, resizes, its own growth and layout shifts.
+    // ponytail: three rects read per frame while open; scroll/resize listeners + ResizeObserver if it ever shows in a profile
+    let frame = 0
+    const follow = () => {
+      // in a scaled part of the page (a zoomable canvas) it scales as the dropdown does: the top layer drops
+      // ancestors' transforms. Drawn size over layout size, which rounds to whole pixels
+      const w = root.offsetWidth
+      const { width } = root.getBoundingClientRect()
+      const s = w && Math.abs(width - w) >= 1 ? width / w : 1
+      // first: the control's height depends on them
+      box.style.width = width / s + 'px'
+      box.style.setProperty('scale', s == 1 ? '' : s + '')
+      // the control's own height, the box less the options: the wrapper keeps it, as the box left the flow.
+      // Drawn: offsetHeight rounds
+      const row =
+        box.getBoundingClientRect().height - list.getBoundingClientRect().height
+      root.style.minHeight = row / s + 'px'
+      // then where it stands: its height back, it may move (in a centered dialog)
+      const r = root.getBoundingClientRect()
+      const h = viewHeight()
+      const y = pinned ? 0 : scrollY
+      const bottom = r.top + row
+      box.style.left = r.left + (pinned ? 0 : scrollX) + 'px'
+      box.style[up ? 'bottom' : 'top'] =
+        (up ? h - bottom - y : r.top + y) + 'px'
+      // on the listbox, the one reader: the stylesheet registers it non-inherited, so a scroll restyles no option
+      list.style.setProperty(
+        '--msl-menu-room',
+        (up ? r.top : h - bottom) / s + 'px'
+      )
+      // missing in jsdom without pretendToBeVisual: a user's tests would crash on every open
+      typeof requestAnimationFrame != 'undefined' &&
+        (frame = requestAnimationFrame(follow))
+    }
+    // now, not next frame: placed before it paints
+    follow()
+    // a scrolling parent clipped it away: close rather than float over that parent's edge.
+    // Opened out of view (a key on the focused dropdown, scrolled away): scroll it back instead, or the top layer
+    // would show it outside that parent. Missing in jsdom: a user's tests would crash on every open
+    let first = true
+    const seen =
+      typeof IntersectionObserver != 'undefined' &&
+      new IntersectionObserver((es) => {
+        // the latest report is the last
+        const vis = es[es.length - 1].isIntersecting
+        first && !vis
+          ? root.scrollIntoView?.({ block: 'nearest' })
+          : vis || closeMenu(true)
+        first = false
+      })
+    seen && seen.observe(root)
+    // composedPath: in a shadow root the document sees the host as target
+    const inside = (e: Event) => e.composedPath().includes(root)
+    // Escape from inside goes through onKeyDown, after attr.onKeyDown.
+    // Prevented: it closes the menu, not a surrounding <dialog> or popover too
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || inside(e)) return
+      e.preventDefault()
+      closeMenu(true)
+    }
+    // clicks, and focus moving out
+    const onOutside = (e: Event) => inside(e) || closeMenu()
+    document.addEventListener('keydown', onKey, true)
+    document.addEventListener('click', onOutside, true)
+    document.addEventListener('focusin', onOutside, true)
+    return () => {
+      frame && cancelAnimationFrame(frame)
+      seen && seen.disconnect()
+      document.removeEventListener('keydown', onKey, true)
+      document.removeEventListener('click', onOutside, true)
+      document.removeEventListener('focusin', onOutside, true)
+      // without the attribute it is hidden, and back in the flow
+      box.removeAttribute('popover')
+      box.removeAttribute('style')
+      root.style.minHeight = minHeight
+    }
+  }, [menuOpen])
+
+  // after the popover is shown. A key on the wrapper that opened the menu types into the field:
+  // a key's effects run before the browser types it
+  useEffect(() => {
+    if (!menuOpen) return
+    ;(inputFld.current || componentRef.current!).focus()
+    // here, not in open(): a click's open isn't committed yet, so the menu is there for both
+    onMenuOpen()
+  }, [menuOpen])
+
+  // after the menu's effect: a key that opens it (End) scrolls once it is placed, its height capped
   useEffect(() => {
     // scrollIntoView is missing in jsdom
-    componentRef
-      .current!.querySelector('.msl-option-focused')
+    listRef.current
+      ?.querySelector('.msl-option-focused')
       ?.scrollIntoView?.({ block: 'nearest' })
   }, [activeIdx])
 
-  const calculatedWidth = `calc(100% - ${
-    clearable && downArrow ? 60 : downArrow || clearable ? 40 : 5
-  }px)`
-
-  const getValueObjFromOptions = (
-    defaultValue: Props['defaultValue'],
-    options: readonly Item[]
-  ): MultiSelectOption[] => {
-    if (!defaultValue) return []
-    let defaultValArr = defaultValue as DefaultValueItem[]
-    const extraValues: MultiSelectOption[] = []
-    const searchedOptions: MultiSelectOption[] = []
-
-    if (typeof defaultValue === 'string') {
-      defaultValArr = defaultValue.split(',')
-    }
-
-    const setExtraValue = (value: DefaultValueItem) => {
-      if (typeof value === 'string') {
-        extraValues.push({ label: value, value })
-      } else {
-        // a JSX label falls back to title, then value, as in chips
-        const label =
-          typeof value.label === 'string'
-            ? value.label
-            : value.title || value.value
-        extraValues.push({ label, value: value.value })
-      }
-    }
-
-    for (let i = 0; i < defaultValArr.length; i++) {
-      if (typeof defaultValArr[i] === 'string') {
-        const optObject = searchOptions(
-          defaultValArr[i] as string,
-          options,
-          true,
-          'value'
-        )
-        if (optObject.length > 0) {
-          searchedOptions.push(optObject[0])
-        } else if (customValue) {
-          setExtraValue(defaultValArr[i])
-        }
-      } else if (typeof defaultValArr[i] === 'object') {
-        const optObject = searchOptions(
-          (defaultValArr[i] as Exclude<DefaultValueItem, string>).value,
-          options,
-          true,
-          'value'
-        )
-        if (optObject.length > 0) {
-          searchedOptions.push(optObject[0])
-        } else if (customValue) {
-          setExtraValue(defaultValArr[i])
-        }
-      }
-    }
-
-    // created values stay, as without a parent; ones the options now have go (#12)
-    setCustom((prev) =>
-      [...prev, ...extraValues].filter(
-        (opt, i, all) =>
-          all.findIndex((o) => o.value === opt.value) === i &&
-          !flatten(options).some((o) => o.value === opt.value)
-      )
-    )
-    return [...searchedOptions, ...extraValues]
-  }
-
-  useEffect(() => {
-    if (clearAll && value.length) {
-      clearValue()
-    }
-  }, [clearAll])
-
-  useEffect(() => {
-    userChanged.current = false
-  }, [selected])
-
-  // options too, as they may arrive after mount (#12). Not after a user change:
-  // parents often pass a new options array on every render
-  useEffect(() => {
-    if (userChanged.current) return
-    let preDefinedValue = getValueObjFromOptions(selected, userOptions)
-
-    if (singleSelect && preDefinedValue.length) {
-      preDefinedValue = [preDefinedValue[0]]
-    }
-
-    setValue(preDefinedValue)
-  }, [selected, userOptions])
-
   const setNewValue = (val: MultiSelectOption[]) => {
+    const values = val.map(valueOf)
+    // controlled: the parent may reject it, so the next delete starts from what it renders
     if (!controlled) {
-      userChanged.current = true
-      setValue(val)
+      latest.current = val
+      setOwn(values)
     }
-    if (jsonValue) {
-      onChange(val)
-    } else {
-      let stringvalue = ''
-      stringvalue += val.map((itm) => itm.value)
-      onChange(stringvalue)
-    }
+    onChange(values, val)
   }
 
-  const checkValueExist = (
-    value: MultiSelectOption,
-    arr: MultiSelectOption[]
-  ) => {
-    const bool = arr.some((itm) => itm.value === value.value)
-    return bool
-  }
+  // valueOf once per selected value: Options asks this twice for every option
+  const selected = new Set(value.map(valueOf))
+  const checkValueExist = (opt: MultiSelectOption) => selected.has(valueOf(opt))
+  // past the limit, unselected options show and announce as disabled. Single select replaces its value, so never
+  const full = !singleSelect && value.length >= max
+  const isDisabled = (opt: MultiSelectOption) =>
+    !!opt.disabled || (full && !checkValueExist(opt))
 
   const addValue = (newValObj: MultiSelectOption) => {
+    // past the limit an unselected pick only calls onChange, the value as it is: no Create, the search and menu stay
+    if (full && !checkValueExist(newValObj)) return setNewValue(value)
     // picking Create (click, Enter or comma) adds the typed text as an option
-    if (newValObj === createOpt.current) {
-      newValObj = { label: newValObj.value, value: newValObj.value }
-      setCustom([...custom, newValObj])
+    if (newValObj === create) {
+      newValObj = ourOpt(newValObj.value)
+      setCustom([...custom, newValObj.value])
     }
-    let tmp = [...value]
-    if (singleSelect) {
-      if (checkValueExist(newValObj, value)) {
-        tmp = []
-      } else {
-        tmp = [newValObj]
-      }
-    } else {
-      if (!checkValueExist(newValObj, value)) {
-        if (limit === null) {
-          tmp.push(newValObj)
-        } else if (limit > value.length) {
-          tmp.push(newValObj)
-        }
-      } else {
-        tmp = tmp.filter((itm) => itm.value !== newValObj.value)
-      }
-    }
-    setNewValue(tmp)
-    setSearch(null)
-    // clear search input
-    if (inputFld.current) {
-      inputFld.current.innerHTML = ''
-    }
-    // unset closeOnSelect: single select closes, multi select stays open
-    if (menuOpen && (closeOnSelect ?? singleSelect)) {
-      setMenuOpen(false)
-      onMenuClose()
-    }
+    // a selected one toggles off (single select: to none)
+    setNewValue(
+      checkValueExist(newValObj)
+        ? value.filter((itm) => valueOf(itm) !== valueOf(newValObj))
+        : singleSelect
+          ? [newValObj]
+          : [...value, newValObj]
+    )
+    setQuery('')
+    // unset closeOnSelect: single select closes, multi select stays open.
+    // The value takes the search field's place, maybe in a later commit: focus the wrapper, not the field.
+    // Left open, focus goes to the wrapper if the field goes (click, Enter, comma).
+    // opened, not menuOpen: Enter in the closed field opens the menu in this same event
+    opened.current && (closeOnSelect ?? singleSelect)
+      ? closeMenu(
+          true,
+          singleSelect || disableChip ? componentRef.current : null
+        )
+      : (lost.current = inputFld.current)
   }
 
-  const deleteValue = (i: number) => {
-    const tmp = [...value]
-    tmp.splice(i, 1)
-    setNewValue(tmp)
-  }
+  const deleteValue = (opt: MultiSelectOption) =>
+    setNewValue(latest.current.filter((itm) => valueOf(itm) !== valueOf(opt)))
 
-  const clearValue = () => {
-    setNewValue([])
-  }
-
-  // the clear button; clearAll clears without onClear
+  // the clear button
   const clearByUser = () => {
-    clearValue()
+    // without the stylesheet's pointer-events: none it is still clickable
+    if (disabled) return
+    setNewValue([])
     onClear()
   }
 
-  // a keyboard delete unmounts the focused button: keep focus in the widget
-  const refocus = () => (inputFld.current || componentRef.current)!.focus()
+  // a keyboard delete unmounts the focused button: keep focus in the widget. Disabled, the field takes none
+  const refocus = () =>
+    ((!disabled && inputFld.current) || componentRef.current!).focus({
+      preventScroll: true
+    })
 
-  const showSearchOption = () => {
-    if (disableSearch) {
-      return false
-    }
+  useEffect(() => {
+    latest.current = value
+    const el = lost.current
+    lost.current = null
+    // the delete unmounted it (the last chip, or a chip keyed by value), or the pick the search field, and focus fell to the body.
+    // A late commit (async onChange) may find the user moved on: leave their focus alone
+    el &&
+      !el.isConnected &&
+      el.ownerDocument.activeElement === el.ownerDocument.body &&
+      refocus()
+  })
 
-    if (!singleSelect && !disableChip) {
-      return true
-    } else if (singleSelect && !value.length) {
-      return true
-    } else if (!singleSelect && disableChip && !value.length) {
-      return true
-    }
+  // disabled while open: it closes, so no pick comes from the open menu, styled or not.
+  // Focus moves to the wrapper: a disabled field or a removed option would drop it
+  useEffect(() => {
+    disabled && closeMenu(false, componentRef.current)
+  }, [disabled])
 
-    return false
+  // Not document.activeElement: in a shadow root that is the host. A focused shadow host only
+  // stands for the element focused inside it, the one that can match :focus-visible.
+  // No ref once unmounted: a late onDelete still deletes
+  const keyboardFocus = () => {
+    const outer = (componentRef.current?.getRootNode() as Document | undefined)
+      ?.activeElement
+    let el = outer
+    while (el?.shadowRoot?.activeElement) el = el.shadowRoot.activeElement
+    return el?.matches(':focus-visible') ? outer! : null
   }
 
-  const searchOptions = (
-    str: string,
-    options: readonly Item[],
-    exact?: boolean,
-    type?: 'value'
-  ) => {
-    const searchedOptions: MultiSelectOption[] = []
-    const searchedOptValues: MultiSelectOption[] = []
-
-    // groups recurse first, so the rest of the loop only sees options
-    const searchInOptions = (opt: MultiSelectOption[]) => {
-      for (let i = 0; i < opt.length; i++) {
-        if (opt[i]?.type === 'group') {
-          searchInOptions(opt[i].childs as MultiSelectOption[])
-        } else if (!exact) {
-          // plain substring match: typed text is not a regex.
-          // String(): untyped JS often passes numbers
-          const needle = str.toLowerCase()
-          if (
-            typeof opt[i].label !== 'object' &&
-            String(opt[i].label).toLowerCase().includes(needle)
-          ) {
-            searchedOptions.push(opt[i])
-          } else if (
-            typeof opt[i].label === 'object' &&
-            opt[i]?.title?.toLowerCase().includes(needle)
-          ) {
-            searchedOptions.push(opt[i])
-          } else if (String(opt[i].value).toLowerCase().includes(needle)) {
-            searchedOptValues.push(opt[i])
-          }
-        } else {
-          if (String(opt[i][type!]) === str) {
-            searchedOptions.push(opt[i])
-          }
-        }
-        if (typeof opt[i].label === 'object' && !('title' in opt[i])) {
-          console.warn(
-            '[multiselect] you must provide a title property as typeof string, if you want to render jsx in option label'
-          )
-        }
-      }
-    }
-    searchInOptions(options as MultiSelectOption[])
-    return [...searchedOptions, ...searchedOptValues]
-  }
-
-  // also runs on input: text can arrive without a keyup (context menu paste, drag and drop)
-  const handleSearchAndCustomValue = (
-    e: React.SyntheticEvent & { key?: string }
-  ) => {
-    const textValue = (e.target as HTMLElement)
-      .textContent!.trim()
-      .replace(/,+/g, '')
-
-    if (textValue) {
-      createOpt.current = {
-        label: `Create "${textValue}"`,
-        value: textValue
-      }
-      // Enter reads this, not `search`: that is null when text arrived without a keyup (paste, IME)
-      const results = searchOptions(textValue, options)
-      if (
-        customValue &&
-        !searchOptions(textValue, options, true, 'value').length
-      ) {
-        results.push(createOpt.current)
-      }
-      setSearch(results)
-
-      if (
-        (e.key === 'Enter' || e.key === ',') &&
-        results.length &&
-        !composing.current
-      ) {
-        addValue(results[0])
-      }
-    } else {
-      setSearch(null)
-    }
-  }
-
-  // the target or an ancestor below the wrapper has attr: any icon depth, and never
-  // climbs past the wrapper (a ShadowRoot or document has no hasAttribute)
+  // the target or an ancestor below the wrapper has attr: any icon depth, never the wrapper or above.
+  // A target outside it counts too: a user portal's, or a chip a sync onChange removed mid-event
   const marked = (target: EventTarget, attr: string) => {
-    for (
-      let el = target as Element | null;
-      el && el !== componentRef.current;
-      el = el.parentNode as Element | null
-    ) {
-      if (el.hasAttribute?.(attr)) return true
-    }
-    return false
-  }
-
-  const focusSearchInput = () => {
-    if (inputFld.current) {
-      inputFld.current.focus()
-    }
+    const root = componentRef.current!
+    const el = (target as Element).closest(`[${attr}]`)
+    return !root.contains(target as Node) || (el !== root && root.contains(el))
   }
 
   const openMenu = ({ target }: React.SyntheticEvent) => {
-    if (!marked(target, 'clickable')) {
-      if (marked(target, 'dropdown-handle')) {
-        if (!menuOpen) {
-          setMenuOpen(true)
-          onMenuOpen()
-          focusSearchInput()
-        } else {
-          setMenuOpen(false)
-          onMenuClose()
-        }
-      } else {
-        // only when closed: an option click bubbles here and must not undo closeOnSelect
-        if (!menuOpen) {
-          setMenuOpen(true)
-          onMenuOpen()
-        }
-        focusSearchInput()
-      }
-    }
+    if (disabled || marked(target, 'data-clickable')) return
+    if (!menuOpen) open()
+    else if (marked(target, 'data-handle')) closeMenu(true)
+    // not a close: an option click bubbles here and must not undo closeOnSelect.
+    // Nor a refocus once closed: an onChange may have moved focus out
+    else opened.current && inputFld.current?.focus()
   }
 
   // moves the highlight over enabled options, staying put at either end
@@ -460,36 +443,62 @@ function MultiSelect({
           ? shown.length
           : activeIdx
     for (i += dir; i >= 0 && i < shown.length; i += dir) {
-      if (!shown[i].disabled)
-        return setActive({ value: shown[i].value, idx: i })
+      if (!isDisabled(shown[i]))
+        return setActive({ value: valueOf(shown[i]), idx: i })
     }
   }
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     attr?.onKeyDown?.(e)
+    // an IME composition's keys: its Enter confirms the text, not a pick.
     // Safari ends the composition before the keydown, leaving only keyCode 229
-    composing.current = e.nativeEvent.isComposing || e.keyCode === 229
-    if (composing.current) return
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return
     const { key, target } = e
-    // chips and the clear button handle their own keys
-    if (disabled || marked(target, 'clickable')) return
+    if (menuOpen && key === 'Escape') {
+      // it closes the menu, not a surrounding <dialog> or popover too. Stopped too: a modal
+      // library's onKeyDown above it in the React tree may ignore defaultPrevented (MUI's does)
+      e.preventDefault()
+      e.stopPropagation()
+      return closeMenu(true)
+    }
+    // Tab moves focus on in page order, and closes the menu. Unless the menu has stops of its own (focusable JSX):
+    // then Tab steps through the open box, and focus leaving it closes the menu.
+    // ponytail: tabIndex >= 0 counts disabled and hidden elements as stops; filter them if JSX in the menu has them
+    if (
+      menuOpen &&
+      key === 'Tab' &&
+      ![...listRef.current!.querySelectorAll<HTMLElement>('*')].some(
+        (el) => el.tabIndex >= 0
+      )
+    )
+      return closeMenu()
+    // our listbox, when the target is JSX in it outside the options: an empty state's button, a group title's
+    const box = (target as Element).closest('[role=option],[role=listbox]')
+    // chips, the clear button and that JSX handle their own keys
+    if (
+      disabled ||
+      marked(target, 'data-clickable') ||
+      (box?.id === listId && box !== target)
+    )
+      return
+    // the first result a click could pick
+    const first = found?.find((opt) => !opt.disabled)
     if (key === 'Enter' && activeIdx >= 0) {
       e.preventDefault()
       addValue(shown[activeIdx])
-      // the search field gives way to the single value: keep focus in the widget
-      ;(singleSelect || disableChip) && componentRef.current!.focus()
-    } else if (
-      key === 'Backspace' &&
-      target === inputFld.current &&
-      !inputFld.current.textContent
-    ) {
+    } else if ((key === 'Enter' || key === ',') && first) {
+      // Prevented: no form submit, and the comma stays out of the field.
+      // Opened first, as any key on the closed field opens it (text pasted there)
+      e.preventDefault()
+      openMenu(e)
+      addValue(first)
+    } else if (key === 'Backspace' && target === inputFld.current && !query) {
       // a value next to the search field means chips mode
-      value.length && deleteValue(value.length - 1)
+      value.length && deleteValue(value[value.length - 1])
     } else if (
       /^Arrow(Down|Up)$/.test(key) ||
       // with search text, Home/End move the caret
-      (/^(Home|End)$/.test(key) &&
-        !(target === inputFld.current && inputFld.current.textContent))
+      (/^(Home|End)$/.test(key) && !(target === inputFld.current && query))
     ) {
       e.preventDefault()
       highlight(key)
@@ -498,7 +507,7 @@ function MultiSelect({
       key === 'Enter' ||
       (key.length === 1 && !e.ctrlKey && !e.metaKey)
     ) {
-      // Space on the wrapper would scroll the page; Enter in the search adds a line break
+      // Space on the wrapper would scroll the page; Enter in the search would submit a form
       ;((key === ' ' && target === e.currentTarget) || key === 'Enter') &&
         e.preventDefault()
       openMenu(e)
@@ -506,179 +515,177 @@ function MultiSelect({
   }
 
   const combobox = {
+    // the wrapper's ARIA (label, description, invalid, required) names whichever element is the combobox
+    ...Object.fromEntries(
+      Object.entries(attr ?? {}).filter(([k]) => k.startsWith('aria-'))
+    ),
     role: 'combobox',
     'aria-expanded': menuOpen,
     'aria-haspopup': 'listbox',
-    'aria-controls': listId,
+    'aria-controls': menuOpen ? listId : undefined,
     'aria-activedescendant':
       activeIdx < 0 ? undefined : `${listId}-${activeIdx}`,
-    'aria-disabled': disabled,
-    // the wrapper's label names whichever element is the combobox
-    'aria-label': attr?.['aria-label'],
-    'aria-labelledby': attr?.['aria-labelledby']
+    'aria-disabled': disabled
   } as const
 
-  const showLabel = (optionObj: MultiSelectOption) => {
-    if (typeof optionObj.label === 'object') {
-      return optionObj?.title || optionObj.value
-    } else {
-      return optionObj.label
-    }
-  }
-
-  const getActiveClass = () => {
-    const el = componentRef.current!
-    const rect = el.getBoundingClientRect()
-    const below = window.innerHeight - (rect.top + el.clientHeight)
-    // up only if that has more room: else it goes off the top of the page
-    if (below < 200 && rect.top > below) {
-      return 'msl-active-up'
-    }
-    return 'msl-active'
-  }
+  const menu = (
+    <div
+      ref={listRef}
+      className={`msl-options ${cn.menu ?? ''}`}
+      id={listId}
+      role='listbox'
+      aria-multiselectable={!singleSelect}
+      // else Chrome makes this scroller a tab stop, as no option is tabbable
+      tabIndex={-1}
+    >
+      {items.length ? (
+        <Options
+          opts={items}
+          {...{
+            addValue,
+            checkValueExist,
+            isDisabled,
+            listId,
+            activeIdx,
+            valueOf,
+            labelOf,
+            textOf,
+            cn
+          }}
+        />
+      ) : (
+        <div className={`msl-option msl-option-disable ${cn.empty ?? ''}`}>
+          {emptyDataLabel}
+        </div>
+      )}
+    </div>
+  )
 
   return (
     <div
       ref={componentRef}
       {...attr}
-      {...(!showSearchOption() && combobox)}
+      {...(!showSearch && combobox)}
       onClick={openMenu}
       tabIndex={disabled ? -1 : 0}
       onKeyDown={onKeyDown}
-      style={{ ...style }}
-      className={`msl-wrp msl-vars ${className || ''} ${
-        disabled ? 'msl-disabled' : ''
-      }${limit !== null && value.length >= limit ? ' msl-limit-reached' : ''}`}
+      data-disabled={disabled || undefined}
+      style={style}
+      className={`msl-wrp msl-vars ${className || ''} ${disabled ? 'msl-disabled' : ''}${
+        full ? ' msl-limit-reached' : ''
+      }`}
     >
-      <input name={name} type='hidden' value={value?.map((itm) => itm.value)} />
-      <div data-msl className={`msl ${menuOpen ? getActiveClass() : ''} `}>
+      <input name={name} type='hidden' value={value.map(valueOf).join(',')} />
+      {/* the popover while open, set up by the open menu's effect. Unstyled: the box inside has the looks */}
+      <div ref={boxRef}>
         <div
-          data-msl
-          className='msl-input-wrp'
-          style={{ width: calculatedWidth }}
+          data-open={menuOpen || undefined}
+          data-up={(menuOpen && up) || undefined}
+          className={`msl ${menuOpen ? (up ? 'msl-active-up' : 'msl-active') : ''} ${cn.control ?? ''}`}
         >
-          {!singleSelect &&
-            !disableChip &&
-            value.map((val, i) => (
-              <Chip
-                key={`msl-chip-${i + 11}`}
-                value={val}
-                disabled={disabled}
-                deleteAction={(byKey) => {
-                  deleteValue(i)
-                  // index keys: only the last chip's button goes away
-                  byKey && i === value.length - 1 && refocus()
-                }}
-              />
-            ))}
-          {!singleSelect && disableChip && value.length > 0 && (
-            <span className='msl-single-value' data-msl>
-              {value.length === 1
-                ? showLabel(value[0])
-                : `${value.length} ${chipAlternateText}`}
-            </span>
-          )}
-          {singleSelect && value.length === 1 && (
-            <span className='msl-single-value' data-msl>
-              {showLabel(value[0])}
-            </span>
-          )}
-          {showSearchOption() && (
-            <div
-              data-msl
-              data-placeholder={placeholder}
-              className='msl-input'
-              contentEditable={!disabled}
-              onKeyUp={handleSearchAndCustomValue}
-              onInput={(e) => {
-                setActive(null)
-                handleSearchAndCustomValue(e)
-              }}
-              onPaste={(e) => {
-                // plain text only: a rich paste keeps its formatting in a contentEditable.
-                // jsdom has no execCommand: then the browser default runs
-                const text = e.clipboardData.getData('text/plain')
-                document.execCommand?.(
-                  'insertText',
-                  false,
-                  text.replace(/\s+/g, ' ')
-                ) && e.preventDefault()
-              }}
-              ref={inputFld}
-              {...combobox}
-            />
-          )}
-          {!showSearchOption() && value.length < 1 && (
-            <div
-              data-msl
-              data-placeholder={placeholder}
-              className='msl-input'
-            />
-          )}
-        </div>
-        {(clearable || downArrow) && (
-          <div className='msl-actions msl-flx'>
-            {clearable && value.length > 0 && (
-              <div
-                role='button'
-                // @ts-expect-error clickable is a custom attribute (it stops the menu from opening)
-                clickable='true'
-                aria-label='close-menu'
-                onClick={clearByUser}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    clearByUser()
-                    refocus()
-                  }
-                }}
-                tabIndex={disabled ? -1 : 0}
-                className='msl-btn msl-clear-btn msl-flx'
-              >
-                {closeIcon || <CloseIcon />}
+          {/* in DOM order, so it stacks right with no stylesheet */}
+          {menuOpen && up && menu}
+          <div className={`msl-input-wrp ${cn.values ?? ''}`}>
+            {!singleSelect && !disableChip && (
+              // data-clickable: clicks and keys on any chip markup are the chip's, not the menu's.
+              // display: contents keeps this box out of the layout, styled or not
+              <div data-clickable style={{ display: 'contents' }}>
+                {value.map((val, i) => (
+                  <React.Fragment key={i}>
+                    {customChip({
+                      label: labelOf(val),
+                      value: valueOf(val),
+                      option: val,
+                      disabled,
+                      classNames: cn,
+                      onDelete: () => {
+                        // a custom chip may stay tabbable while disabled
+                        if (disabled) return
+                        // before the delete: an onChange that flushes sync unmounts the chip right away
+                        lost.current = keyboardFocus()
+                        deleteValue(val)
+                      }
+                    })}
+                  </React.Fragment>
+                ))}
               </div>
             )}
-            {downArrow && (
-              // decorative: the combobox handles the keyboard
+            {!singleSelect && disableChip && value.length > 0 && (
+              <span className={`msl-single-value ${cn.singleValue ?? ''}`}>
+                {value.length === 1 ? (
+                  labelOf(value[0])
+                ) : (
+                  <>
+                    {value.length} {chipAlternateText}
+                  </>
+                )}
+              </span>
+            )}
+            {singleSelect && value.length === 1 && (
+              <span className={`msl-single-value ${cn.singleValue ?? ''}`}>
+                {labelOf(value[0])}
+              </span>
+            )}
+            {showSearch && (
+              <input
+                placeholder={placeholder}
+                className={`msl-input ${cn.input ?? ''}`}
+                disabled={disabled}
+                // the browser's own history list would cover the menu
+                autoComplete='off'
+                value={query}
+                onChange={(e) => {
+                  setActive(null)
+                  setQuery(e.target.value)
+                }}
+                ref={inputFld}
+                {...combobox}
+              />
+            )}
+            {!showSearch && value.length < 1 && (
               <div
-                aria-hidden='true'
-                dropdown-handle='true'
-                className='msl-btn msl-arrow-btn msl-flx'
-                style={{ ...(menuOpen && { transform: 'rotate(180deg)' }) }}
-              >
-                {downArrowIcon || <DownIcon />}
-              </div>
+                data-placeholder={placeholder}
+                className={`msl-input ${cn.input ?? ''}`}
+              />
             )}
           </div>
-        )}
-      </div>
-      <div
-        className='msl-options'
-        id={listId}
-        role='listbox'
-        aria-multiselectable={!singleSelect}
-        // else Chrome makes this scroller a tab stop, as no option is tabbable
-        tabIndex={-1}
-      >
-        {items.length ? (
-          <Options
-            opts={items}
-            {...{
-              singleSelect,
-              addValue,
-              checkValueExist,
-              value,
-              largeData,
-              menuOpen,
-              listId,
-              activeIdx
-            }}
-          />
-        ) : (
-          <option className='msl-option msl-option-disable'>
-            {emptyDataLabel}
-          </option>
-        )}
+          {(clearable || downArrow) && (
+            <div className={`msl-actions msl-flx ${cn.actions ?? ''}`}>
+              {clearable && value.length > 0 && (
+                <div
+                  role='button'
+                  // it stops the menu from opening
+                  data-clickable
+                  aria-label={clearLabel}
+                  aria-disabled={disabled}
+                  onClick={clearByUser}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      clearByUser()
+                      refocus()
+                    }
+                  }}
+                  tabIndex={disabled ? -1 : 0}
+                  className={`msl-btn msl-clear-btn msl-flx ${cn.clearButton ?? ''}`}
+                >
+                  {closeIcon || <CloseIcon />}
+                </div>
+              )}
+              {downArrow && (
+                // decorative: the combobox handles the keyboard
+                <div
+                  aria-hidden='true'
+                  data-handle
+                  className={`msl-btn msl-arrow-btn msl-flx ${cn.arrowButton ?? ''}`}
+                >
+                  {downArrowIcon || <DownIcon />}
+                </div>
+              )}
+            </div>
+          )}
+          {menuOpen && !up && menu}
+        </div>
       </div>
     </div>
   )

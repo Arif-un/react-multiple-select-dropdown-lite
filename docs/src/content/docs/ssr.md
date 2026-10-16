@@ -3,7 +3,7 @@ title: Next.js and SSR
 description: Use react-multiple-select-dropdown-lite with server rendering and the Next.js App Router.
 ---
 
-Server rendering works on React 16 to 19, and the markup hydrates without id mismatches.
+Server rendering works on React 18 and 19, and the markup hydrates without id mismatches.
 
 ## Next.js App Router
 
@@ -34,7 +34,7 @@ import { useState } from 'react'
 import MultiSelect from 'react-multiple-select-dropdown-lite'
 
 export default function TopicPicker() {
-  const [topics, setTopics] = useState('')
+  const [topics, setTopics] = useState<string[]>([])
   return (
     <MultiSelect
       options={[{ label: 'News', value: 'news' }]}

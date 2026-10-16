@@ -1,38 +1,22 @@
-/* CSS variables for sizes and the open menu, plain rules for colors.
-   .msl-vars as well, so the variables win over the defaults whatever the CSS order */
+/* .msl-vars as well, so the variables win over the defaults whatever the CSS order */
 .msl-vars.dark-msl {
-  --input-width: 320px;
-  --border-radius: 6px;
-  --font-size: 15px;
-  --active-menu-background: #1f2430;
-  --active-menu-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+  --msl-input-width: 320px;
+  --msl-border-radius: 6px;
+  --msl-font-size: 15px;
+  --msl-background: #1f2430;
+  --msl-active-menu-background: #1f2430;
+  --msl-active-menu-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+  --msl-active-menu-border-color: #3a4152;
+  --msl-divider-color: rgb(255 255 255 / 0.08);
+  --msl-border-color: #3a4152;
+  --msl-hover-border-color: #5b6580;
+  --msl-chip-background: #343b4d;
+  --msl-chip-delete-background: #4a5268;
+  --msl-chip-delete-color: #e6e6e6;
+  --msl-button-hover-background: #3a4152;
+  --msl-option-hover-background: #2c3242;
+  --msl-option-active-background: #22395c;
+  --msl-option-active-color: #8fb8ff;
+  --msl-group-title-background: #2a3040;
   color: #e6e6e6;
-}
-.dark-msl .msl {
-  background: #1f2430;
-  border-color: #3a4152;
-}
-.dark-msl .msl:not(.msl-active, .msl-active-up):hover {
-  border-color: #5b6580;
-}
-.dark-msl .msl-chip {
-  background: #343b4d;
-}
-.dark-msl .msl-chip-delete {
-  background: #4a5268;
-  color: #e6e6e6;
-}
-.dark-msl .msl-btn:hover {
-  background: #3a4152;
-}
-.dark-msl .msl-options .msl-option:hover,
-.dark-msl .msl-options .msl-option-focused {
-  background: #2c3242;
-}
-.dark-msl .msl-option-active {
-  background: #22395c;
-  color: #8fb8ff;
-}
-.dark-msl .msl-grp-title {
-  background: #2a3040;
 }

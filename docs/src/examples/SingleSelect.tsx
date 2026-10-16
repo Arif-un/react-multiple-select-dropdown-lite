@@ -10,18 +10,18 @@ const options = [
 ]
 
 export default function SingleSelect() {
-  const [value, setValue] = useState('m')
+  const [value, setValue] = useState(['m'])
 
   return (
     <>
       <MultiSelect
         singleSelect
         options={options}
-        defaultValue='m'
+        defaultValue={['m']}
         onChange={setValue}
         placeholder='Pick a size'
       />
-      <p className='demo-output'>value: "{value}"</p>
+      <p className='demo-output'>value: {JSON.stringify(value)}</p>
     </>
   )
 }

@@ -2,6 +2,89 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+Breaking release: one value format, React 18+, modern bundles, a native search input, and an open menu that is one box in the top layer. The JS bundles are about 19% smaller, about 7% smaller gzipped. The stylesheet grew from 1.4 to 1.7 kB gzipped.
+
+### Upgrade notes
+
+- **`value` and `defaultValue` take an array of option values.** The comma separated string and option object forms are gone.
+- **`onChange(values, options)`** always gets the selected values and their option objects. A created value's option is `{ label: value, value }`. The hidden form input still posts the values joined by commas.
+- **`jsonValue` is removed.** Read the option objects from `onChange`'s second argument.
+- **`defaultValue` is read once, on mount**, like an uncontrolled input. To change the selection later, use `value`, or remount with a new `key`.
+- **React 18 or 19 is required.**
+- **No UMD build and no `dist/index.esm.js`.** Import the package through a bundler. The ES module build is `dist/index.modern.js`, which `module` already points to.
+- **No ES5 build.** The bundles use modern syntax and import `react/jsx-runtime`. Transpile them yourself if you target old browsers. Even then, chip delete needs `:focus-visible`: Chrome 86, Firefox 85, Safari 15.4.
+- **Types:** `MultiSelectValue`, `MultiSelectBaseProps`, `MultiSelectStringProps` and `MultiSelectJsonProps` are gone. `MultiSelectProps` is a single interface, so `Omit` works on it directly.
+- **`label` is a string, and options lose `title`.** For JSX, pass `getLabel={(opt) => <Jsx />}`. Search and the tooltip then use `label`.
+- **CSS variables start with `--msl-`**, so they can't clash with an app's own `--border-radius` or `--font-size`: `--input-width` is `--msl-input-width`, and so on for all of them. Rename them in your CSS.
+- **The search field is an `<input>`**, not a `contentEditable` div. Rules on `.msl-input::before` no longer reach its placeholder: set the new `--msl-placeholder-color` variable instead. It fits its text through CSS `field-sizing: content`; browsers without that show it at the default input width.
+- **Chips render inside a `<div data-clickable="true" style="display: contents">`**, so DOM snapshots change. It takes no layout room. `.msl-chip` and `.msl-chip-delete` keep their classes, but the clickable attribute moves from them to the wrapper, and chips are no longer children of `.msl-input-wrp`: use `.msl-input-wrp .msl-chip`, not `>`.
+- **The `clickable` and `dropdown-handle` attributes are now `data-clickable` and `data-handle`**, valid HTML. Update selectors and DOM snapshots that use the old names.
+- **No `data-msl` attribute.** It marked internal elements and multi select options, and nothing read it. Update DOM snapshots and selectors that use it: `.msl-option` and the other `msl-*` classes stay.
+- **Layout and the arrow flip live in the CSS**, not in inline styles. Left inline: the chip wrapper's `display: contents` and, while open, the dropdown's `min-height` and the open box's position (see below). `.msl` is a grid: `.msl-input-wrp` takes the free space (it had an inline `width: calc(100% - 60px)`), `.msl-actions` sits in the flow instead of `position: absolute`, and the options span both columns. Recheck custom CSS that sizes `.msl-input-wrp` or positions `.msl-actions`. The open arrow turns through `rotate` on `.msl-active .msl-arrow-btn`, not an inline `transform`, so without the stylesheet it no longer flips.
+- **No "Empty" option.** Without `options`, the menu shows `emptyDataLabel`, as it does for `[]`.
+- **Empty states are `<div>`s, not `<option>`s**, so they can hold JSX. Use `.msl-option-disable`, not `option.msl-option-disable`.
+- **The open menu is one box, a popover over the dropdown.** While open, `.msl` (the input box, now with the options attached: one border and shadow) is a `popover="manual"` in the top layer, over the dropdown, which keeps its height. It stays in place in the DOM, inside a new unstyled `<div>` around `.msl`, so your CSS reaches it through its ancestors and it inherits the text look there, while `overflow: hidden` parents, stacking contexts and z-indexes no longer clip or cover it. This needs the Popover API: Chrome 114, Firefox 125, Safari 17. Check:
+  - `.msl-active` / `.msl-active-up` mark the open box, which holds the options after the values (before them, opening upward). The seam rules are gone (clip-path, the stripped border, the radius transitions), as are `.msl-options { position: absolute; max-height: 0 }` and `.msl-wrp { position: relative }`.
+  - The open box is as wide as the dropdown and clips the options, so a wider `width` or `min-width` on `.msl-options` is cut off. Widen the open box instead: `.msl-active { min-width: 400px }`.
+  - While open, the box follows the dropdown every animation frame. With fake timers that fake `requestAnimationFrame` (Jest's, Vitest's), `runAllTimers()` never runs dry: close the menu first, or use `advanceTimersByTime()`.
+  - In the top layer, transforms on the dropdown's ancestors don't apply to the open box. It copies their scale (a zoomable canvas), not a rotation or skew.
+  - Without the Popover API (jsdom, for one), the box is a plain element in the dropdown, so tests that query the container keep working.
+- **A new default look, and a rewritten stylesheet.** `--msl-font-size` is `14px` (was `16px`), options and group titles pad `4px 8px` (was `7px 5px`), the selected option's background is a grey `hsl(209.49deg 10.01% 93.31%)` (was `#e6f4fa`), the chip delete button stays transparent until hovered (`--msl-chip-delete-background`, was `rgb(218, 218, 218)`), and the open menu has a softer shadow, a faded border (`--msl-active-menu-border-color`) and a divider between the input and the options (`--msl-divider-color`). Set the variables back, and `.msl-option, .msl-grp-title { padding: 7px 5px }`, for the old look. The stylesheet uses native CSS nesting (Chrome 120, Firefox 117, Safari 17.2) and logical properties, so chip and input spacing follow right-to-left text. Option rules no longer go through `.msl-options`, so a lone `.msl-option` or `.msl-option-focused` rule of yours matches their specificity. The arrow turns with `rotate`, not `transform`. One class with the same state overrides any rule: the closed box's hover border no longer outranks it, and `.msl-disabled`'s `pointer-events: none` is no longer `!important`. The line height is set on `.msl-wrp` and inherited, not forced on every element inside, so a class on a part sets it for the part's content too, and your markup in labels or chips (a `<button>`) keeps its own. Keep `--msl-line-height` unitless: a `%` or `em` value is worked out once, against the wrapper's font size.
+- **`largeData` is removed**: options always render only while the menu is open. Delete the prop.
+- **`clearAll` is removed.** To clear the value, pass `value={[]}` to a controlled select, or remount it with a new `key`.
+- **`width` is removed from the types.** It has done nothing since 2.0.1, and TypeScript now rejects it: set the `--msl-input-width` CSS variable instead.
+- **Tab closes the menu** and moves on in page order. It used to step through the chips and the clear button with the menu still open. Focusable JSX in the menu (a button in `emptyDataLabel` or a group `title`) is still a Tab stop: while the menu has any, Tab steps through the open box in page order, chips and the clear button included, and focus leaving it closes the menu.
+- **Closing the menu clears the search text.**
+- **Markup for utility CSS.** Options sit right inside `.msl-options` (the `<div>` around them is gone), and the open box stacks by DOM order (with `msl-active-up` the options come before the input).
+- **ARIA labels:** the clear button is `Clear` (was `close-menu`), set it with `clearLabel`. The default chip's delete button is `Remove Apple` for an `Apple` chip (was `delete-value`), or `Remove` when the label has no text; translate it through `customChip`. Update tests that query these labels.
+
+```jsx
+// v2
+<MultiSelect options={options} value='apple,banana' onChange={(csv) => ...} />
+<MultiSelect jsonValue options={options} onChange={(opts) => ...} />
+<MultiSelect options={[{ label: <b>Apple</b>, title: 'Apple', value: 'apple' }]} />
+
+// v3
+<MultiSelect options={options} value={['apple', 'banana']} onChange={(values) => ...} />
+<MultiSelect options={options} onChange={(values, opts) => ...} />
+<MultiSelect options={[{ label: 'Apple', value: 'apple' }]} getLabel={(opt) => <b>{opt.label}</b>} />
+```
+
+### Added
+
+- `clearLabel`, `createLabel(text)` and `customValuesTitle` props, so no built-in text is left untranslatable: ``createLabel={(text) => `Ajouter « ${text} »`}``.
+- `emptyDataLabel`, `chipAlternateText` and a group's `title` and `emptyDataLabel` take JSX.
+- CSS variables for every color: `--msl-border-color`, `--msl-hover-border-color`, `--msl-disabled-background`, `--msl-chip-background`, `--msl-chip-delete-background`, `--msl-chip-delete-color`, `--msl-button-hover-background`, `--msl-option-hover-background`, `--msl-option-active-background`, `--msl-option-active-color`, `--msl-option-disabled-color`, `--msl-group-title-background`, `--msl-focus-color`, `--msl-background` (the closed box), `--msl-scrollbar-color`, `--msl-active-menu-border-color` and `--msl-divider-color` (the line between the input and the open menu). A dark theme is one rule.
+- `customChip(props)` prop, to render chips yourself: `customChip={({ label, onDelete }) => <button type='button' onClick={onDelete}>{label} ×</button>}`. It gets `label`, `value`, `option`, `disabled` and `onDelete`, typed as `MultiSelectChipProps`. It is a render function, not a component, so it can't use hooks: return `<MyChip {...props} />` for that.
+- `filterOption(option, search)` prop, to replace the search match.
+- `getLabel(option)` and `getValue(option)` props. `getLabel` renders options, chips and the single value. Together they read options of any shape, e.g. `{ id, name }` straight from an API. The types infer the shape from `options`, and require `getLabel` or `getValue` when it has no string `label` or `value`. With `customValue`, `onChange`'s options are typed to also hold created `{ label, value }` options.
+- `classNames` prop: classes for each part (`control`, `values`, `input`, `singleValue`, `chip`, `chipDelete`, `actions`, `clearButton`, `arrowButton`, `menu`, `group`, `groupTitle`, `option`, `empty`), to style the select with Tailwind or other utility CSS and no stylesheet. `customChip` gets them in its props. A Tailwind page in the docs has a full example.
+- State attributes for utility variants: `data-focused` on the highlighted option (next to `aria-selected` and `aria-disabled`), `data-open` and `data-up` on the open box, `data-disabled` on the wrapper.
+- Group options are indented one step per level, nested groups included, with the group's title at the level of the group: `--msl-group-offset` (`12px`, `0` for flat). Groups carry an `msl-grp` class.
+- `--msl-placeholder-color` CSS variable, for the search field's placeholder and the static one shown with `disableSearch`.
+
+### Changed
+
+- The open menu follows the dropdown as the page or a parent scrolls, the window resizes or the dropdown grows, and closes once a scrolling parent hides the dropdown. In a scaled part of the page (`transform: scale()`) it scales as the dropdown does. Scrolling past the end of the options doesn't scroll the page.
+- The menu is no taller than the room left in the viewport, as well as `--msl-menu-max-height`. The room is `--msl-menu-room` on `.msl-options`, registered non-inherited, so your own CSS can cap the menu with it.
+- Without a listbox to point at, the closed combobox has no `aria-controls`.
+- All `aria-*` in `attr` reach the combobox, not only `aria-label` and `aria-labelledby`: an `aria-describedby` error or `aria-invalid` stays announced in the search field.
+- The open and close radius transitions are gone.
+- A disabled select ignores clicks without the stylesheet too: it no longer leaned on `pointer-events: none` to stay closed and keep its value. Disabling a select with its menu open closes the menu, and focus moves from it to the dropdown.
+- `onMenuOpen` runs once the open menu is in the DOM and focused, after a click as after a key. It used to run before the open rendered.
+- The Escape that closes the menu is canceled and stops at the select, so a surrounding `<dialog>`, popover or modal library's dialog (MUI's) stays open. With the menu closed, Escape is theirs.
+- Options that arrive after mount resolve the selection when they render. There is no longer an effect that re-resolves it.
+- Values missing from `options` are left out of the display and of `onChange`, unless `customValue` is set. They show up once matching options arrive. With `customValue` they are listed under Custom Values only while selected: once deselected they leave the menu (v2 kept them listed), unlike values created by typing.
+- Once `limit` is reached, unselected options get `aria-disabled="true"` and `msl-option-disable`, and the keyboard highlight skips them. Picking one only calls `onChange`, the value unchanged: a Create item no longer adds the typed text to Custom Values, and the search text and the menu stay. Single select ignores `limit`: its wrapper no longer gets `msl-limit-reached`.
+- Enter and comma pick the first search result that isn't `disabled`, no longer a `disabled` one.
+- While the select is disabled, the chip delete and clear buttons have `aria-disabled="true"`, so screen readers announce them unavailable.
+- Search results keep option order. Label matches no longer come before value-only matches.
+- The menu's scrollbar thumb no longer darkens on hover in Safari, matching Chrome and Firefox.
+- Keys pressed on focusable JSX in the menu, such as a button in `emptyDataLabel` or a group `title`, are left to it: Enter no longer picks the highlighted option or refocuses the search field.
+- Long search text scrolls on one line instead of wrapping, and no longer runs under the clear and arrow buttons. A placeholder too long for the input ends in an ellipsis.
+
 ## [2.1.0] - 2026-10-12
 
 React 19 support, TypeScript types, keyboard and screen reader support, a controlled `value` prop, and a long list of bug fixes. Existing props, events, CSS variables and class names keep working.
