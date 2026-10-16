@@ -47,12 +47,13 @@ declare namespace MultiSelect {
   /**
    * classes per element, added after its `msl-*` class: style every part with Tailwind or other utility CSS.
    * State is in attributes: options have `aria-selected`, `aria-disabled` and `data-focused` (the keyboard highlight),
-   * the open menu's control `data-open` and, opening upward, `data-up`, the wrapper `data-disabled`
+   * the open control `data-open` and, opening upward, `data-up`, the wrapper `data-disabled`
    */
   interface MultiSelectClassNames {
-    /** `msl-plate`: the open menu, the control over the options (or under them, with `data-up`) */
-    plate?: string
-    /** `msl`: the box with the values, the search field and the buttons, closed and in the plate */
+    /**
+     * `msl`: the box with the values, the search field and the buttons. Open, it holds the options too, after them
+     * (before, with `data-up`), in the top layer over the wrapper
+     */
     control?: string
     /** `msl-input-wrp`: chips, single value and search field */
     values?: string
@@ -145,10 +146,7 @@ declare namespace MultiSelect {
     downArrow?: boolean
     downArrowIcon?: React.ReactNode
     closeIcon?: React.ReactNode
-    /**
-     * on the wrapper only. The open menu renders outside it, at the end of `<body>`, or of the dialog, popover or shadow root it sits in: give it classes with `classNames.plate`
-     * (a theme class too), or theme every select through `.msl-vars`
-     */
+    /** on the wrapper */
     className?: string
     /** classes for each element inside, e.g. Tailwind utilities */
     classNames?: MultiSelectClassNames
@@ -160,7 +158,6 @@ declare namespace MultiSelect {
      * renders each chip; a render function, not a component, so no hooks in it: render a component that has them,
      * `(p) => <MyChip key={p.value} {...p} />`. Chips are keyed by position: `key={p.value}` resets a chip's state when
      * its value moves, instead of handing it to the next value. Clicks and keys inside it don't open the menu.
-     * While the menu is open each chip renders twice: in the open plate, and in the hidden wrapper that holds its space.
      * Default: the `msl-chip` markup
      */
     // $$typeof: memo / forwardRef components type as callable but are objects
@@ -169,7 +166,7 @@ declare namespace MultiSelect {
     }
     /** name of the hidden input, for forms: it holds the selected values joined by commas */
     name?: string
-    /** on the wrapper only, not the open menu */
+    /** on the wrapper. While the menu is open, it gets the control's height as an inline `min-height` */
     style?: React.CSSProperties
     /**
      * spread onto the wrapper div, which then sets its own onClick, onKeyDown (after calling yours), tabIndex, style, className and data-disabled,
@@ -180,7 +177,7 @@ declare namespace MultiSelect {
     attr?: React.HTMLAttributes<HTMLDivElement> & { [key: string]: any }
     disabled?: boolean
     /**
-     * max selected values in multi select, `null` for no limit. The wrapper and the open plate get `msl-limit-reached` once hit,
+     * max selected values in multi select, `null` for no limit. The wrapper gets `msl-limit-reached` once hit,
      * and unselected options `aria-disabled` and `msl-option-disable`; picking one only calls `onChange`, the value unchanged
      */
     limit?: number | null
