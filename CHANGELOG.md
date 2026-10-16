@@ -38,6 +38,7 @@ Breaking release: one value format, React 18+, modern bundles, a native search i
 - **Tab closes the menu** and moves on in page order. It used to step through the chips and the clear button with the menu still open. Focusable JSX in the menu (a button in `emptyDataLabel` or a group `title`) is still a Tab stop: while the menu has any, Tab steps through the open box in page order, chips and the clear button included, and focus leaving it closes the menu.
 - **Closing the menu clears the search text.**
 - **Markup for utility CSS.** Options sit right inside `.msl-options` (the `<div>` around them is gone), and the open box stacks by DOM order (with `msl-active-up` the options come before the input).
+- **No `msl-flx` class.** `.msl-btn` and `.msl-actions` center their content themselves. Move rules on `.msl-flx` to those classes.
 - **ARIA labels:** the clear button is `Clear` (was `close-menu`), set it with `clearLabel`. The default chip's delete button is `Remove Apple` for an `Apple` chip (was `delete-value`), or `Remove` when the label has no text; translate it through `customChip`. Update tests that query these labels.
 
 ```jsx

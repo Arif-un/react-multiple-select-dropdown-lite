@@ -54,7 +54,7 @@ function MultiSelect({
   placeholder = 'Select...',
   disableChip = false,
   name = '',
-  style = noStyle,
+  style,
   attr,
   disabled = false,
   limit,
@@ -649,7 +649,7 @@ function MultiSelect({
             )}
           </div>
           {(clearable || downArrow) && (
-            <div className={`msl-actions msl-flx ${cn.actions ?? ''}`}>
+            <div className={`msl-actions ${cn.actions ?? ''}`}>
               {clearable && value.length > 0 && (
                 <div
                   role='button'
@@ -666,7 +666,7 @@ function MultiSelect({
                     }
                   }}
                   tabIndex={disabled ? -1 : 0}
-                  className={`msl-btn msl-clear-btn msl-flx ${cn.clearButton ?? ''}`}
+                  className={`msl-btn msl-clear-btn ${cn.clearButton ?? ''}`}
                 >
                   {closeIcon || <CloseIcon />}
                 </div>
@@ -676,7 +676,7 @@ function MultiSelect({
                 <div
                   aria-hidden='true'
                   data-handle
-                  className={`msl-btn msl-arrow-btn msl-flx ${cn.arrowButton ?? ''}`}
+                  className={`msl-btn msl-arrow-btn ${cn.arrowButton ?? ''}`}
                 >
                   {downArrowIcon || <DownIcon />}
                 </div>

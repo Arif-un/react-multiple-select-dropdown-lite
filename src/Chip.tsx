@@ -35,7 +35,7 @@ export default function Chip({
           }
         }}
         tabIndex={disabled ? -1 : 0}
-        className={`msl-btn msl-chip-delete msl-flx ${classNames.chipDelete ?? ''}`}
+        className={`msl-btn msl-chip-delete ${classNames.chipDelete ?? ''}`}
       >
         <CloseIcon />
       </div>
