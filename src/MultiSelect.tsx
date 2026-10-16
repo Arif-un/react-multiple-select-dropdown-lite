@@ -70,6 +70,9 @@ function MultiSelect({
   customChip = Chip,
   closeOnSelect,
   disableSearch = false,
+  searchInMenu = false,
+  searchPlaceholder = 'Search...',
+  deleteOnBackspace = true,
   classNames: cn = noStyle
 }: MultiSelectProps) {
   // selected values; defaultValue is initial only, as in an uncontrolled input
@@ -110,9 +113,9 @@ function MultiSelect({
   const value = singleSelect ? resolved.slice(0, 1) : resolved
   // no limit (null) is Infinity: one comparison checks it
   const max = limit ?? Infinity
-  // a search field, unless a value takes its place (single select, disableChip)
-  const showSearch =
-    !disableSearch && (!value.length || (!singleSelect && !disableChip))
+  const chips = !singleSelect && !disableChip
+  // a search field in the control, unless a value takes its place (single select, disableChip)
+  const inline = !disableSearch && !searchInMenu && (!value.length || chips)
   // plain substring match: typed text is not a regex. Our { label, value } options skip a
   // user's filterOption, which expects their own shape. String(): untyped JS often passes numbers
   const matches = (opt: MultiSelectOption, text: string) =>
@@ -145,6 +148,9 @@ function MultiSelect({
   const boxRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  // or with searchInMenu atop the open menu, next to any value
+  const showSearch = inline || (!disableSearch && searchInMenu && menuOpen)
+  const searchRef = useRef<HTMLDivElement>(null)
   // picked on open: the menu goes above the input
   const [up, setUp] = useState(false)
   // the latest: an inline one would restart the open menu's listeners on every parent render
@@ -228,7 +234,7 @@ function MultiSelect({
     }
     // over the wrapper, the menu below (or above) it, as tall as the viewport leaves room for.
     // Follows the wrapper through scrolls, resizes, its own growth and layout shifts.
-    // ponytail: three rects read per frame while open; scroll/resize listeners + ResizeObserver if it ever shows in a profile
+    // ponytail: three rects (four with searchInMenu) read per frame while open; scroll/resize listeners + ResizeObserver if it ever shows in a profile
     let frame = 0
     const follow = () => {
       // in a scaled part of the page (a zoomable canvas) it scales as the dropdown does: the top layer drops
@@ -239,10 +245,13 @@ function MultiSelect({
       // first: the control's height depends on them
       box.style.width = width / s + 'px'
       box.style.setProperty('scale', s == 1 ? '' : s + '')
-      // the control's own height, the box less the options: the wrapper keeps it, as the box left the flow.
-      // Drawn: offsetHeight rounds
+      // the control's own height, the box less the options and a searchInMenu field: the wrapper keeps it,
+      // as the box left the flow. Drawn: offsetHeight rounds
+      const sh = searchRef.current?.getBoundingClientRect().height || 0
       const row =
-        box.getBoundingClientRect().height - list.getBoundingClientRect().height
+        box.getBoundingClientRect().height -
+        list.getBoundingClientRect().height -
+        sh
       root.style.minHeight = row / s + 'px'
       // then where it stands: its height back, it may move (in a centered dialog)
       const r = root.getBoundingClientRect()
@@ -255,7 +264,7 @@ function MultiSelect({
       // on the listbox, the one reader: the stylesheet registers it non-inherited, so a scroll restyles no option
       list.style.setProperty(
         '--msl-menu-room',
-        (up ? r.top : h - bottom) / s + 'px'
+        ((up ? r.top : h - bottom) - sh) / s + 'px'
       )
       // missing in jsdom without pretendToBeVisual: a user's tests would crash on every open
       typeof requestAnimationFrame != 'undefined' &&
@@ -470,10 +479,12 @@ function MultiSelect({
         (el) => el.tabIndex >= 0
       )
     )
-      // From in the listbox (a clicked option), which the close removes: focus moves to the listbox, the browser tabs
-      // on from it, then it closes. Firefox and Safari lose the place of a removed focused element, Firefox of a clicked option
-      return listRef.current!.contains(target as Node)
-        ? (listRef.current!.focus(), setTimeout(closeMenu))
+      // From in the listbox (a clicked option) or a searchInMenu field, which the close removes: focus moves to the listbox,
+      // the browser tabs on from it, then it closes. Firefox and Safari lose the place of a removed focused element, Firefox of a clicked option.
+      // Shift+Tab may land back on a searchInMenu field: back, so the close brings focus to the wrapper
+      return listRef.current!.contains(target as Node) ||
+        searchRef.current?.contains(target as Node)
+        ? (listRef.current!.focus(), setTimeout(() => closeMenu(true)))
         : closeMenu()
     // our listbox, when the target is JSX in it outside the options: an empty state's button, a group title's
     const box = (target as Element).closest('[role=option],[role=listbox]')
@@ -496,8 +507,11 @@ function MultiSelect({
       openMenu(e)
       addValue(first)
     } else if (key === 'Backspace' && target === inputFld.current && !query) {
-      // a value next to the search field means chips mode
-      value.length && deleteValue(value[value.length - 1])
+      // chips only: with searchInMenu the field is there next to a single value or count too
+      deleteOnBackspace &&
+        chips &&
+        value.length &&
+        deleteValue(value[value.length - 1])
     } else if (
       /^Arrow(Down|Up)$/.test(key) ||
       // with search text, Home/End move the caret
@@ -531,7 +545,24 @@ function MultiSelect({
     'aria-disabled': disabled
   } as const
 
-  const menu = (
+  const search = showSearch && (
+    <input
+      placeholder={inline ? placeholder : searchPlaceholder}
+      className={`msl-input ${cn.input ?? ''}`}
+      disabled={disabled}
+      // the browser's own history list would cover the menu
+      autoComplete='off'
+      value={query}
+      onChange={(e) => {
+        setActive(null)
+        setQuery(e.target.value)
+      }}
+      ref={inputFld}
+      {...combobox}
+    />
+  )
+
+  const list = (
     <div
       ref={listRef}
       className={`msl-options ${cn.menu ?? ''}`}
@@ -564,6 +595,18 @@ function MultiSelect({
     </div>
   )
 
+  // with searchInMenu the field heads the options, on the side away from the control when opening upward
+  const menu = (
+    <>
+      {!inline && search && (
+        <div ref={searchRef} className={`msl-search ${cn.search ?? ''}`}>
+          {search}
+        </div>
+      )}
+      {list}
+    </>
+  )
+
   return (
     <div
       ref={componentRef}
@@ -589,7 +632,7 @@ function MultiSelect({
           {/* in DOM order, so it stacks right with no stylesheet */}
           {menuOpen && up && menu}
           <div className={`msl-input-wrp ${cn.values ?? ''}`}>
-            {!singleSelect && !disableChip && (
+            {chips && (
               // data-clickable: clicks and keys on any chip markup are the chip's, not the menu's.
               // display: contents keeps this box out of the layout, styled or not
               <div data-clickable style={{ display: 'contents' }}>
@@ -629,23 +672,8 @@ function MultiSelect({
                 {labelOf(value[0])}
               </span>
             )}
-            {showSearch && (
-              <input
-                placeholder={placeholder}
-                className={`msl-input ${cn.input ?? ''}`}
-                disabled={disabled}
-                // the browser's own history list would cover the menu
-                autoComplete='off'
-                value={query}
-                onChange={(e) => {
-                  setActive(null)
-                  setQuery(e.target.value)
-                }}
-                ref={inputFld}
-                {...combobox}
-              />
-            )}
-            {!showSearch && value.length < 1 && (
+            {inline && search}
+            {!inline && value.length < 1 && (
               <div
                 data-placeholder={placeholder}
                 className={`msl-input ${cn.input ?? ''}`}
