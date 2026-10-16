@@ -31,7 +31,7 @@
 
 .playground {
   display: grid;
-  grid-template-columns: minmax(12rem, 16rem) 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 2rem;
   padding: 1.5rem;
   border: 1px solid #d7dbe2;
@@ -41,9 +41,21 @@
   color-scheme: light;
   text-align: start;
 }
+.playground-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: 1.5rem;
+  align-content: start;
+}
+.pg-column {
+  display: grid;
+  gap: 1.5rem;
+  align-content: start;
+}
 .playground fieldset {
   display: grid;
   gap: 0.35rem;
+  align-content: start;
   margin: 0;
   padding: 0;
   border: 0;
@@ -61,6 +73,47 @@
   align-items: center;
   cursor: pointer;
 }
+.playground label:has(:disabled) {
+  opacity: 0.45;
+  cursor: default;
+}
+.playground .pg-field {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.15rem;
+  margin-top: 0.25rem;
+}
+.pg-field input,
+.pg-field select {
+  min-width: 0;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid #c4c8d0;
+  border-radius: 0.375rem;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+.playground-stage {
+  position: sticky;
+  top: calc(var(--sl-nav-height) + 1rem);
+  align-self: start;
+  min-width: 0;
+}
+.playground-demo {
+  min-height: 9rem;
+  padding: 1.5rem;
+  border: 1px solid #e3e6eb;
+  border-radius: 0.5rem;
+}
+.playground-demo.dark {
+  border-color: #151922;
+  background: #151922;
+  color: #e6e6e6;
+  color-scheme: dark;
+}
+.playground-demo.dark .demo-output {
+  color: #9aa3b5;
+}
 .playground pre {
   margin-top: 1rem;
   padding: 0.75rem 1rem;
@@ -69,9 +122,55 @@
   font-size: 0.8125rem;
   overflow-x: auto;
 }
-@media (max-width: 40rem) {
+.pg-reset {
+  margin-top: 0.75rem;
+  padding: 0.3rem 0.8rem;
+  border: 1px solid #c4c8d0;
+  border-radius: 0.375rem;
+  background: #f6f7f9;
+  color: inherit;
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+.pg-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 4px;
+  padding: 1px 4px 1px 10px;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1e3a8a;
+  font-size: 13px;
+}
+.pg-chip button {
+  padding: 0 4px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.pg-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.pg-status > span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+@media (max-width: 50rem) {
   .playground {
     grid-template-columns: 1fr;
+  }
+  /* the demo first, the controls under it */
+  .playground-stage {
+    position: static;
+    order: -1;
   }
 }
 

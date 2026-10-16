@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- `searchInMenu` prop: the search field sits at the top of the open menu instead of after the values, so the closed control shows only the values (or `placeholder`) and no search placeholder next to the chips. Single select and `disableChip` can then search with a value selected. The field's box is `.msl-search` (`classNames.search`), and its placeholder is the new `searchPlaceholder` prop (`'Search...'`).
+- `deleteOnBackspace` prop (`true`): set it to `false` so Backspace in the empty search field leaves the chips, and only their delete buttons remove them.
+
 ## [3.0.0-beta.1] - 2026-10-16
 
 Breaking release: one value format, React 18+, modern bundles, a native search input, and an open menu that is one box in the top layer. The JS bundles are about 19% smaller, about 6% smaller gzipped. The stylesheet grew from 1.4 to 1.7 kB gzipped.

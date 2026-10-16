@@ -59,6 +59,8 @@ declare namespace MultiSelect {
     values?: string
     /** `msl-input`: the search field, or the placeholder when there is none */
     input?: string
+    /** `msl-search`: the box around the search field with `searchInMenu`, atop the options */
+    search?: string
     /** `msl-single-value`: the value with `singleSelect`, or the count with `disableChip` */
     singleValue?: string
     /** `msl-chip`, default chips only */
@@ -194,6 +196,15 @@ declare namespace MultiSelect {
     /** close the menu after picking an option. Unset: closes with `singleSelect`, stays open otherwise */
     closeOnSelect?: boolean
     disableSearch?: boolean
+    /**
+     * the search field heads the open menu instead of following the values: the closed control shows only
+     * the values, or `placeholder`. Single select and `disableChip` can then search with a value selected
+     */
+    searchInMenu?: boolean
+    /** the search field's placeholder with `searchInMenu`. Default: `'Search...'` */
+    searchPlaceholder?: string
+    /** Backspace in the empty search field removes the last chip. Default: `true`; `false` leaves the chip delete buttons */
+    deleteOnBackspace?: boolean
     onMenuOpen?: () => void
     onMenuClose?: () => void
     /** after the clear button empties the value */

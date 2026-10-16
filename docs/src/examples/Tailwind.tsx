@@ -27,6 +27,9 @@ const classNames = {
   control:
     'grid cursor-text grid-cols-[minmax(0,1fr)_auto] overflow-hidden rounded-lg border border-gray-400 not-data-open:hover:border-gray-600 data-open:border-gray-200 data-open:bg-white data-open:shadow-lg in-data-disabled:bg-gray-50',
   values: 'flex min-w-0 flex-wrap items-center gap-1 p-1',
+  // with searchInMenu, the search field's box heading the options
+  search:
+    'col-span-full flex border-t border-gray-200 p-1 in-data-up:border-t-0 in-data-up:border-b',
   input:
     'min-w-0 flex-1 border-0 bg-transparent p-1 [font:inherit] text-inherit outline-none placeholder:text-gray-400 empty:before:text-gray-400 empty:before:content-[attr(data-placeholder)]',
   singleValue: 'truncate p-1',
@@ -35,8 +38,8 @@ const classNames = {
   actions: 'flex items-center pr-1',
   clearButton: `${button} size-6 hover:bg-gray-200 [&_svg]:size-2.5`,
   arrowButton: `${button} size-6 hover:bg-gray-200 in-data-open:rotate-180 [&_svg]:size-5`,
-  // --msl-menu-room is set on the menu; the divider sits on whichever side meets the control
-  menu: 'col-span-full max-h-[min(400px,var(--msl-menu-room))] overflow-auto border-gray-200 py-1 first:border-b last:border-t',
+  // --msl-menu-room is set on the menu; the divider sits on the side toward the control, below it or (data-up) above
+  menu: 'col-span-full max-h-[min(400px,var(--msl-menu-room))] overflow-auto border-t border-gray-200 py-1 in-data-up:border-t-0 in-data-up:border-b',
   option:
     'mx-1.5 my-1 cursor-pointer rounded-md px-2 py-1 hover:bg-gray-100 aria-selected:text-blue-600 aria-disabled:cursor-default aria-disabled:text-gray-300 data-focused:bg-gray-100',
   // a step in per level, the title at its group's level

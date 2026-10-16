@@ -13,7 +13,7 @@ export default function CustomIcons() {
     <MultiSelect
       options={options}
       defaultValue={['n']}
-      downArrowIcon={<span aria-hidden>▾</span>}
+      downArrowIcon={<span aria-hidden>🔽</span>}
       closeIcon={<span aria-hidden>✕</span>}
     />
   )
