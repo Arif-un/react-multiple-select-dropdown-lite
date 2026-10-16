@@ -34,6 +34,7 @@ const groups = [
   {
     type: 'group',
     title: 'Citrus',
+    collapsible: true,
     childs: [
       { label: 'Lemon', value: 'lemon' },
       { label: 'Lime', value: 'lime' }
@@ -44,6 +45,34 @@ const groups = [
     title: 'Exotic',
     childs: [],
     emptyDataLabel: 'Out of season'
+  }
+]
+
+const submenus = [
+  { label: 'Apple', value: 'apple' },
+  {
+    type: 'submenu',
+    title: 'Vegetables',
+    childs: [
+      { label: 'Carrot', value: 'carrot' },
+      {
+        type: 'submenu',
+        title: 'Leafy greens',
+        childs: [
+          { label: 'Kale', value: 'kale' },
+          { label: 'Spinach', value: 'spinach' }
+        ]
+      },
+      { label: 'Potato', value: 'potato' }
+    ]
+  },
+  {
+    type: 'submenu',
+    title: 'Nuts',
+    childs: [
+      { label: 'Almond', value: 'almond' },
+      { label: 'Cashew', value: 'cashew' }
+    ]
   }
 ]
 
@@ -89,9 +118,14 @@ const sets: Record<
     defaultValue: ['apple', 'banana']
   },
   groups: {
-    label: 'Nested groups',
+    label: 'Nested and collapsible groups',
     options: groups as MultiSelectOption[],
     defaultValue: ['blueberry']
+  },
+  submenus: {
+    label: 'Nested submenus',
+    options: submenus as MultiSelectOption[],
+    defaultValue: ['kale']
   },
   users: {
     label: 'Any shape (getLabel / getValue)',

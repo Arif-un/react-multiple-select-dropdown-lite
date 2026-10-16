@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import MultiSelect from 'react-multiple-select-dropdown-lite'
 // no dist/index.css: Tailwind styles every part
-import './Tailwind.css'
+import './tailwind-demos.css'
 
 const options = [
   { label: 'Apple', value: 'apple' },
@@ -38,8 +38,9 @@ const classNames = {
   actions: 'flex items-center pr-1',
   clearButton: `${button} size-6 hover:bg-gray-200 [&_svg]:size-2.5`,
   arrowButton: `${button} size-6 hover:bg-gray-200 in-data-open:rotate-180 [&_svg]:size-5`,
-  // --msl-menu-room is set on the menu; the divider sits on the side toward the control, below it or (data-up) above
-  menu: 'col-span-full max-h-[min(400px,var(--msl-menu-room))] overflow-auto border-t border-gray-200 py-1 in-data-up:border-t-0 in-data-up:border-b',
+  // --msl-menu-room is set on the menu; the divider sits on the side toward the control, below it or (data-up) above.
+  // It fades in, and out: closing, the control has data-closing until the fade ends
+  menu: 'col-span-full max-h-[min(400px,var(--msl-menu-room))] overflow-auto border-t border-gray-200 py-1 in-data-up:border-t-0 in-data-up:border-b transition-opacity duration-150 starting:opacity-0 in-data-closing:opacity-0',
   option:
     'mx-1.5 my-1 cursor-pointer rounded-md px-2 py-1 hover:bg-gray-100 aria-selected:text-blue-600 aria-disabled:cursor-default aria-disabled:text-gray-300 data-focused:bg-gray-100',
   // a step in per level, the title at its group's level

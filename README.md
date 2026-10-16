@@ -74,11 +74,14 @@ More in the [examples](https://arif-un.github.io/react-multiple-select-dropdown-
 - [x] [Disabled](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#disabled) <br>
 - [x] [Select Limit](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#limit) <br>
 - [x] [Group](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#groups) <br>
+- [x] [Collapsible groups](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#groups) <br>
+- [x] [Nested submenus](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#submenus) <br>
 - [x] [Searchable](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#multi-select) <br>
 - [x] [Custom Creatable Value](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#creatable-values) <br>
 - [x] [Search in the menu](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#search-in-the-menu) <br>
 - [x] [Delete chips with their button only](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#delete-chips-with-their-button-only) <br>
 - [x] [Themeable (using css var)](https://arif-un.github.io/react-multiple-select-dropdown-lite/styling/) <br>
+- [x] [Enter and exit animations in CSS](https://arif-un.github.io/react-multiple-select-dropdown-lite/styling/#animations) <br>
 - [x] [Controlled value](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#controlled-value) <br>
 - [x] [Keyboard navigation](https://arif-un.github.io/react-multiple-select-dropdown-lite/accessibility/#keyboard) <br>
 - [x] [Accessible (ARIA combobox)](https://arif-un.github.io/react-multiple-select-dropdown-lite/accessibility/#aria) <br>
@@ -93,7 +96,7 @@ Also in the [API docs](https://arif-un.github.io/react-multiple-select-dropdown-
 
 | Props             | type                        | default                          | description                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | ----------------- | --------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| options           | array                       | `[]`                             | options and groups (see [Groups](#groups)) <br> `label`: string, searched and shown <br> `value`: string <br> `disabled`: bool <br> `style`: (object) custom style <br> `classes`: (string) class names <br> <br> example: <br> `[ { label : "Option 1", value : "opt_1", style: {textAlign: 'center'}, classes: "classA classB" } ]`                                                                                           |
+| options           | array                       | `[]`                             | options, groups and submenus (see [Groups](#groups)) <br> `label`: string, searched and shown <br> `value`: string <br> `disabled`: bool <br> `style`: (object) custom style <br> `classes`: (string) class names <br> <br> example: <br> `[ { label : "Option 1", value : "opt_1", style: {textAlign: 'center'}, classes: "classA classB" } ]`                                                                                 |
 | name              | string                      | ''                               | specify a name for form                                                                                                                                                                                                                                                                                                                                                                                                         |
 | disabled          | bool                        | false                            | disable input                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | defaultValue      | string array                |                                  | initial selection, as option values. Resolves once `options` load; later changes are ignored (use `value`, or a new `key` to reset). Values not in `options` are left out, or listed under Custom Values with `customValue`                                                                                                                                                                                                     |
@@ -108,7 +111,7 @@ Also in the [API docs](https://arif-un.github.io/react-multiple-select-dropdown-
 | clearable         | bool                        | true                             | show / hide close icon to clear value                                                                                                                                                                                                                                                                                                                                                                                           |
 | downArrow         | bool                        | true                             | show / hide down icon in dropdown                                                                                                                                                                                                                                                                                                                                                                                               |
 | className         | string                      |                                  | custom class for the wrapper                                                                                                                                                                                                                                                                                                                                                                                                    |
-| classNames        | object                      |                                  | classes for each part, e.g. Tailwind utilities: `{ control: 'rounded-lg border', option: 'px-2 py-1 data-focused:bg-gray-100' }`. Keys: `control`, `values`, `input`, `search`, `singleValue`, `chip`, `chipDelete`, `actions`, `clearButton`, `arrowButton`, `menu`, `group`, `groupTitle`, `option`, `empty`. See [Tailwind](#tailwind)                                                                                       |
+| classNames        | object                      |                                  | classes for each part, e.g. Tailwind utilities: `{ control: 'rounded-lg border', option: 'px-2 py-1 data-focused:bg-gray-100' }`. Keys: `control`, `values`, `input`, `search`, `singleValue`, `chip`, `chipDelete`, `actions`, `clearButton`, `arrowButton`, `menu`, `group`, `groupTitle`, `groupBody`, `option`, `submenu`, `empty`. See [Tailwind](#tailwind)                                                               |
 | placeholder       | string                      | Select...                        | Input Placeholder                                                                                                                                                                                                                                                                                                                                                                                                               |
 | disableChip       | bool                        | false                            | disable multiple select chips show value or total selected value only                                                                                                                                                                                                                                                                                                                                                           |
 | attr              | object                      |                                  | props for the wrapper div, e.g. `id` or `data-*`. Its `aria-*` (`aria-label`, `aria-labelledby`, `aria-describedby`, `aria-invalid`, ...) also go to whichever element is the combobox                                                                                                                                                                                                                                          |
@@ -144,6 +147,30 @@ const options = [
   }
 ]
 ```
+
+A group with `collapsible: true` shows and hides its options on a click of its title (or Enter); `collapsed: true` starts it closed. `type: 'submenu'` makes the title a row that opens its options in a popover beside the menu, on hover, click, Enter or Arrow Right. Submenus nest to any depth, and groups go inside them ([demo](https://arif-un.github.io/react-multiple-select-dropdown-lite/examples/#submenus)). Search finds options in closed groups and submenus too.
+
+```js
+const options = [
+  {
+    type: 'group',
+    title: 'Citrus',
+    collapsible: true,
+    collapsed: true,
+    childs: [lemon, lime]
+  },
+  {
+    type: 'submenu',
+    title: 'Vegetables',
+    childs: [
+      carrot,
+      { type: 'submenu', title: 'Leafy greens', childs: [kale, spinach] }
+    ]
+  }
+]
+```
+
+The stylesheet places a submenu (`.msl-submenu`) beside its title with CSS anchor positioning, on the other side or above where there is no room. Its title's `aria-expanded` is the open state for your CSS.
 
 ### Controlled value
 
@@ -197,19 +224,22 @@ import 'react-multiple-select-dropdown-lite/dist/index.css'
 
 | Key             | Action                                                                                           |
 | --------------- | ------------------------------------------------------------------------------------------------ |
-| Arrow Down / Up | open the menu and move the highlight over enabled options                                        |
+| Arrow Down / Up | open the menu and move the highlight over enabled options (within the submenu it is in)          |
+| Arrow Right     | on a submenu title, open it and highlight its first option                                       |
+| Arrow Left      | in a submenu, close it and highlight its title                                                   |
 | Home / End      | first / last option (in the search field only while it is empty)                                 |
 | Enter           | pick the highlighted option, else the first search result that isn't `disabled`                  |
+| Enter           | on a highlighted submenu title, open it; on a collapsible group's title, toggle it               |
 | , (comma)       | pick the first search result that isn't `disabled`, or create the typed value with `customValue` |
 | Backspace       | in an empty search field, remove the last chip (unless `deleteOnBackspace={false}`)              |
-| Escape          | close the menu, not a surrounding dialog or popover                                              |
+| Escape          | close the menu, not a surrounding dialog or popover; in a submenu, close that submenu            |
 | Tab             | close the menu and move on in page order, after any button in the menu                           |
 | Enter / Space   | on a chip's delete button or the clear button, press it                                          |
 | any character   | on the focused dropdown, open the menu                                                           |
 
 ### Accessibility
 
-The search field (or the dropdown itself when there is no search field, and with `searchInMenu` while closed) is an ARIA combobox that controls a listbox of options, with `aria-expanded`, `aria-activedescendant`, `aria-selected` and `aria-disabled`. Groups are `role="group"`, named by their title. Give it an accessible name through `attr`:
+The search field (or the dropdown itself when there is no search field, and with `searchInMenu` while closed) is an ARIA combobox that controls a listbox of options, with `aria-expanded`, `aria-activedescendant`, `aria-selected` and `aria-disabled`. Groups are `role="group"`, named by their title. The titles of collapsible groups and submenus are options with `aria-expanded`, and a submenu is a `role="group"` inside the listbox, named by its title. Give it an accessible name through `attr`:
 
 ```jsx
 <MultiSelect options={options} attr={{ 'aria-label': 'Fruits' }} />
@@ -274,11 +304,31 @@ State classes to style against:
 | `msl-option-focused`           | option  | highlighted by the keyboard           |
 | `msl-option-disable`           | option  | disabled                              |
 
-Other parts: `msl-wrp` (wrapper), `msl` (the input box; open, it holds the options too, in the top layer over the wrapper), `msl-chip`, `msl-chip-delete`, `msl-single-value`, `msl-input`, `msl-search` (the search field's box with `searchInMenu`), `msl-clear-btn`, `msl-arrow-btn`, `msl-options`, `msl-option`, `msl-grp` (a group), `msl-grp-title`.
+Other parts: `msl-wrp` (wrapper), `msl` (the input box; open, it holds the options too, in the top layer over the wrapper), `msl-chip`, `msl-chip-delete`, `msl-single-value`, `msl-input`, `msl-search` (the search field's box with `searchInMenu`), `msl-clear-btn`, `msl-arrow-btn`, `msl-options`, `msl-option`, `msl-grp` (a group), `msl-grp-title`, `msl-grp-body` (a collapsible group's childs), `msl-submenu` (a submenu's popover).
+
+### Animations
+
+Opening needs nothing from the component: the options, a submenu and an expanding group's body are new elements, so `@starting-style` (Tailwind's `starting:`) animates them in. Closing, whatever closes stays until the CSS animations and transitions that its `data-closing` starts have ended: the open box (`.msl[data-closing]`, still `.msl-active`), a copy of a closed submenu (`.msl-submenu[data-closing]`), and a copy of a collapsed group's body (`.msl-grp-body[data-closing]`). Without exit CSS it closes at once. A closing menu is inert, and focus leaves it.
+
+```css
+.msl-options,
+.msl-submenu {
+  transition: opacity 150ms;
+  @starting-style {
+    opacity: 0;
+  }
+}
+.msl[data-closing] .msl-options,
+.msl-submenu[data-closing] {
+  opacity: 0;
+}
+```
+
+With Tailwind: `starting:opacity-0 in-data-closing:opacity-0` on `classNames.menu`, `data-closing:opacity-0` on `classNames.submenu`. The [docs](https://arif-un.github.io/react-multiple-select-dropdown-lite/styling/#animations) have an example where the open box grows and shrinks with its content.
 
 ### Tailwind
 
-Skip `dist/index.css` and style each part with `classNames`. State is in attributes, for Tailwind's variants: options have `aria-selected`, `aria-disabled` and `data-focused` (the keyboard highlight), the open control `data-open` (and `data-up` when it opens upward), the wrapper `data-disabled`.
+Skip `dist/index.css` and style each part with `classNames`. State is in attributes, for Tailwind's variants: options have `aria-selected`, `aria-disabled` and `data-focused` (the keyboard highlight), the open control `data-open` (and `data-up` when it opens upward), the wrapper `data-disabled`, and whatever is closing `data-closing` (see [Animations](#animations)).
 
 ```jsx
 <MultiSelect

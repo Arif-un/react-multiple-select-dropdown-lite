@@ -1,0 +1,83 @@
+@media (prefers-reduced-motion: no-preference) {
+  /* the open box grows to fit the options, and shrinks back: their grid row goes from 0fr to 1fr */
+  .animated .msl {
+    grid-template-rows: max-content 0fr;
+    transition:
+      grid-template-rows 200ms,
+      box-shadow 200ms;
+  }
+  .animated .msl-active {
+    grid-template-rows: max-content 1fr;
+  }
+  .animated .msl-active[data-closing] {
+    grid-template-rows: max-content 0fr;
+    box-shadow: none;
+  }
+  /* opening upward, the options come first: they only fade */
+  .animated .msl-active-up {
+    grid-template-rows: 1fr max-content;
+  }
+
+  .animated .msl-options {
+    transition: opacity 200ms;
+
+    @starting-style {
+      opacity: 0;
+    }
+  }
+  .animated .msl[data-closing] .msl-options {
+    opacity: 0;
+  }
+
+  /* a submenu fades in, and its copy out */
+  .animated .msl-submenu {
+    transition:
+      opacity 150ms,
+      translate 150ms;
+
+    @starting-style {
+      opacity: 0;
+      translate: -6px 0;
+    }
+
+    &[data-closing] {
+      opacity: 0;
+    }
+  }
+
+  /* a collapsible group slides open and shut: the one box in its body, a grid row from 0fr to 1fr.
+     Its options fade too */
+  .animated .msl-grp-body {
+    display: grid;
+    grid-template-rows: 1fr;
+    transition: grid-template-rows 200ms;
+
+    @starting-style {
+      grid-template-rows: 0fr;
+    }
+
+    &[data-closing] {
+      grid-template-rows: 0fr;
+    }
+
+    > div {
+      overflow: hidden;
+      min-height: 0;
+    }
+  }
+  .animated .msl-grp-body .msl-option {
+    transition: opacity 200ms;
+
+    @starting-style {
+      opacity: 0;
+    }
+  }
+  .animated .msl-grp-body[data-closing] .msl-option {
+    opacity: 0;
+  }
+
+  /* the chevrons turn */
+  .animated [aria-expanded]::after {
+    transition: rotate 150ms;
+  }
+}
