@@ -2,9 +2,9 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [3.0.0-beta.1] - 2026-10-16
 
-Breaking release: one value format, React 18+, modern bundles, a native search input, and an open menu that is one box in the top layer. The JS bundles are about 19% smaller, about 7% smaller gzipped. The stylesheet grew from 1.4 to 1.7 kB gzipped.
+Breaking release: one value format, React 18+, modern bundles, a native search input, and an open menu that is one box in the top layer. The JS bundles are about 19% smaller, about 6% smaller gzipped. The stylesheet grew from 1.4 to 1.7 kB gzipped.
 
 ### Upgrade notes
 
@@ -202,6 +202,7 @@ Most apps need no changes. Check these if they apply to you:
 
 - Single select bugs
 
+[3.0.0-beta.1]: https://www.npmjs.com/package/react-multiple-select-dropdown-lite/v/3.0.0-beta.1
 [2.1.0]: https://www.npmjs.com/package/react-multiple-select-dropdown-lite/v/2.1.0
 [2.0.6]: https://www.npmjs.com/package/react-multiple-select-dropdown-lite/v/2.0.6
 [2.0.5]: https://www.npmjs.com/package/react-multiple-select-dropdown-lite/v/2.0.5
