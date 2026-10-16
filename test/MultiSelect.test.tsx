@@ -2854,19 +2854,26 @@ describe('keyboard', () => {
     expect(isOpen()).toBe(true)
   })
 
-  it('Tab from an option or the listbox closes, not prevented: the browser moves on from where it was', () => {
+  it('Tab from an option or the listbox closes after the browser moves on from it, not prevented', async () => {
     const { q, root, option, isOpen } = setupKeys({
       disableSearch: true,
       defaultValue: ['apple']
     })
+    const tick = () => act(() => new Promise((r) => setTimeout(r)))
     fireEvent.click(root)
     // a click focuses the option, and no search field takes focus back
     option('Banana').focus()
     expect(press(option('Banana'), 'Tab')).toBe(true)
+    // the browser moves on from the listbox, still there: Firefox and Safari restart elsewhere from a removed
+    // element, Firefox from a clicked option too
+    expect(isOpen()).toBe(true)
+    expect(document.activeElement).toBe(q('.msl-options'))
+    await tick()
     expect(isOpen()).toBe(false)
     fireEvent.click(root)
     q('.msl-options').focus()
     expect(press(q('.msl-options'), 'Tab', { shiftKey: true })).toBe(true)
+    await tick()
     expect(isOpen()).toBe(false)
   })
 
