@@ -217,11 +217,18 @@
   }
 }
 
-:where(.msl-active) > .msl-options {
+.msl-search {
+  grid-column: 1 / -1;
+  border: 0 solid var(--msl-divider-color);
+}
+
+:where(.msl-active) > .msl-options,
+:where(.msl-active) > .msl-search {
   border-block-start-width: 1px;
 }
 
-:where(.msl-active-up) > .msl-options {
+:where(.msl-active-up) > .msl-options,
+:where(.msl-active-up) > .msl-search {
   border-block-end-width: 1px;
 }
 
