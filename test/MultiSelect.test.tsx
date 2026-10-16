@@ -1,11 +1,11 @@
 // Characterization tests: they pin the current behavior, quirks included.
 // Tests named "current behavior: ..." document known bugs; a fix should update them on purpose.
-import { memo, Suspense, useEffect, useRef, useState } from 'react'
+import { memo, StrictMode, Suspense, useEffect, useRef, useState } from 'react'
 import type { ComponentProps } from 'react'
 import { createPortal, flushSync } from 'react-dom'
 import { renderToString } from 'react-dom/server'
 import { jsx } from 'react/jsx-runtime'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import type {
   MultiSelectChipProps,
@@ -220,6 +220,7 @@ describe('render', () => {
       menu: '.msl-options',
       group: '[role="group"]',
       groupTitle: '.msl-grp-title',
+      groupBody: '.msl-grp-body',
       option: '[role="option"]',
       empty: '.msl-option-disable:not([role])'
     }
@@ -236,7 +237,8 @@ describe('render', () => {
       options: [
         ...opts,
         { type: 'group', title: 'G', childs: [{ label: 'Kiwi', value: 'k' }] },
-        { type: 'group', title: 'None', childs: [] }
+        { type: 'group', title: 'None', childs: [] },
+        { type: 'group', title: 'C', collapsible: true, childs: [] }
       ]
     })
     fireEvent.click(root)
@@ -1006,18 +1008,16 @@ describe('searchInMenu', () => {
       100
     )
     const { root, q } = setup({ searchInMenu: true })
-    // the wrapper 60px down; the open box 150px tall, its options 100px, the field 30px: the control is 20px
+    // the wrapper 60px down; the open box 150px tall: the field 30px, the options 100px, the control 20px
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
       function (this: HTMLElement) {
         return (this === root
           ? { top: 60, bottom: 80, left: 5, width: 50 }
-          : {
-              height: this.hasAttribute('role')
-                ? 100
-                : this.classList.contains('msl-search')
-                  ? 30
-                  : 150
-            }) as unknown as DOMRect
+          : this.hasAttribute('role')
+            ? { top: 30, bottom: 130, height: 100 }
+            : this.classList.contains('msl-search')
+              ? { top: 0, bottom: 30, height: 30 }
+              : { top: 0, bottom: 150, height: 150 }) as unknown as DOMRect
       }
     )
     fireEvent.click(root)
@@ -1758,9 +1758,9 @@ describe('menu open / close', () => {
       function (this: HTMLElement) {
         return (this === root
           ? { top: 60, bottom: 80, left: 5, width: 50 }
-          : {
-              height: this.hasAttribute('role') ? 100 : 120
-            }) as unknown as DOMRect
+          : this.hasAttribute('role')
+            ? { top: 0, bottom: 100, height: 100 }
+            : { top: 0, bottom: 120, height: 120 }) as unknown as DOMRect
       }
     )
     fireEvent.click(root)
@@ -1799,16 +1799,19 @@ describe('menu open / close', () => {
   })
 
   it.each([
-    ['below', 0, 'top', '0px', '0 0', '180px'],
-    ['above', 60, 'bottom', '30px', '0 100%', '120px']
+    ['below', 0, 'top', '0px', '0 0', '178px', [10, 59]],
+    ['above', 60, 'bottom', '29px', '0 100%', '120px', [1, 50]]
   ])(
     'scales as a scaled part of the page scales the dropdown (%s)',
-    (_, top, side, at, origin, room) => {
+    (_, top, side, at, origin, room, [listTop, listBottom]) => {
       vi.spyOn(document.documentElement, 'clientHeight', 'get').mockReturnValue(
         100
       )
       // drawn at half its 200px layout width: the top layer drops that scale, so the box scales itself.
-      // Drawn 60px tall, its options 50px: the control is 10px
+      // Drawn 60px tall, its 2px borders 1px: the options 49px, the control 9px and both borders
+      const css = document.head.appendChild(document.createElement('style'))
+      css.textContent = '.msl { border: 2px solid }'
+      onTestFinished(() => css.remove())
       vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(200)
       vi.spyOn(
         HTMLElement.prototype,
@@ -1816,9 +1819,9 @@ describe('menu open / close', () => {
       ).mockImplementation(function (this: HTMLElement) {
         return (this.classList.contains('msl-wrp')
           ? { left: 10, top, bottom: top + 10, width: 100 }
-          : {
-              height: this.hasAttribute('role') ? 50 : 60
-            }) as unknown as DOMRect
+          : this.hasAttribute('role')
+            ? { top: listTop, bottom: listBottom, height: 49 }
+            : { top: 0, bottom: 60, height: 60 }) as unknown as DOMRect
       })
       const { root } = setup()
       fireEvent.click(root)
@@ -1831,7 +1834,7 @@ describe('menu open / close', () => {
       ])
       expect(pop().style.getPropertyValue(side)).toBe(at)
       // in the wrapper's own pixels
-      expect(root.style.minHeight).toBe('20px')
+      expect(root.style.minHeight).toBe('22px')
       expect(
         box()!
           .querySelector<HTMLElement>('.msl-options')!
@@ -3298,5 +3301,540 @@ describe('keyboard', () => {
     } finally {
       delete (Element.prototype as Partial<Element>).scrollIntoView
     }
+  })
+})
+
+const fruits = [
+  {
+    type: 'group',
+    title: 'Citrus',
+    collapsible: true,
+    childs: [
+      { label: 'Lemon', value: 'lemon' },
+      { label: 'Lime', value: 'lime' }
+    ]
+  },
+  {
+    type: 'group',
+    title: 'Berries',
+    collapsible: true,
+    collapsed: true,
+    childs: [{ label: 'Blueberry', value: 'blueberry' }]
+  }
+]
+
+const nested = [
+  { label: 'Apple', value: 'apple' },
+  {
+    type: 'submenu',
+    title: 'Veg',
+    childs: [
+      { label: 'Carrot', value: 'carrot' },
+      {
+        type: 'submenu',
+        title: 'Greens',
+        childs: [
+          { label: 'Kale', value: 'kale' },
+          { label: 'Leek', value: 'leek', disabled: true }
+        ]
+      },
+      { label: 'Potato', value: 'potato' }
+    ]
+  },
+  { label: 'Banana', value: 'banana' }
+]
+
+function setupTree(props: MultiSelectProps = {}) {
+  const utils = setup(props)
+  return {
+    ...utils,
+    focused: () => utils.q('.msl-option-focused')?.textContent,
+    // the open submenus, by title, outermost first
+    subs: () =>
+      utils
+        .qa('.msl-submenu')
+        .map(
+          (el) =>
+            document.getElementById(el.getAttribute('aria-labelledby')!)!
+              .textContent
+        ),
+    titles: () =>
+      utils.qa('.msl-grp-title').map((el) => el.getAttribute('aria-expanded'))
+  }
+}
+
+describe('collapsible groups', () => {
+  it('the title shows and hides the childs, hidden at first with collapsed', () => {
+    const { root, qa, optionTexts, titles, isOpen } = setupTree({
+      options: fruits
+    })
+    fireEvent.click(root)
+    const [citrus, berries] = qa('.msl-grp-title')
+    // a row the keyboard reaches, which still names its group
+    expect(citrus.getAttribute('role')).toBe('option')
+    expect(citrus.hasAttribute('aria-selected')).toBe(false)
+    expect(
+      citrus.closest('[role="group"]')!.getAttribute('aria-labelledby')
+    ).toBe(citrus.id)
+    expect(titles()).toEqual(['true', 'false'])
+    expect(optionTexts()).toEqual(['Lemon', 'Lime'])
+    fireEvent.click(citrus)
+    fireEvent.click(berries)
+    expect(titles()).toEqual(['false', 'true'])
+    expect(optionTexts()).toEqual(['Blueberry'])
+    expect(isOpen()).toBe(true)
+    // kept from one open to the next
+    fireEvent.keyDown(document, { key: 'Escape' })
+    fireEvent.click(root)
+    expect(titles()).toEqual(['false', 'true'])
+    fireEvent.click(qa('.msl-grp-title')[1])
+    expect(optionTexts()).toEqual([])
+  })
+
+  it('arrows reach the titles, Enter toggles them', () => {
+    const { input, focused, titles, optionTexts, onChange } = setupTree({
+      options: fruits
+    })
+    const key = (k: string) => {
+      press(input(), k)
+      return focused()
+    }
+    expect(key('ArrowDown')).toBe('Citrus')
+    expect(input().getAttribute('aria-activedescendant')).toBe(
+      document.querySelector('.msl-grp-title')!.id
+    )
+    expect(key('Enter')).toBe('Citrus')
+    expect(titles()).toEqual(['false', 'false'])
+    expect(['ArrowDown', 'Enter', 'ArrowDown', 'ArrowDown'].map(key)).toEqual([
+      'Berries',
+      'Berries',
+      'Blueberry',
+      'Blueberry'
+    ])
+    expect(optionTexts()).toEqual(['Blueberry'])
+    expect(key('Home')).toBe('Citrus')
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('Enter on a focused title toggles it, not the highlighted row', () => {
+    const { root, qa, titles, focused } = setupTree({
+      options: fruits,
+      disableSearch: true
+    })
+    press(root, 'End')
+    expect(focused()).toBe('Berries')
+    press(qa('.msl-grp-title')[0], 'Enter')
+    expect(titles()).toEqual(['false', 'false'])
+  })
+
+  it('titles stay reachable past the limit, and getValue never sees a group', () => {
+    const { input, focused } = setupTree({
+      options: [...fruits, { label: 'Kiwi', value: 'kiwi' }],
+      limit: 1,
+      defaultValue: ['lemon'],
+      // throws on a group, which has no value
+      getValue: (opt: MultiSelectOption) => opt.value.toString()
+    })
+    const key = (k: string) => {
+      press(input(), k)
+      return focused()
+    }
+    // Lime and Kiwi are disabled
+    expect(
+      ['ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowDown'].map(key)
+    ).toEqual(['Citrus', 'Lemon', 'Berries', 'Berries'])
+  })
+})
+
+describe('submenus', () => {
+  it('a title row opens the childs in a group beside it, placed by CSS anchors', () => {
+    const { root, option, qa, optionTexts, subs } = setupTree({
+      options: nested,
+      classNames: { submenu: 'tw-sub' }
+    })
+    fireEvent.click(root)
+    const veg = option('Veg')
+    expect(veg.getAttribute('role')).toBe('option')
+    expect(veg.getAttribute('aria-expanded')).toBe('false')
+    expect(veg.hasAttribute('aria-selected')).toBe(false)
+    expect(veg.hasAttribute('style')).toBe(false)
+    expect(optionTexts()).toEqual(['Apple', 'Veg', 'Banana'])
+    fireEvent.click(veg)
+    fireEvent.click(veg)
+    expect(veg.getAttribute('aria-expanded')).toBe('true')
+    expect(subs()).toEqual(['Veg'])
+    const [menu] = qa('.msl-submenu')
+    expect(menu.getAttribute('role')).toBe('group')
+    expect(menu.className).toBe('msl-submenu tw-sub')
+    // in the listbox, right after its title
+    expect(veg.nextElementSibling).toBe(menu)
+    expect(optionTexts()).toEqual([
+      'Apple',
+      'Veg',
+      'Carrot',
+      'Greens',
+      'Potato',
+      'Banana'
+    ])
+    fireEvent.click(option('Greens'))
+    expect(subs()).toEqual(['Veg', 'Greens'])
+    // an anchor name per depth: one open submenu each
+    const anchors = (el: HTMLElement) => [
+      (el.style as CSSStyleDeclaration & { anchorName: string }).anchorName,
+      (el.nextElementSibling as HTMLElement).style.positionAnchor
+    ]
+    expect(anchors(veg)).toEqual(['--msl-0', '--msl-0'])
+    expect(anchors(option('Greens'))).toEqual(['--msl-1', '--msl-1'])
+  })
+
+  it('picks in submenus; a pick that closes the menu closes them too', () => {
+    const { root, option, chips, onChange, subs, isOpen, rerender } = setupTree(
+      { options: nested }
+    )
+    fireEvent.click(root)
+    fireEvent.click(option('Veg'))
+    fireEvent.click(option('Greens'))
+    fireEvent.click(option('Kale'))
+    expect(chips()).toEqual(['Kale'])
+    expect(onChange).toHaveBeenLastCalledWith(
+      ['kale'],
+      [{ label: 'Kale', value: 'kale' }]
+    )
+    // multi select stays open, submenus too
+    expect(subs()).toEqual(['Veg', 'Greens'])
+    rerender(<MultiSelect options={nested} singleSelect />)
+    fireEvent.click(option('Carrot'))
+    expect(isOpen()).toBe(false)
+    fireEvent.click(root)
+    expect(subs()).toEqual([])
+  })
+
+  it('a pause on a row opens its submenu and closes deeper ones; rows crossed on the way change nothing', () => {
+    vi.useFakeTimers()
+    try {
+      const { root, input, option, subs } = setupTree({ options: nested })
+      fireEvent.click(root)
+      const rest = (text: string, ms = 100) => {
+        fireEvent.mouseEnter(option(text))
+        act(() => vi.advanceTimersByTime(ms))
+        return subs()
+      }
+      expect(rest('Veg', 99)).toEqual([])
+      act(() => vi.advanceTimersByTime(1))
+      expect(subs()).toEqual(['Veg'])
+      expect(rest('Greens')).toEqual(['Veg', 'Greens'])
+      expect(rest('Carrot')).toEqual(['Veg'])
+      // over Banana on the way back to Potato: too quick to close Veg
+      expect(rest('Banana', 50)).toEqual(['Veg'])
+      expect(rest('Potato')).toEqual(['Veg'])
+      expect(rest('Apple')).toEqual([])
+      // a pause cut short by the menu closing opens nothing
+      fireEvent.mouseEnter(option('Veg'))
+      press(input(), 'Escape')
+      act(() => vi.advanceTimersByTime(100))
+      fireEvent.click(root)
+      expect(subs()).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('Right Arrow or Enter go into a submenu, Left Arrow or Escape back out; arrows stay in it', () => {
+    const { input, focused, subs, isOpen, option } = setupTree({
+      options: nested
+    })
+    const key = (k: string) => {
+      expect(press(input(), k)).toBe(false)
+      return focused()
+    }
+    expect(['ArrowDown', 'ArrowDown', 'ArrowRight'].map(key)).toEqual([
+      'Apple',
+      'Veg',
+      'Carrot'
+    ])
+    expect(subs()).toEqual(['Veg'])
+    // Banana, at the top, is out of reach
+    expect(
+      ['ArrowDown', 'ArrowDown', 'ArrowDown', 'Home', 'End', 'ArrowUp'].map(key)
+    ).toEqual(['Greens', 'Potato', 'Potato', 'Carrot', 'Potato', 'Greens'])
+    // Leek is disabled
+    expect(['Enter', 'ArrowDown'].map(key)).toEqual(['Kale', 'Kale'])
+    expect(input().getAttribute('aria-activedescendant')).toBe(
+      option('Kale').id
+    )
+    expect(subs()).toEqual(['Veg', 'Greens'])
+    expect(key('ArrowLeft')).toBe('Greens')
+    expect(subs()).toEqual(['Veg'])
+    expect(['ArrowRight', 'Escape'].map(key)).toEqual(['Kale', 'Greens'])
+    expect(key('Escape')).toBe('Veg')
+    expect(subs()).toEqual([])
+    expect(isOpen()).toBe(true)
+    // the caret's, off a submenu
+    expect(press(input(), 'ArrowLeft')).toBe(true)
+    key('ArrowUp')
+    expect(press(input(), 'ArrowRight')).toBe(true)
+    key('Escape')
+    expect(isOpen()).toBe(false)
+  })
+
+  it('Enter on a focused title opens it, not the highlighted row', () => {
+    const { root, option, subs, focused, onChange } = setupTree({
+      options: nested,
+      disableSearch: true
+    })
+    press(root, 'ArrowDown')
+    press(option('Veg'), 'Enter')
+    expect(subs()).toEqual(['Veg'])
+    expect(focused()).toBe('Apple')
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('an empty submenu shows its emptyDataLabel, the highlight left on its title', () => {
+    const { input, focused, subs, q } = setupTree({
+      options: [
+        { type: 'submenu', title: 'None', childs: [], emptyDataLabel: 'Nada' }
+      ]
+    })
+    press(input(), 'ArrowDown')
+    expect(
+      ['ArrowRight', 'Enter'].map((k) => (press(input(), k), focused()))
+    ).toEqual(['None', 'None'])
+    expect(subs()).toEqual(['None'])
+    expect(q('.msl-submenu').textContent).toBe('Nada')
+  })
+
+  it('the highlight holds as a submenu opens above it', () => {
+    vi.useFakeTimers()
+    try {
+      const { input, option, focused } = setupTree({
+        options: [
+          {
+            type: 'submenu',
+            title: 'S1',
+            childs: [{ label: 'Kiwi', value: 'kiwi' }]
+          },
+          {
+            type: 'submenu',
+            title: 'S2',
+            childs: [{ label: 'Lime', value: 'lime' }]
+          },
+          { label: 'Apple', value: 'apple' }
+        ]
+      })
+      const rest = (text: string) => {
+        fireEvent.mouseEnter(option(text))
+        act(() => vi.advanceTimersByTime(100))
+      }
+      press(input(), 'End')
+      rest('S1')
+      expect(focused()).toBe('Apple')
+      press(input(), 'ArrowUp')
+      expect(focused()).toBe('S2')
+      // S1 closes: S2 moves up
+      rest('S2')
+      expect(focused()).toBe('S2')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('search finds options in submenus and collapsed groups, listed flat', () => {
+    const { input, optionTexts, qa } = setupTree({
+      options: [...nested, ...fruits]
+    })
+    type(input(), 'l')
+    expect(optionTexts()).toEqual([
+      'Apple',
+      'Kale',
+      'Leek',
+      'Lemon',
+      'Lime',
+      'Blueberry'
+    ])
+    expect(qa('.msl-options [aria-expanded]')).toEqual([])
+  })
+
+  it('shows submenus as manual popovers where the browser has the API', () => {
+    const shown: Element[] = []
+    const proto = HTMLElement.prototype as Partial<HTMLElement>
+    proto.showPopover = function (this: HTMLElement) {
+      shown.push(this)
+    }
+    try {
+      const { root, option, q } = setupTree({ options: nested })
+      fireEvent.click(root)
+      fireEvent.click(option('Veg'))
+      const menu = q('.msl-submenu')
+      expect(shown).toEqual([pop(), menu])
+      expect(menu.getAttribute('popover')).toBe('manual')
+    } finally {
+      delete proto.showPopover
+    }
+  })
+})
+
+describe('exit animations', () => {
+  const proto = Element.prototype as Partial<Element>
+  const timing = (endTime: number) => ({
+    effect: { getComputedTiming: () => ({ endTime }) },
+    finish: vi.fn()
+  })
+  // jsdom has no animations: these run one always (a hover's transition), one never ending (a spinner),
+  // and one at or in a [data-closing] element until end()
+  function animate() {
+    let resolve = () => {}
+    const hover = { ...timing(200), finished: new Promise(() => {}) }
+    const spin = timing(Infinity)
+    const exit = {
+      ...timing(150),
+      finished: new Promise<void>((r) => (resolve = r))
+    }
+    proto.getAnimations = function (this: Element) {
+      const closing =
+        this.closest('[data-closing]') || this.querySelector('[data-closing]')
+      return [hover, spin, ...(closing ? [exit] : [])] as never
+    }
+    return {
+      hover,
+      spin,
+      end: () =>
+        act(async () => {
+          resolve()
+        })
+    }
+  }
+  afterEach(() => {
+    delete proto.getAnimations
+    delete (HTMLElement.prototype as Partial<HTMLElement>).showPopover
+  })
+
+  it('the closed menu stays until the exit animations data-closing starts end, inert, with its search', async () => {
+    const a = animate()
+    const { root, q, input, option, optionTexts, onMenuClose } = setup()
+    fireEvent.click(root)
+    type(input(), 'an')
+    option('Banana').focus()
+    press(option('Banana'), 'Escape')
+    const ctl = q('.msl')
+    expect(ctl.hasAttribute('data-closing')).toBe(true)
+    // the open look stays: the exit animates from it
+    expect(ctl.hasAttribute('data-open')).toBe(true)
+    expect(q('.msl-options').hasAttribute('inert')).toBe(true)
+    expect(input().getAttribute('aria-expanded')).toBe('false')
+    expect(onMenuClose).toHaveBeenCalledTimes(1)
+    // out of the inert menu
+    expect(document.activeElement).toBe(input())
+    expect(input().value).toBe('an')
+    expect(optionTexts()).toEqual(['Banana'])
+    // the hover's transition ran before: not the exit's, not cut short
+    expect(a.hover.finish).not.toHaveBeenCalled()
+    await a.end()
+    expect(q('.msl-options')).toBeNull()
+    expect(ctl.hasAttribute('data-closing')).toBe(false)
+    expect(input().value).toBe('')
+    expect(a.spin.finish).not.toHaveBeenCalled()
+  })
+
+  it('opened again mid exit, it is the same menu, as it was', async () => {
+    const a = animate()
+    const { root, q, input } = setup({ searchInMenu: true })
+    fireEvent.click(root)
+    const field = input()
+    press(field, 'Escape')
+    // no inline field: the wrapper
+    expect(document.activeElement).toBe(root)
+    expect(q('.msl-search').hasAttribute('inert')).toBe(true)
+    fireEvent.click(root)
+    expect(q('.msl').hasAttribute('data-closing')).toBe(false)
+    expect(q('.msl-search').hasAttribute('inert')).toBe(false)
+    expect(q('.msl-options').hasAttribute('inert')).toBe(false)
+    expect(input()).toBe(field)
+    expect(document.activeElement).toBe(field)
+    // the first close's end leaves it open
+    await a.end()
+    expect(q('.msl-options')).not.toBeNull()
+  })
+
+  it('a closed submenu leaves a copy where it was, until it has left; open again, the copy goes', async () => {
+    const a = animate()
+    const shown: Element[] = []
+    ;(HTMLElement.prototype as Partial<HTMLElement>).showPopover = function (
+      this: HTMLElement
+    ) {
+      shown.push(this)
+    }
+    const { input, q, qa } = setupTree({ options: nested })
+    press(input(), 'ArrowDown')
+    press(input(), 'ArrowDown')
+    press(input(), 'ArrowRight')
+    const menu = q('.msl-submenu')
+    vi.spyOn(menu, 'getBoundingClientRect').mockReturnValue({
+      left: 10,
+      top: 20
+    } as DOMRect)
+    press(input(), 'ArrowLeft')
+    const [copy] = qa('.msl-submenu')
+    expect(menu.isConnected).toBe(false)
+    expect(copy.hasAttribute('data-closing')).toBe(true)
+    expect(copy.hasAttribute('inert')).toBe(true)
+    expect(copy.querySelector('[id]')).toBeNull()
+    // there, as its title may place another submenu
+    expect([copy.style.left, copy.style.top, copy.style.margin]).toEqual([
+      '10px',
+      '20px',
+      '0px'
+    ])
+    expect(shown).toEqual([pop(), menu, copy])
+    // its enter animations would run again on a new element
+    expect(a.hover.finish).toHaveBeenCalled()
+    expect(a.spin.finish).not.toHaveBeenCalled()
+    await act(async () => {})
+    expect(copy.isConnected).toBe(true)
+    press(input(), 'ArrowRight')
+    expect(copy.isConnected).toBe(false)
+    expect(qa('.msl-submenu')).toHaveLength(1)
+    press(input(), 'ArrowLeft')
+    await a.end()
+    expect(qa('.msl-submenu')).toEqual([])
+  })
+
+  it("strict mode's test unmount leaves no copy", async () => {
+    animate()
+    const { container } = render(
+      <StrictMode>
+        <MultiSelect options={nested} />
+      </StrictMode>
+    )
+    fireEvent.click(container.firstChild as Element)
+    fireEvent.click(
+      [...container.querySelectorAll('.msl-option')].find(
+        (el) => el.textContent === 'Veg'
+      )!
+    )
+    await act(async () => {})
+    expect(container.querySelectorAll('.msl-submenu')).toHaveLength(1)
+    expect(container.querySelector('[data-closing]')).toBeNull()
+  })
+
+  it("a collapsed group's rows leave a copy, until it has left", async () => {
+    const a = animate()
+    const { root, q } = setupTree({ options: fruits })
+    fireEvent.click(root)
+    const title = q('.msl-grp-title')
+    // the rows' box, for the copy, with one box in it: a grid row of that animates the height
+    const body = title.nextElementSibling!
+    expect(body.className).toBe('msl-grp-body ')
+    expect(body.children).toHaveLength(1)
+    expect(body.firstElementChild!.hasAttribute('class')).toBe(false)
+    fireEvent.click(title)
+    const copy = q('.msl-grp > .msl-grp-body[data-closing]')
+    expect(copy.hasAttribute('inert')).toBe(true)
+    expect(copy.hasAttribute('popover')).toBe(false)
+    expect(copy.querySelector('[id]')).toBeNull()
+    expect(
+      [...copy.querySelectorAll('.msl-option')].map((el) => el.textContent)
+    ).toEqual(['Lemon', 'Lime'])
+    await a.end()
+    expect(q('[data-closing]')).toBeNull()
   })
 })

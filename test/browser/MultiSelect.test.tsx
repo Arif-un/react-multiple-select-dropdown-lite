@@ -1148,3 +1148,323 @@ it('keeps the highlighted option scrolled into view', async () => {
   expect(item.bottom).toBeLessThanOrEqual(box.bottom + 1)
   expect(item.top).toBeGreaterThanOrEqual(box.top - 1)
 })
+
+const tree = [
+  { label: 'Apple', value: 'apple' },
+  {
+    type: 'submenu',
+    title: 'Veg',
+    childs: [
+      { label: 'Carrot', value: 'carrot' },
+      {
+        type: 'submenu',
+        title: 'Greens',
+        childs: [{ label: 'Kale', value: 'kale' }]
+      }
+    ]
+  },
+  { label: 'Banana', value: 'banana' }
+]
+
+const submenu = (title: string) =>
+  [...document.querySelectorAll<HTMLElement>('.msl-submenu')].find(
+    (el) =>
+      document.getElementById(el.getAttribute('aria-labelledby')!)!
+        .textContent === title
+  )
+
+// the test page is 414px wide: room for a 120px submenu on one side
+const narrow = { width: 150 }
+
+it('opens a submenu beside its title in the top layer, its first row level with the title', async () => {
+  const { root, option } = await setup({ options: tree, style: narrow })
+  await userEvent.click(root)
+  await userEvent.click(option('Veg'))
+  await userEvent.click(option('Greens'))
+  for (const [title, first] of [
+    ['Veg', 'Carrot'],
+    ['Greens', 'Kale']
+  ]) {
+    const sub = submenu(title)!
+    expect(sub.matches(':popover-open')).toBe(true)
+    const t = option(title).getBoundingClientRect()
+    expect(sub.getBoundingClientRect().left).toBeCloseTo(t.right, 0)
+    expect(option(first).getBoundingClientRect().top).toBeCloseTo(t.top, 0)
+  }
+  // the deeper one paints over the one it opens from
+  const kale = option('Kale').getBoundingClientRect()
+  expect(document.elementFromPoint(kale.left + 2, kale.top + 2)).toBe(
+    option('Kale')
+  )
+})
+
+it('opens a submenu on the other side without room', async () => {
+  const { root, option } = await setup({
+    options: tree,
+    style: { ...narrow, marginInlineStart: innerWidth - 170 }
+  })
+  await userEvent.click(root)
+  await userEvent.click(option('Veg'))
+  expect(submenu('Veg')!.getBoundingClientRect().right).toBeCloseTo(
+    option('Veg').getBoundingClientRect().left,
+    0
+  )
+})
+
+it('opens a submenu with room on neither side over its title, on screen', async () => {
+  const { root, option } = await setup({ options: tree })
+  await userEvent.click(root)
+  await userEvent.click(option('Veg'))
+  const sub = submenu('Veg')!.getBoundingClientRect()
+  expect(sub.left).toBeCloseTo(option('Veg').getBoundingClientRect().left, 0)
+  expect(sub.right).toBeLessThanOrEqual(innerWidth)
+})
+
+it('opens a submenu to the left in right-to-left', async () => {
+  const screen = await render(
+    <div dir='rtl'>
+      <MultiSelect options={tree} style={narrow} />
+    </div>
+  )
+  await userEvent.click(screen.container.querySelector('.msl-wrp')!)
+  const veg = [...box()!.querySelectorAll('.msl-option')].find(
+    (el) => el.textContent === 'Veg'
+  )!
+  await userEvent.click(veg)
+  expect(submenu('Veg')!.getBoundingClientRect().right).toBeCloseTo(
+    veg.getBoundingClientRect().left,
+    0
+  )
+})
+
+it('a pause over a submenu title opens it, over a row outside closes it', async () => {
+  const { root, option } = await setup({ options: tree })
+  await userEvent.click(root)
+  await userEvent.hover(option('Veg'))
+  await expect.poll(() => submenu('Veg')).toBeTruthy()
+  await userEvent.hover(option('Carrot'))
+  await userEvent.hover(option('Banana'))
+  await expect.poll(() => submenu('Veg')).toBeUndefined()
+})
+
+it('picks in a submenu, the menu left open; a click outside closes it all', async () => {
+  const { root, option, chips, outside, focused } = await setup({
+    options: tree
+  })
+  await userEvent.click(root)
+  await userEvent.click(option('Veg'))
+  await userEvent.click(option('Carrot'))
+  await expect.poll(chips).toEqual(['Carrot'])
+  expect(submenu('Veg')).toBeTruthy()
+  expect(focused()).toBe('search')
+  await userEvent.click(outside)
+  await expect.poll(box).toBeNull()
+  expect(document.querySelector('.msl-submenu')).toBeNull()
+})
+
+it('the keyboard scrolls a submenu to its highlighted row, the list under it left alone', async () => {
+  const { input, q, option, focused } = await setup({
+    options: [
+      ...Array.from({ length: 20 }, (_, i) => ({
+        label: `Item ${i}`,
+        value: `${i}`
+      })),
+      {
+        type: 'submenu',
+        title: 'More',
+        childs: Array.from({ length: 40 }, (_, i) => ({
+          label: `More ${i}`,
+          value: `m${i}`
+        }))
+      }
+    ]
+  })
+  input().focus()
+  await userEvent.keyboard('{End}{ArrowRight}')
+  await expect.poll(() => submenu('More')).toBeTruthy()
+  const list = q('.msl-options')
+  const top = list.scrollTop
+  expect(top).toBeGreaterThan(0)
+  await userEvent.keyboard('{End}')
+  const sub = submenu('More')!
+  await expect.poll(() => sub.scrollTop).toBeGreaterThan(0)
+  expect(list.scrollTop).toBe(top)
+  expect(highlighted()).toBe(option('More 39'))
+  expect(focused()).toBe('search')
+})
+
+it('a collapsible group toggles on a click of its title', async () => {
+  const { root, q, visibleOptions } = await setup({
+    options: [
+      {
+        type: 'group',
+        title: 'Citrus',
+        collapsible: true,
+        collapsed: true,
+        childs: opts
+      }
+    ]
+  })
+  await userEvent.click(root)
+  expect(visibleOptions()).toEqual([])
+  await userEvent.click(q('.msl-grp-title'))
+  await expect.poll(visibleOptions).toEqual(['Apple', 'Banana', 'Cherry'])
+  expect(box()).not.toBeNull()
+})
+
+// ends the running animations: tests give them 10s, so a slow step never outlasts one
+const finish = () => document.getAnimations().forEach((a) => a.finish())
+
+// exit CSS for a test, removed after it
+const withCss = async (text: string, run: () => Promise<void>) => {
+  const css = document.head.appendChild(document.createElement('style'))
+  css.textContent = text
+  try {
+    await run()
+  } finally {
+    css.remove()
+  }
+}
+
+it('the closed menu stays, inert, until the transition data-closing starts ends', () =>
+  withCss(
+    '.msl-options { transition: opacity 10s } .msl[data-closing] .msl-options { opacity: 0 }',
+    async () => {
+      const { root, q, focused } = await setup()
+      await userEvent.click(root)
+      await userEvent.keyboard('{Escape}')
+      const list = q('.msl-options')
+      expect(q('.msl').hasAttribute('data-closing')).toBe(true)
+      expect(list.inert).toBe(true)
+      expect(focused()).toBe('search')
+      await expect.poll(() => +getComputedStyle(list).opacity).toBeLessThan(1)
+      expect(list.isConnected).toBe(true)
+      finish()
+      await expect.poll(() => list.isConnected).toBe(false)
+      expect(q('.msl').hasAttribute('data-closing')).toBe(false)
+    }
+  ))
+
+it('without exit CSS a pick closes the menu at once: the stylesheet transitions the picked option, which is no exit', async () => {
+  // Apple, not hovered, transitions off its selected background
+  const { root, option } = await setup({
+    singleSelect: true,
+    defaultValue: ['apple']
+  })
+  await userEvent.click(root)
+  await userEvent.click(option('Banana'))
+  await new Promise((r) =>
+    requestAnimationFrame(() => requestAnimationFrame(r))
+  )
+  expect(box()).toBeNull()
+})
+
+it('a closed submenu fades out where it was, from shown though CSS fades it in', () =>
+  withCss(
+    '.msl-submenu { transition: opacity 10s } .msl-submenu[data-closing] { opacity: 0 } @starting-style { .msl-submenu { opacity: 0 } }',
+    async () => {
+      const { input } = await setup({ options: tree, style: narrow })
+      input().focus()
+      await userEvent.keyboard('{ArrowDown}{ArrowDown}{ArrowRight}')
+      const sub = submenu('Veg')!
+      finish()
+      expect(getComputedStyle(sub).opacity).toBe('1')
+      const at = sub.getBoundingClientRect()
+      await userEvent.keyboard('{ArrowLeft}')
+      const copy = document.querySelector<HTMLElement>(
+        '.msl-submenu[data-closing]'
+      )!
+      expect(copy.matches(':popover-open')).toBe(true)
+      const now = copy.getBoundingClientRect()
+      expect([now.left, now.top]).toEqual([at.left, at.top])
+      // not from the fade in's start
+      expect(+getComputedStyle(copy).opacity).toBeGreaterThan(0.9)
+      finish()
+      await expect.poll(() => document.querySelector('.msl-submenu')).toBeNull()
+    }
+  ))
+
+it("a collapsed group's rows leave once their exit transition ends", () =>
+  withCss(
+    '.msl-option { transition: opacity 10s } [data-closing] .msl-option { opacity: 0 }',
+    async () => {
+      const { root, q } = await setup({
+        options: [
+          { type: 'group', title: 'Citrus', collapsible: true, childs: opts }
+        ]
+      })
+      await userEvent.click(root)
+      await userEvent.click(q('.msl-grp-title'))
+      const rows = () =>
+        [...document.querySelectorAll('[data-closing] .msl-option')].map(
+          (el) => el.textContent
+        )
+      expect(rows()).toEqual(['Apple', 'Banana', 'Cherry'])
+      finish()
+      await expect.poll(rows).toEqual([])
+    }
+  ))
+
+it('the dropdown keeps its height while CSS grows the open box, its menu row from 0fr', () =>
+  withCss(
+    '.msl { grid-template-rows: max-content 0fr; transition: grid-template-rows 400ms } .msl-active { grid-template-rows: max-content 1fr }',
+    async () => {
+      const { root, q } = await setup()
+      const closed = root.getBoundingClientRect().height
+      await userEvent.click(root)
+      for (const t of [0, 100, 200]) {
+        document.getAnimations().forEach((a) => {
+          a.pause()
+          a.currentTime = t
+        })
+        await new Promise((r) =>
+          requestAnimationFrame(() => requestAnimationFrame(r))
+        )
+        expect(root.getBoundingClientRect().height).toBe(closed)
+      }
+      // squeezed: the menu less tall than its content, or overflowing its row
+      expect(q('.msl-options').getBoundingClientRect().height).toBeLessThan(
+        q('.msl-options').scrollHeight
+      )
+    }
+  ))
+
+it("CSS animates a collapsible group's height, open and shut, through a grid row of its body's one box", () =>
+  withCss(
+    '.msl-grp-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 10s linear } @starting-style { .msl-grp-body { grid-template-rows: 0fr } } .msl-grp-body[data-closing] { grid-template-rows: 0fr } .msl-grp-body > div { overflow: hidden; min-height: 0 }',
+    async () => {
+      const { root, q } = await setup({
+        options: [
+          {
+            type: 'group',
+            title: 'Citrus',
+            collapsible: true,
+            collapsed: true,
+            childs: opts
+          }
+        ]
+      })
+      await userEvent.click(root)
+      const at = (t: number) =>
+        document.getAnimations().forEach((a) => {
+          a.pause()
+          a.currentTime = t
+        })
+      const height = (el: Element) => el.getBoundingClientRect().height
+      await userEvent.click(q('.msl-grp-title'))
+      const body = q('.msl-grp-body')
+      const full = body.firstElementChild!.scrollHeight
+      at(0)
+      expect(height(body)).toBe(0)
+      at(5000)
+      expect(height(body)).toBeCloseTo(full / 2, 0)
+      finish()
+      expect(height(body)).toBeCloseTo(full, 0)
+      await userEvent.click(q('.msl-grp-title'))
+      const copy = q('.msl-grp-body[data-closing]')
+      at(5000)
+      expect(height(copy)).toBeCloseTo(full / 2, 0)
+      finish()
+      await expect.poll(() => copy.isConnected).toBe(false)
+    }
+  ))
