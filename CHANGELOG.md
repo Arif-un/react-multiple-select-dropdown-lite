@@ -2,9 +2,9 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [3.0.0-beta.1] - 2026-10-16
 
-Breaking release: one value format, React 18+, modern bundles, a native search input, and an open menu that is one box in the top layer. The JS bundles are about 19% smaller, about 7% smaller gzipped. The stylesheet grew from 1.4 to 1.7 kB gzipped.
+Breaking release: one value format, React 18+, modern bundles, a native search input, and an open menu that is one box in the top layer. The JS bundles are about 19% smaller, about 6% smaller gzipped. The stylesheet grew from 1.4 to 1.7 kB gzipped.
 
 ### Upgrade notes
 
@@ -38,6 +38,7 @@ Breaking release: one value format, React 18+, modern bundles, a native search i
 - **Tab closes the menu** and moves on in page order. It used to step through the chips and the clear button with the menu still open. Focusable JSX in the menu (a button in `emptyDataLabel` or a group `title`) is still a Tab stop: while the menu has any, Tab steps through the open box in page order, chips and the clear button included, and focus leaving it closes the menu.
 - **Closing the menu clears the search text.**
 - **Markup for utility CSS.** Options sit right inside `.msl-options` (the `<div>` around them is gone), and the open box stacks by DOM order (with `msl-active-up` the options come before the input).
+- **No `msl-flx` class.** `.msl-btn` and `.msl-actions` center their content themselves. Move rules on `.msl-flx` to those classes.
 - **ARIA labels:** the clear button is `Clear` (was `close-menu`), set it with `clearLabel`. The default chip's delete button is `Remove Apple` for an `Apple` chip (was `delete-value`), or `Remove` when the label has no text; translate it through `customChip`. Update tests that query these labels.
 
 ```jsx
@@ -84,6 +85,7 @@ Breaking release: one value format, React 18+, modern bundles, a native search i
 - The menu's scrollbar thumb no longer darkens on hover in Safari, matching Chrome and Firefox.
 - Keys pressed on focusable JSX in the menu, such as a button in `emptyDataLabel` or a group `title`, are left to it: Enter no longer picks the highlighted option or refocuses the search field.
 - Long search text scrolls on one line instead of wrapping, and no longer runs under the clear and arrow buttons. A placeholder too long for the input ends in an ellipsis.
+- `react-dom` is no longer a peer dependency: the component doesn't import it.
 
 ## [2.1.0] - 2026-10-12
 
@@ -200,6 +202,7 @@ Most apps need no changes. Check these if they apply to you:
 
 - Single select bugs
 
+[3.0.0-beta.1]: https://www.npmjs.com/package/react-multiple-select-dropdown-lite/v/3.0.0-beta.1
 [2.1.0]: https://www.npmjs.com/package/react-multiple-select-dropdown-lite/v/2.1.0
 [2.0.6]: https://www.npmjs.com/package/react-multiple-select-dropdown-lite/v/2.0.6
 [2.0.5]: https://www.npmjs.com/package/react-multiple-select-dropdown-lite/v/2.0.5

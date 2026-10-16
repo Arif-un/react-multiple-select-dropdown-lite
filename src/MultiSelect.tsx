@@ -8,7 +8,6 @@ import type {
   MultiSelectProps
 } from './index'
 import Options from './Options'
-import './styles.css'
 
 type Item = MultiSelectOption | MultiSelectGroup
 
@@ -55,7 +54,7 @@ function MultiSelect({
   placeholder = 'Select...',
   disableChip = false,
   name = '',
-  style = noStyle,
+  style,
   attr,
   disabled = false,
   limit,
@@ -471,7 +470,11 @@ function MultiSelect({
         (el) => el.tabIndex >= 0
       )
     )
-      return closeMenu()
+      // From in the listbox (a clicked option), which the close removes: focus moves to the listbox, the browser tabs
+      // on from it, then it closes. Firefox and Safari lose the place of a removed focused element, Firefox of a clicked option
+      return listRef.current!.contains(target as Node)
+        ? (listRef.current!.focus(), setTimeout(closeMenu))
+        : closeMenu()
     // our listbox, when the target is JSX in it outside the options: an empty state's button, a group title's
     const box = (target as Element).closest('[role=option],[role=listbox]')
     // chips, the clear button and that JSX handle their own keys
@@ -650,7 +653,7 @@ function MultiSelect({
             )}
           </div>
           {(clearable || downArrow) && (
-            <div className={`msl-actions msl-flx ${cn.actions ?? ''}`}>
+            <div className={`msl-actions ${cn.actions ?? ''}`}>
               {clearable && value.length > 0 && (
                 <div
                   role='button'
@@ -667,7 +670,7 @@ function MultiSelect({
                     }
                   }}
                   tabIndex={disabled ? -1 : 0}
-                  className={`msl-btn msl-clear-btn msl-flx ${cn.clearButton ?? ''}`}
+                  className={`msl-btn msl-clear-btn ${cn.clearButton ?? ''}`}
                 >
                   {closeIcon || <CloseIcon />}
                 </div>
@@ -677,7 +680,7 @@ function MultiSelect({
                 <div
                   aria-hidden='true'
                   data-handle
-                  className={`msl-btn msl-arrow-btn msl-flx ${cn.arrowButton ?? ''}`}
+                  className={`msl-btn msl-arrow-btn ${cn.arrowButton ?? ''}`}
                 >
                   {downArrowIcon || <DownIcon />}
                 </div>

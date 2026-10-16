@@ -1,6 +1,6 @@
 {
   "name": "react-multiple-select-dropdown-lite",
-  "version": "2.1.0",
+  "version": "3.0.0-beta.1",
   "description": "React Multiple Select Light Weight Dropdown list | Searchable | Addable | Groupable etc",
   "author": "arif-un",
   "license": "MIT",
@@ -23,8 +23,7 @@
     "fmt:check": "oxfmt --check"
   },
   "peerDependencies": {
-    "react": "^18 || ^19",
-    "react-dom": "^18 || ^19"
+    "react": "^18 || ^19"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

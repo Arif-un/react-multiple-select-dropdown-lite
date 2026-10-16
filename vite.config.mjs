@@ -1,56 +1,37 @@
 import { playwright } from '@vitest/browser-playwright'
 import { readFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 
 const bundles = ['index.js', 'index.modern.js']
 
-// Copies imported CSS to dist/index.css byte for byte. Vite's CSS pipeline would add a marker comment.
-// The JS never imports it; users import dist/index.css themselves.
-const cssAsIs = {
-  name: 'css-as-is',
-  apply: 'build',
-  enforce: 'pre',
-  resolveId(source, importer) {
-    if (source.endsWith('.css'))
-      return '\0css:' + resolve(dirname(importer), source)
-  },
-  load(id) {
-    if (!id.startsWith('\0css:')) return
-    const file = id.slice(5)
-    // the \0 id is virtual, so `vite build --watch` only sees the real file if told
-    this.addWatchFile(file)
-    this.emitFile({
-      type: 'asset',
-      fileName: 'index.css',
-      source: readFileSync(file, 'utf8')
-    })
-    return ''
-  }
-}
-
-// ships the hand-written public types as dist/index.d.ts (why hand-written: see the file)
-const typesAsIs = {
-  name: 'types-as-is',
+// Ships the stylesheet and the hand-written public types (why hand-written: see the file) byte for byte:
+// Vite's CSS pipeline would add a marker comment. The JS never imports the CSS; users import dist/index.css themselves
+const asIs = {
+  name: 'as-is',
   apply: 'build',
   buildStart() {
-    this.addWatchFile('src/index.d.ts')
-    this.emitFile({
-      type: 'asset',
-      fileName: 'index.d.ts',
-      source: readFileSync('src/index.d.ts', 'utf8')
-    })
+    for (const [file, fileName] of [
+      ['src/styles.css', 'index.css'],
+      ['src/index.d.ts', 'index.d.ts']
+    ]) {
+      this.addWatchFile(file)
+      this.emitFile({
+        type: 'asset',
+        fileName,
+        source: readFileSync(file, 'utf8')
+      })
+    }
   }
 }
 
 export default defineConfig({
-  plugins: [cssAsIs, typesAsIs],
+  plugins: [asIs],
   build: {
     lib: { entry: 'src/MultiSelect.tsx' },
     sourcemap: true,
     rolldownOptions: {
-      external: ['react', 'react-dom', 'react/jsx-runtime'],
+      external: ['react', 'react/jsx-runtime'],
       output: [
         // 'use client': Next.js App Router can import it from a Server Component
         {
@@ -81,7 +62,7 @@ export default defineConfig({
     projects: [
       { extends: true, test: { name: 'src', exclude: ['test/browser/**'] } },
       {
-        // real Chromium + real CSS: layout, focus, contentEditable typing (things jsdom fakes).
+        // real browsers + real CSS: layout, focus, typing (things jsdom fakes).
         // Runs without coverage (see test script): Vite's dev-server interop adds branches that aren't in src.
         extends: true,
         test: {
@@ -91,7 +72,11 @@ export default defineConfig({
             enabled: true,
             headless: true,
             provider: playwright(),
-            instances: [{ browser: 'chromium' }]
+            instances: [
+              { browser: 'chromium' },
+              { browser: 'webkit' },
+              { browser: 'firefox' }
+            ]
           }
         }
       },
