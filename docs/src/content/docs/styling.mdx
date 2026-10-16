@@ -46,7 +46,6 @@ The defaults live on `.msl-vars`, the wrapper of every dropdown. Override them o
 | `--msl-group-title-background`   | `#fafafa`                      | group title                                   |
 | `--msl-group-offset`             | `12px`                         | indent of a group's options, per level        |
 | `--msl-focus-color`              | `rgb(0 119 255)`               | keyboard focus outline                        |
-| `--msl-menu-z-index`             | `9999`                         | open menu stacking, raised over an outer one  |
 | `--msl-background`               | `transparent`                  | background while closed                       |
 | `--msl-scrollbar-color`          | `rgb(0 0 0 / 0.1)`             | menu scrollbar thumb                          |
 
@@ -55,7 +54,7 @@ The defaults live on `.msl-vars`, the wrapper of every dropdown. Override them o
 .msl-vars {
   --msl-input-width: 100%;
 }
-/* one dropdown: <MultiSelect className='compact' classNames={{ plate: 'compact' }} /> */
+/* one dropdown: <MultiSelect className='compact' /> */
 .msl-vars.compact {
   --msl-font-size: 12px;
 }
@@ -73,25 +72,23 @@ Colors are variables too, so a theme is one rule.
 
 ## The open menu
 
-The open menu is one box, `.msl-plate`: a copy of the input with the options attached. It renders at the end of `<body>` (or in the open `<dialog>`, popover, `aria-modal="true"` element, fullscreen element or shadow root the dropdown sits in; for a dialog in the shadow root of a component it is slotted into, in the slotted element), over the dropdown, which stays in place, hidden, holding its space. In `<body>` it is `position: absolute`, so a page scroll moves it with the page; elsewhere, or for a dropdown in a fixed or sticky part of the page, `position: fixed`. `overflow: hidden` parents and stacking contexts don't clip it, and it lines up, scaled as the dropdown is, in a transformed dialog or a scaled part of the page. It stacks at `--msl-menu-z-index`, or above a higher z-index around the dropdown (an overlay it sits in). It is as wide as the dropdown and clips the options: to widen the menu, widen the plate, which widens its copy of the input too.
-
-Your `className` and `style` stay on the dropdown. Give the plate classes, a theme class too, with `classNames={{ plate: 'compact' }}`, or theme every select through `.msl-vars`. Selectors that reach the dropdown through its ancestors, like `.sidebar .msl-wrp`, don't match it, nor do rules on `.msl-wrp`: the plate is `.msl-plate.msl-vars`. It renders inline `--msl-inherited-color`, `--msl-inherited-font` and `--msl-inherited-z-index` (the highest z-index around it) from the dropdown, which the stylesheet reads, and the dropdown's `dir` and `lang`, so it keeps the text color, font and direction of where the dropdown stands. While it is open, focus and the pointer are in the plate, so the dropdown's ancestors lose `:focus-within` and `:hover`.
+The open menu is one box: the input box, `.msl.msl-active` (`.msl-active-up` opening upward), with the options attached. It is a popover over the dropdown, in the top layer, so `overflow: hidden` parents, stacking contexts and z-indexes don't clip or cover it, in a modal `<dialog>` too. It stays in place in the DOM, so your CSS reaches it through its ancestors and it inherits the text color, font and direction there. The dropdown keeps the input box's height. The menu follows the dropdown as the page scrolls, and lines up, scaled as the dropdown is, in a transformed dialog or a scaled part of the page. It is as wide as the dropdown and clips the options: to widen the menu, widen the open box (`.msl-active { min-width: 400px }`).
 
 ## Class names
 
 State classes:
 
-| Class                          | On             | When                                  |
-| ------------------------------ | -------------- | ------------------------------------- |
-| `msl-disabled`                 | wrapper, plate | `disabled`                            |
-| `msl-limit-reached`            | wrapper, plate | `limit` is reached                    |
-| `msl-active` / `msl-active-up` | `.msl`         | menu is open, below / above the input |
-| `msl-option-active`            | option         | selected                              |
-| `msl-option-focused`           | option         | highlighted by the keyboard           |
-| `msl-option-disable`           | option         | disabled                              |
+| Class                          | On      | When                                  |
+| ------------------------------ | ------- | ------------------------------------- |
+| `msl-disabled`                 | wrapper | `disabled`                            |
+| `msl-limit-reached`            | wrapper | `limit` is reached                    |
+| `msl-active` / `msl-active-up` | `.msl`  | menu is open, below / above the input |
+| `msl-option-active`            | option  | selected                              |
+| `msl-option-focused`           | option  | highlighted by the keyboard           |
+| `msl-option-disable`           | option  | disabled                              |
 
-Parts: `msl-plate` (open menu), `msl-wrp` (wrapper), `msl` (input box), `msl-chip`, `msl-chip-delete`, `msl-single-value`, `msl-input`, `msl-clear-btn`, `msl-arrow-btn`, `msl-options` (menu), `msl-option`, `msl-grp` (a group), `msl-grp-title`.
+Parts: `msl-wrp` (wrapper), `msl` (input box, and the open menu), `msl-chip`, `msl-chip-delete`, `msl-single-value`, `msl-input`, `msl-clear-btn`, `msl-arrow-btn`, `msl-options` (menu), `msl-option`, `msl-grp` (a group), `msl-grp-title`.
 
 A single option can carry its own `classes` and `style`. To add classes to every part, Tailwind utilities for example, use the `classNames` prop: see [Tailwind](../tailwind/).
 
-The component's inline styles are behavior, not looks: `display: contents` on the chip wrapper, which keeps that box out of the layout with or without the stylesheet, `visibility: hidden` on the dropdown while its menu is open, and the plate's `position`, coordinates, `pointer-events: auto` (modal libraries turn pointer events off on `<body>`, where it renders) and `visibility: visible` (it renders inside the hidden dropdown when that is what is slotted into a dialog). Everything else is in the stylesheet: without it the markup is unstyled, and plain CSS overrides any of its rules.
+The component's inline styles are behavior, not looks: `display: contents` on the chip wrapper, which keeps that box out of the layout with or without the stylesheet, and, while the menu is open, the dropdown's `min-height` (the open box left the flow) and the popover's `position`, coordinates, width and scale, and a reset of the browser's popover look (`inset`, `margin`, `padding`, `border`, `background`, `color: inherit`, `overflow`), on the unstyled `<div>` around `.msl`. Everything else is in the stylesheet: without it the markup is unstyled, and plain CSS overrides any of its rules.

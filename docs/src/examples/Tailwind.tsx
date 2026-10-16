@@ -23,12 +23,10 @@ const button =
   'inline-flex cursor-pointer items-center justify-center rounded-full'
 
 const classNames = {
-  // renders at the end of <body> (or of the dialog it sits in), so it sets its own text color and size
-  plate:
-    'z-[max(50,var(--msl-inherited-z-index)+1)] overflow-hidden rounded-lg bg-white text-sm text-gray-900 shadow-lg ring-1 ring-gray-200',
+  // open, it holds the options too, in the top layer over the page: it sets its own background
   control:
-    'flex cursor-text rounded-lg border border-gray-400 not-data-open:hover:border-gray-600 data-open:rounded-none data-open:border-transparent in-data-disabled:bg-gray-50',
-  values: 'flex min-w-0 flex-1 flex-wrap items-center gap-1 p-1',
+    'grid cursor-text grid-cols-[minmax(0,1fr)_auto] overflow-hidden rounded-lg border border-gray-400 not-data-open:hover:border-gray-600 data-open:border-gray-200 data-open:bg-white data-open:shadow-lg in-data-disabled:bg-gray-50',
+  values: 'flex min-w-0 flex-wrap items-center gap-1 p-1',
   input:
     'min-w-0 flex-1 border-0 bg-transparent p-1 [font:inherit] text-inherit outline-none placeholder:text-gray-400 empty:before:text-gray-400 empty:before:content-[attr(data-placeholder)]',
   singleValue: 'truncate p-1',
@@ -38,7 +36,7 @@ const classNames = {
   clearButton: `${button} size-6 hover:bg-gray-200 [&_svg]:size-2.5`,
   arrowButton: `${button} size-6 hover:bg-gray-200 in-data-open:rotate-180 [&_svg]:size-5`,
   // --msl-menu-room is set on the menu; the divider sits on whichever side meets the control
-  menu: 'max-h-[min(400px,var(--msl-menu-room))] overflow-auto border-gray-200 py-1 first:border-b last:border-t',
+  menu: 'col-span-full max-h-[min(400px,var(--msl-menu-room))] overflow-auto border-gray-200 py-1 first:border-b last:border-t',
   option:
     'mx-1.5 my-1 cursor-pointer rounded-md px-2 py-1 hover:bg-gray-100 aria-selected:text-blue-600 aria-disabled:cursor-default aria-disabled:text-gray-300 data-focused:bg-gray-100',
   // a step in per level, the title at its group's level
