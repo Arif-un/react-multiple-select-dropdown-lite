@@ -903,6 +903,138 @@ describe('disableChip / disableSearch / disabled', () => {
   })
 })
 
+describe('searchInMenu', () => {
+  it('moves the search field atop the open menu, the closed control showing only values', () => {
+    const { root, q, input, chips, optionTexts, option } = setup({
+      searchInMenu: true,
+      defaultValue: ['apple'],
+      classNames: { search: 'my-search' }
+    })
+    expect(input()).toBeNull()
+    expect(q('.msl-input')).toBeNull()
+    expect(root.getAttribute('role')).toBe('combobox')
+    expect(root.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(root)
+    const field = input()
+    expect(field.parentElement!.className).toBe('msl-search my-search')
+    expect(field.parentElement!.nextElementSibling).toBe(q('.msl-options'))
+    expect(field.placeholder).toBe('Search...')
+    expect(document.activeElement).toBe(field)
+    // the combobox moves to the field
+    expect(field.getAttribute('role')).toBe('combobox')
+    expect(field.getAttribute('aria-controls')).toBe(q('.msl-options').id)
+    expect(root.hasAttribute('role')).toBe(false)
+    type(field, 'an')
+    expect(optionTexts()).toEqual(['Banana'])
+    fireEvent.click(option('Banana'))
+    expect(chips()).toEqual(['Apple', 'Banana'])
+    expect(document.activeElement).toBe(input())
+  })
+
+  it('keeps the placeholder in the empty control, the field taking searchPlaceholder', () => {
+    const { root, q, input } = setup({
+      searchInMenu: true,
+      searchPlaceholder: 'Find'
+    })
+    expect(q('.msl-input').getAttribute('data-placeholder')).toBe('Select...')
+    fireEvent.click(root)
+    expect(
+      q('.msl-input-wrp .msl-input').getAttribute('data-placeholder')
+    ).toBe('Select...')
+    expect(input().placeholder).toBe('Find')
+  })
+
+  it.each([{ singleSelect: true }, { disableChip: true }])(
+    'searches next to a single value or count, which Backspace leaves (%o)',
+    (props) => {
+      const { root, input, single, optionTexts } = setup({
+        searchInMenu: true,
+        defaultValue: ['apple'],
+        ...props
+      })
+      fireEvent.click(root)
+      type(input(), 'ch')
+      expect(optionTexts()).toEqual(['Cherry'])
+      type(input(), '', 'Backspace')
+      expect(single()).toBe('Apple')
+    }
+  )
+
+  it('Escape or a closing pick leaves focus on the wrapper', () => {
+    const { root, input, isOpen, option } = setup({
+      searchInMenu: true,
+      closeOnSelect: true
+    })
+    fireEvent.click(root)
+    press(input(), 'Escape')
+    expect(isOpen()).toBe(false)
+    expect(document.activeElement).toBe(root)
+    fireEvent.click(root)
+    fireEvent.click(option('Apple'))
+    expect(isOpen()).toBe(false)
+    expect(document.activeElement).toBe(root)
+  })
+
+  it('Tab from the field closes after the browser moves on from it, not prevented; Shift+Tab back onto it ends on the wrapper', async () => {
+    const { q, root, input, isOpen } = setup({ searchInMenu: true })
+    const tick = () => act(() => new Promise((r) => setTimeout(r)))
+    fireEvent.click(root)
+    expect(press(input(), 'Tab')).toBe(true)
+    // the close removes the field: the browser moves on from the listbox
+    expect(document.activeElement).toBe(q('.msl-options'))
+    await tick()
+    expect(isOpen()).toBe(false)
+    fireEvent.click(root)
+    expect(press(input(), 'Tab', { shiftKey: true })).toBe(true)
+    // the browser's Shift+Tab from the listbox: the field before it, which the close removes
+    input().focus()
+    await tick()
+    expect(isOpen()).toBe(false)
+    expect(document.activeElement).toBe(root)
+  })
+
+  it('with disableSearch, no field anywhere: the wrapper stays the combobox', () => {
+    const { root, input } = setup({ searchInMenu: true, disableSearch: true })
+    fireEvent.click(root)
+    expect(input()).toBeNull()
+    expect(root.getAttribute('role')).toBe('combobox')
+    expect(root.getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('opening upward, heads the box; the wrapper and the room leave out its height', () => {
+    vi.spyOn(document.documentElement, 'clientHeight', 'get').mockReturnValue(
+      100
+    )
+    const { root, q } = setup({ searchInMenu: true })
+    // the wrapper 60px down; the open box 150px tall, its options 100px, the field 30px: the control is 20px
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+      function (this: HTMLElement) {
+        return (this === root
+          ? { top: 60, bottom: 80, left: 5, width: 50 }
+          : {
+              height: this.hasAttribute('role')
+                ? 100
+                : this.classList.contains('msl-search')
+                  ? 30
+                  : 150
+            }) as unknown as DOMRect
+      }
+    )
+    fireEvent.click(root)
+    expect([...box()!.children].map((el) => el.classList[0])).toEqual([
+      'msl-search',
+      'msl-options',
+      'msl-input-wrp',
+      'msl-actions'
+    ])
+    expect(pop().style.bottom).toBe('20px')
+    expect(root.style.minHeight).toBe('20px')
+    expect(q('.msl-options').style.getPropertyValue('--msl-menu-room')).toBe(
+      '30px'
+    )
+  })
+})
+
 // a chip whose delete button sits in its own shadow root, as in web component libraries
 const shadowChip: MultiSelectProps['customChip'] = ({ label, onDelete }) => (
   <span
@@ -3088,6 +3220,16 @@ describe('keyboard', () => {
     press(input(), 'Backspace')
     expect(chips()).toEqual([])
     expect(values(onChange)).toEqual([['apple'], []])
+  })
+
+  it('deleteOnBackspace={false} leaves chips to their delete buttons', () => {
+    const { input, chips, onChange } = setupKeys({
+      defaultValue: ['apple'],
+      deleteOnBackspace: false
+    })
+    press(input(), 'Backspace')
+    expect(chips()).toEqual(['Apple'])
+    expect(onChange).not.toHaveBeenCalled()
   })
 
   it.each(['a', ',', 'Enter', ' '])('%s opens the menu', (key) => {

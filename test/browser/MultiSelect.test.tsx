@@ -1044,6 +1044,80 @@ it('Backspace in an empty search field removes the last chip', async () => {
   await expect.poll(chips).toEqual([])
 })
 
+it('searchInMenu: the field heads the open menu, the control and the wrapper keep their size', async () => {
+  const { root, q, after, menuHeight, focused, visibleOptions } = await setup({
+    searchInMenu: true,
+    defaultValue: ['apple']
+  })
+  expect(q('input.msl-input')).toBeNull()
+  const closed = root.getBoundingClientRect()
+  const values = q('.msl-input-wrp').getBoundingClientRect()
+  await userEvent.click(root)
+  await expect.poll(menuHeight).toBeGreaterThan(0)
+  await expect.poll(focused).toBe('search')
+  expect(root.getBoundingClientRect()).toEqual(closed)
+  expect(q('.msl-input-wrp').getBoundingClientRect()).toEqual(values)
+  // control, divider, field, divider, options
+  const search = q('.msl-search')
+  expect(search.getBoundingClientRect().top).toBeCloseTo(values.bottom)
+  expect(q('.msl-options').getBoundingClientRect().top).toBeCloseTo(
+    search.getBoundingClientRect().bottom
+  )
+  expect(getComputedStyle(search).borderTopWidth).toBe('1px')
+  expect(getComputedStyle(search).borderBottomWidth).toBe('0px')
+  await userEvent.keyboard('an')
+  expect(visibleOptions()).toEqual(['Banana'])
+  await userEvent.tab()
+  expect(menuHeight()).toBe(0)
+  expect(document.activeElement).toBe(after)
+  // Shift+Tab lands back on the field, which the close removes: focus goes to the wrapper, not the body
+  await userEvent.click(root)
+  await expect.poll(focused).toBe('search')
+  await userEvent.tab({ shift: true })
+  await expect.poll(menuHeight).toBe(0)
+  expect(focused()).toBe('wrapper')
+})
+
+it('searchInMenu opening upward: the field heads the box, the values stay put', async () => {
+  const { root, q, menuHeight } = await setup(
+    { searchInMenu: true },
+    { offsetTop: window.innerHeight - 80 }
+  )
+  const closed = root.getBoundingClientRect()
+  const values = q('.msl-input-wrp').getBoundingClientRect()
+  await userEvent.click(root)
+  await expect.poll(menuHeight).toBeGreaterThan(0)
+  expect(q('.msl').className).toContain('msl-active-up')
+  expect(q('.msl-input-wrp').getBoundingClientRect()).toEqual(values)
+  expect(box()!.getBoundingClientRect().bottom).toBeCloseTo(closed.bottom)
+  const search = q('.msl-search')
+  expect(search.getBoundingClientRect().bottom).toBeCloseTo(
+    q('.msl-options').getBoundingClientRect().top
+  )
+  expect(getComputedStyle(search).borderTopWidth).toBe('0px')
+  expect(getComputedStyle(search).borderBottomWidth).toBe('1px')
+})
+
+it('searchInMenu: the options leave the field room in the viewport', async () => {
+  const many = Array.from({ length: 50 }, (_, i) => ({
+    label: `Option ${i}`,
+    value: `${i}`
+  }))
+  const { root, q, menuHeight } = await setup(
+    { options: many, searchInMenu: true },
+    { offsetTop: document.documentElement.clientHeight - 300 }
+  )
+  await userEvent.click(root)
+  await expect.poll(menuHeight).toBeGreaterThan(0)
+  expect(box()!.className).toContain('msl-active')
+  const room =
+    document.documentElement.clientHeight - root.getBoundingClientRect().bottom
+  expect(parseFloat(getComputedStyle(q('.msl-options')).maxHeight)).toBeCloseTo(
+    room - q('.msl-search').getBoundingClientRect().height,
+    2
+  )
+})
+
 it('singleSelect: Enter picks, closes, and focus stays on the widget', async () => {
   const { root, input, q, menuHeight, focused } = await setup({
     singleSelect: true
