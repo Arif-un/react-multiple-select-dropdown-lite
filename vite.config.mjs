@@ -62,7 +62,7 @@ export default defineConfig({
     projects: [
       { extends: true, test: { name: 'src', exclude: ['test/browser/**'] } },
       {
-        // real Chromium + real CSS: layout, focus, typing (things jsdom fakes).
+        // real browsers + real CSS: layout, focus, typing (things jsdom fakes).
         // Runs without coverage (see test script): Vite's dev-server interop adds branches that aren't in src.
         extends: true,
         test: {

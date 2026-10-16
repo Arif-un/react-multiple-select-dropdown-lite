@@ -16,7 +16,7 @@ A **lightweight** select that has every feature a select/multiselect should have
 
 ```bash
 pnpm build       # vite build -> dist/
-pnpm test        # build, jsdom suite (src + both bundles, 100% coverage), then real Chromium suite
+pnpm test        # build, jsdom suite (src + both bundles, 100% coverage), then the real-browser suite (Chromium, WebKit, Firefox)
 pnpm lint
 pnpm typecheck
 pnpm fmt         # oxfmt; CI runs fmt:check
@@ -29,7 +29,7 @@ Docs site: `docs/` (Astro Starlight), `cd docs && pnpm dev`. It imports the comm
 - **`dist/` is committed.** Run `pnpm build` after any `src/` change and commit `dist/`. CI fails if it is stale.
 - **Public types are hand-written** in `src/index.d.ts` and copied verbatim to `dist/index.d.ts` (the CJS bundle is `module.exports = MultiSelect`, which only `export =` describes). Update it with every prop change.
 - `src/styles.css` ships byte for byte as `dist/index.css`, comments too: keep them to the variable group labels. Selectors stay single-class, so one user class overrides any rule; nesting only adds states and pseudo-elements.
-- **100% coverage gate** on `src/`. `test/MultiSelect.test.tsx` runs against src and both bundles. Layout, focus and real typing go in `test/browser/` (Chromium via Playwright).
+- **100% coverage gate** on `src/`. `test/MultiSelect.test.tsx` runs against src and both bundles. Layout, focus and real typing go in `test/browser/` (Chromium, WebKit and Firefox via Playwright).
 - **React 18 and 19** are both supported (CI matrix). Use parameter defaults, not `defaultProps` (React 19 ignores them on function components).
 - Bundles start with `'use client';` for React Server Components.
 - Formatting: no semicolons, single quotes, no trailing commas (oxfmt). `cond && call()` branching is allowed.
