@@ -262,7 +262,8 @@ it('Tab from a clicked option moves on in page order, not from the end of the bo
   await userEvent.click(q('.msl-arrow-btn'))
   await userEvent.click(option('Cherry'))
   await userEvent.tab({ shift: true })
-  expect(menuHeight()).toBe(0)
+  // focus stayed inside: it closes once the browser has moved it
+  await expect.poll(menuHeight).toBe(0)
   expect(focused()).toBe('clear')
 })
 
