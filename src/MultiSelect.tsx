@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useId } from 'react'
-import { createPortal, flushSync } from 'react-dom'
 import Chip from './Chip'
 import { CloseIcon, DownIcon } from './icons'
 import type PublicMultiSelect from './index'
@@ -22,9 +21,6 @@ const createText = (text: string) => `Create "${text}"`
 // the viewport less a classic scrollbar. innerHeight too: quirks mode makes the root as tall as the page
 const viewHeight = () =>
   Math.min(innerHeight, document.documentElement.clientHeight)
-// the scale ancestors' transforms give: drawn size over layout size, which rounds to whole pixels
-const scaleOf = (drawn: number, size: number) =>
-  size && Math.abs(drawn - size) >= 1 ? drawn / size : 1
 
 // options we create, { label, value }: the user's getters only know their own shape
 const ours = new WeakSet<MultiSelectOption>()
@@ -126,7 +122,6 @@ function MultiSelect({
       : [textOf(opt), valueOf(opt)].some((s) =>
           String(s).toLowerCase().includes(text.toLowerCase())
         )
-  // the search text, shared by both copies of the field: text that reaches the closed one (paste, drop, IME) shows in the plate's
   const [query, setQuery] = useState('')
   // searched trimmed, commas dropped: a typed comma picks
   const term = query.trim().replace(/,+/g, '')
@@ -147,21 +142,12 @@ function MultiSelect({
     null
   )
   const componentRef = useRef<HTMLDivElement>(null)
-  // the open menu: one plate, portaled out of clipping parents and placed over the hidden wrapper
-  const plateRef = useRef<HTMLDivElement>(null)
+  // holds the control and, while open, the options: then it is a popover, in the top layer over the wrapper
+  const boxRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   // picked on open: the menu goes above the input
   const [up, setUp] = useState(false)
-  // the text look, direction and language of where the dropdown stands, not of where the plate renders.
-  // Read on open, not in render: a hiding Suspense boundary detaches the wrapper's ref, the menu still open
-  const [look, setLook] = useState<{
-    pos: 'absolute' | 'fixed'
-    dir: string
-    lang?: string
-    vars: object
-  }>()
-  // an empty box beside the plate, positioned as it is: it measures their containing block
-  const probeRef = useRef<HTMLDivElement>(null)
   // the latest: an inline one would restart the open menu's listeners on every parent render
   const onClose = useRef(onMenuClose)
   onClose.current = onMenuClose
@@ -180,120 +166,36 @@ function MultiSelect({
 
   // once per open: closes can overlap, as when a pick's onChange moves focus out (a close) and the pick closes too
   const opened = useRef(false)
+  // the selection as last set or rendered: a chip's onDelete may run late (after an exit animation)
+  const latest = useRef(value)
+  // the element with keyboard focus (focus-visible) when a chip was deleted, the search field a pick may remove,
+  // or the element focused when the menu closed (an option)
+  const lost = useRef<Element | null>(null)
 
-  // where the plate renders, picked on open: picked again while open, it would remount
-  const home = useRef<Element | ShadowRoot | null>(null)
-
-  const open = (key: boolean) => {
-    const el = componentRef.current!
-    const r = el.getBoundingClientRect()
+  const open = () => {
+    const r = componentRef.current!.getBoundingClientRect()
     const below = viewHeight() - r.bottom
-    // an open <dialog> or popover is in the top layer, over <body>, and a modal one makes the rest of the page
-    // inert. A fullscreen element is all that shows. Page CSS can't reach into a shadow root.
-    // An aria-modal one (react-bootstrap, MUI, Headless UI) traps focus: in <body> the plate would lose it and close.
-    // Up the flat tree: slotted into a component, the dropdown may sit in a dialog in its shadow root,
-    // then the plate goes in the slotted element, which shows in that dialog
-    const root = el.getRootNode() as Document | ShadowRoot
-    // the root's own: the document's stands for a fullscreen element in a shadow root by its host
-    const full = root.fullscreenElement
-    const body = (root as Document).body
-    let top: Node | null | undefined = el
-    let slotted: Element | undefined
-    let pinned = false
-    // the highest z-index around it: the plate goes over an overlay the dropdown sits in
-    let z = 0
-    while (
-      top &&
-      !(top as Element).matches?.('dialog[open],[popover],[aria-modal=true]')
-    ) {
-      if ((top as Element).matches) {
-        const { position, zIndex } = getComputedStyle(top as Element)
-        // a fixed or sticky dropdown stays put as the page scrolls, as a fixed plate does
-        pinned ||= /fixed|sticky/.test(position)
-        z = Math.max(z, +zIndex || 0)
-      }
-      const slot: HTMLSlotElement | null = (top as Element).assignedSlot
-      // only in the dropdown's own tree: a slotted shadow host shows none of its light DOM
-      slotted ||=
-        slot && top.getRootNode() == root ? (top as Element) : undefined
-      top = slot || top.parentNode || (top as ShadowRoot).host
-    }
-    home.current = top
-      ? top.getRootNode() == root
-        ? (top as Element)
-        : slotted || (root as ShadowRoot)
-      : full?.contains(el)
-        ? full
-        : body || root
-    const { color, fontFamily, direction } = getComputedStyle(el)
     opened.current = true
-    const show = () => {
-      // up only if that has more room: else it goes off the top of the page
-      setUp(below < 200 && r.top > below)
-      setLook({
-        // in <body> it scrolls with the page on the compositor: a fixed one trails a page scroll by a frame
-        pos: home.current == body && !pinned ? 'absolute' : 'fixed',
-        dir: direction,
-        lang: el.closest<HTMLElement>('[lang]')?.lang,
-        // variables, not color and font-family: those, inline, would beat a class on the plate
-        vars: {
-          '--msl-inherited-color': color,
-          '--msl-inherited-font': fontFamily,
-          '--msl-inherited-z-index': z
-        }
-      })
-      setMenuOpen(true)
-    }
-    // a key flushes, so the plate is there for the text it types. Not a click: a click() from an effect
-    // would flush inside React's commit, which React warns about
-    key ? flushSync(show) : show()
+    // up only if that has more room: else it goes off the top of the page
+    setUp(below < 200 && r.top > below)
+    setMenuOpen(true)
   }
 
-  const controls = (el: HTMLElement) => [
-    ...el
-      .querySelector('.msl')!
-      .querySelectorAll<HTMLElement>('input,button,[tabindex]')
-  ]
-  // the same control in the wrapper as el in the plate; the wrapper for the plate itself.
-  // A stateful customChip's two copies may differ: the chips' controls count from the start, the rest from the end
-  const twinOf = (el: Element | null) => {
-    if (el === plateRef.current) return componentRef.current
-    const a = controls(plateRef.current!)
-    const b = controls(componentRef.current!)
-    const i = a.indexOf(el as HTMLElement)
-    return i < 0
-      ? undefined
-      : b[
-          el!.closest('.msl-input-wrp > [data-clickable]')
-            ? i
-            : b.length - a.length + i
-        ]
-  }
-
-  // back: focus was in the plate, so it returns to the same control in the wrapper (or to `to`), and Tab moves on from there
+  // focus moves to `to` first. back: if the close removes the focused element (an option),
+  // the effect after it brings focus back to the search field or the wrapper.
+  // No ref while a Suspense boundary hides it: focus left with it
   const closeMenu = (back?: boolean, to?: HTMLElement | null) => {
-    const plate = plateRef.current
-    if (!opened.current || !plate) return
+    if (!opened.current) return
     opened.current = false
-    // found before the close re-renders the wrapper: a pick may unmount it (the search field)
-    const twin = to || twinOf((plate.getRootNode() as Document).activeElement)
-    const doc = plate.ownerDocument
-    const close = () => {
-      setMenuOpen(false)
-      // the plate's search field is gone with its text
-      setQuery('')
-    }
-    // flushed only to move focus once the plate is gone: other closes can come mid-commit (an autoFocus)
-    back ? flushSync(close) : close()
-    // only if focus went with the plate: the flushed update may have moved it on (an autoFocus, an effect).
-    // Optional: an onChange may have unmounted the whole select
+    to?.focus({ preventScroll: true })
     back &&
-      doc.activeElement === doc.body &&
-      (twin?.isConnected
-        ? twin
-        : inputFld.current || componentRef.current
-      )?.focus({ preventScroll: true })
-    // once focus is back: it may move it on
+      componentRef.current &&
+      (lost.current = (
+        componentRef.current.getRootNode() as Document
+      ).activeElement)
+    setMenuOpen(false)
+    // the search text goes with the menu
+    setQuery('')
     onClose.current()
   }
 
@@ -301,39 +203,60 @@ function MultiSelect({
   useEffect(() => {
     if (!menuOpen) return
     const root = componentRef.current!
-    const plate = plateRef.current!
-    const probe = probeRef.current!
-    // over the hidden wrapper, the menu below (or above) it, as tall as the viewport leaves room for.
+    const box = boxRef.current!
+    const list = listRef.current!
+    // a fixed or sticky dropdown (in a modal <dialog>, a popover) stays put as the page scrolls, as a fixed box does.
+    // Else absolute, in page coordinates: the page carries it with no frame of lag. Up the flat tree: slotted into a dialog
+    let pinned = false
+    for (
+      let el: Element | null | undefined = root;
+      el && !pinned;
+      el =
+        el.assignedSlot ||
+        el.parentElement ||
+        (el.parentNode as ShadowRoot).host
+    )
+      pinned = /fixed|sticky/.test(getComputedStyle(el).position)
+    const minHeight = root.style.minHeight
+    // in the top layer: over clipping parents, stacking contexts and a modal dialog. The attribute only while open:
+    // until shown, a popover is display: none. Shown before it paints: an open is a click or a key, whose effects run at once.
+    // The UA's popover look undone inline, so it inherits and shows nothing of its own: the box inside has the looks
+    box.style.cssText = `position:${pinned ? 'fixed' : 'absolute'};inset:auto;margin:0;padding:0;border:0;background:none;color:inherit;overflow:visible;transform-origin:0 ${up ? '100%' : 0}`
+    // missing in jsdom, whose UA stylesheet would still hide a [popover]: a user's tests couldn't focus or query the menu
+    if (box.showPopover) {
+      box.setAttribute('popover', 'manual')
+      box.showPopover()
+    }
+    // over the wrapper, the menu below (or above) it, as tall as the viewport leaves room for.
     // Follows the wrapper through scrolls, resizes, its own growth and layout shifts.
-    // A transformed (filtered, contained) <dialog> or shadow host is the plate's containing block,
-    // not the viewport: placed in its box, as the probe measures it. Not the plate: its own transform would count
-    // ponytail: two rect reads per frame while open; scroll/resize listeners + ResizeObserver if it ever shows in a profile
+    // ponytail: three rects read per frame while open; scroll/resize listeners + ResizeObserver if it ever shows in a profile
     let frame = 0
-    const box = plate.querySelector<HTMLElement>('.msl-options')!
     const follow = () => {
+      // in a scaled part of the page (a zoomable canvas) it scales as the dropdown does: the top layer drops
+      // ancestors' transforms. Drawn size over layout size, which rounds to whole pixels
+      const w = root.offsetWidth
+      const { width } = root.getBoundingClientRect()
+      const s = w && Math.abs(width - w) >= 1 ? width / w : 1
+      // first: the control's height depends on them
+      box.style.width = width / s + 'px'
+      box.style.setProperty('scale', s == 1 ? '' : s + '')
+      // the control's own height, the box less the options: the wrapper keeps it, as the box left the flow.
+      // Drawn: offsetHeight rounds
+      const row =
+        box.getBoundingClientRect().height - list.getBoundingClientRect().height
+      root.style.minHeight = row / s + 'px'
+      // then where it stands: its height back, it may move (in a centered dialog)
       const r = root.getBoundingClientRect()
-      const cb = probe.getBoundingClientRect()
       const h = viewHeight()
-      // in a scaled part of the page (a zoomable canvas) the plate scales as the dropdown does,
-      // less what its containing block scales it, and its offsets are in that block's pixels
-      const s = scaleOf(r.width, root.offsetWidth)
-      const c = scaleOf(cb.height, probe.offsetHeight)
-      const at = {
-        left: (r.left - cb.left) / c + 'px',
-        width: r.width / s + 'px',
-        [up ? 'bottom' : 'top']:
-          (up ? cb.bottom - r.bottom : r.top - cb.top) / c + 'px',
-        // unset when unscaled, so a class on the plate can scale it (an open animation)
-        scale: s == c ? '' : s / c + '',
-        'transform-origin': s == c ? '' : up ? '0 100%' : '0 0'
-      }
-      for (const [k, v] of Object.entries(at)) plate.style.setProperty(k, v)
-      // React 18 leaves the portal showing when a Suspense boundary hides the wrapper again: hide it too
-      plate.style.display = root.checkVisibility?.() === false ? 'none' : ''
+      const y = pinned ? 0 : scrollY
+      const bottom = r.top + row
+      box.style.left = r.left + (pinned ? 0 : scrollX) + 'px'
+      box.style[up ? 'bottom' : 'top'] =
+        (up ? h - bottom - y : r.top + y) + 'px'
       // on the listbox, the one reader: the stylesheet registers it non-inherited, so a scroll restyles no option
-      box.style.setProperty(
+      list.style.setProperty(
         '--msl-menu-room',
-        (up ? r.top : h - r.bottom) / s + 'px'
+        (up ? r.top : h - bottom) / s + 'px'
       )
       // missing in jsdom without pretendToBeVisual: a user's tests would crash on every open
       typeof requestAnimationFrame != 'undefined' &&
@@ -342,8 +265,8 @@ function MultiSelect({
     // now, not next frame: placed before it paints
     follow()
     // a scrolling parent clipped it away: close rather than float over that parent's edge.
-    // Opened out of view (a key on the focused dropdown, scrolled away): scroll it back instead, a fixed plate
-    // can't scroll to itself on focus. Missing in jsdom: a user's tests would crash on every open
+    // Opened out of view (a key on the focused dropdown, scrolled away): scroll it back instead, or the top layer
+    // would show it outside that parent. Missing in jsdom: a user's tests would crash on every open
     let first = true
     const seen =
       typeof IntersectionObserver != 'undefined' &&
@@ -357,8 +280,7 @@ function MultiSelect({
       })
     seen && seen.observe(root)
     // composedPath: in a shadow root the document sees the host as target
-    const inside = (e: Event) =>
-      e.composedPath().some((el) => el === root || el === plate)
+    const inside = (e: Event) => e.composedPath().includes(root)
     // Escape from inside goes through onKeyDown, after attr.onKeyDown.
     // Prevented: it closes the menu, not a surrounding <dialog> or popover too
     const onKey = (e: KeyboardEvent) => {
@@ -377,14 +299,18 @@ function MultiSelect({
       document.removeEventListener('keydown', onKey, true)
       document.removeEventListener('click', onOutside, true)
       document.removeEventListener('focusin', onOutside, true)
+      // without the attribute it is hidden, and back in the flow
+      box.removeAttribute('popover')
+      box.removeAttribute('style')
+      root.style.minHeight = minHeight
     }
   }, [menuOpen])
 
-  // in an effect, not open(): flushSync can't commit from inside another commit (a click() from an effect).
-  // It runs in the open's commit, so a key that opened the menu types into the plate
+  // after the popover is shown. A key on the wrapper that opened the menu types into the field:
+  // a key's effects run before the browser types it
   useEffect(() => {
     if (!menuOpen) return
-    ;(inputFld.current || plateRef.current!).focus()
+    ;(inputFld.current || componentRef.current!).focus()
     // here, not in open(): a click's open isn't committed yet, so the menu is there for both
     onMenuOpen()
   }, [menuOpen])
@@ -392,15 +318,10 @@ function MultiSelect({
   // after the menu's effect: a key that opens it (End) scrolls once it is placed, its height capped
   useEffect(() => {
     // scrollIntoView is missing in jsdom
-    plateRef.current
+    listRef.current
       ?.querySelector('.msl-option-focused')
       ?.scrollIntoView?.({ block: 'nearest' })
   }, [activeIdx])
-
-  // the selection as last set or rendered: a chip's onDelete may run late (after an exit animation)
-  const latest = useRef(value)
-  // the element with keyboard focus (focus-visible) when a chip was deleted, or the search field a pick may remove
-  const lost = useRef<Element | null>(null)
 
   const setNewValue = (val: MultiSelectOption[]) => {
     const values = val.map(valueOf)
@@ -439,7 +360,7 @@ function MultiSelect({
     setQuery('')
     // unset closeOnSelect: single select closes, multi select stays open.
     // The value takes the search field's place, maybe in a later commit: focus the wrapper, not the field.
-    // Left open, focus goes to the plate if the field goes (click, Enter, comma).
+    // Left open, focus goes to the wrapper if the field goes (click, Enter, comma).
     // opened, not menuOpen: Enter in the closed field opens the menu in this same event
     opened.current && (closeOnSelect ?? singleSelect)
       ? closeMenu(
@@ -462,9 +383,9 @@ function MultiSelect({
 
   // a keyboard delete unmounts the focused button: keep focus in the widget. Disabled, the field takes none
   const refocus = () =>
-    (disabled
-      ? componentRef.current
-      : inputFld.current || plateRef.current || componentRef.current)!.focus()
+    ((!disabled && inputFld.current) || componentRef.current!).focus({
+      preventScroll: true
+    })
 
   useEffect(() => {
     latest.current = value
@@ -479,12 +400,9 @@ function MultiSelect({
   })
 
   // disabled while open: it closes, so no pick comes from the open menu, styled or not.
-  // After the effect above, which brings focus back from the closed plate on the next commit:
-  // no flushSync in an effect, and from the end of <body> Tab would move on from there
+  // Focus moves to the wrapper: a disabled field or a removed option would drop it
   useEffect(() => {
-    if (!disabled) return
-    lost.current = plateRef.current
-    closeMenu()
+    disabled && closeMenu(false, componentRef.current)
   }, [disabled])
 
   // Not document.activeElement: in a shadow root that is the host. A focused shadow host only
@@ -498,21 +416,17 @@ function MultiSelect({
     return el?.matches(':focus-visible') ? outer! : null
   }
 
-  // the target or an ancestor below the plate or wrapper holding it has attr: any icon depth, never
-  // them or above. The plate first: it may sit in the wrapper (slotted into a dialog).
-  // A target outside both counts too: a user portal's, or a chip a sync onChange removed mid-event
+  // the target or an ancestor below the wrapper has attr: any icon depth, never the wrapper or above.
+  // A target outside it counts too: a user portal's, or a chip a sync onChange removed mid-event
   const marked = (target: EventTarget, attr: string) => {
-    const box = [plateRef.current, componentRef.current].find((el) =>
-      el?.contains(target as Node)
-    )
+    const root = componentRef.current!
     const el = (target as Element).closest(`[${attr}]`)
-    return !box || (el !== box && box.contains(el))
+    return !root.contains(target as Node) || (el !== root && root.contains(el))
   }
 
-  // plate events bubble here through the portal
-  const openMenu = ({ target, type }: React.SyntheticEvent) => {
+  const openMenu = ({ target }: React.SyntheticEvent) => {
     if (disabled || marked(target, 'data-clickable')) return
-    if (!menuOpen) open(type === 'keydown')
+    if (!menuOpen) open()
     else if (marked(target, 'data-handle')) closeMenu(true)
     // not a close: an option click bubbles here and must not undo closeOnSelect.
     // Nor a refocus once closed: an onChange may have moved focus out
@@ -540,8 +454,6 @@ function MultiSelect({
     // Safari ends the composition before the keydown, leaving only keyCode 229
     if (e.nativeEvent.isComposing || e.keyCode === 229) return
     const { key, target } = e
-    const inMenu = (el?: Element) =>
-      el?.closest('[role=listbox]')?.id === listId
     if (menuOpen && key === 'Escape') {
       // it closes the menu, not a surrounding <dialog> or popover too. Stopped too: a modal
       // library's onKeyDown above it in the React tree may ignore defaultPrevented (MUI's does)
@@ -549,32 +461,17 @@ function MultiSelect({
       e.stopPropagation()
       return closeMenu(true)
     }
-    if (menuOpen && key === 'Tab') {
-      const plate = plateRef.current!
-      // the plate is a stop before its controls, as the wrapper is
-      // ponytail: tabIndex >= 0 counts disabled and hidden elements as stops; filter them if JSX in the menu has them
-      const stops = [plate, ...plate.querySelectorAll<HTMLElement>('*')].filter(
+    // Tab moves focus on in page order, and closes the menu. Unless the menu has stops of its own (focusable JSX):
+    // then Tab steps through the open box, and focus leaving it closes the menu.
+    // ponytail: tabIndex >= 0 counts disabled and hidden elements as stops; filter them if JSX in the menu has them
+    if (
+      menuOpen &&
+      key === 'Tab' &&
+      ![...listRef.current!.querySelectorAll<HTMLElement>('*')].some(
         (el) => el.tabIndex >= 0
       )
-      const at = (el: Node) => (target as Node).compareDocumentPosition(el)
-      // where the browser moves focus in the plate, also from an option or the listbox, which are no stops
-      const next = e.shiftKey
-        ? stops.filter((el) => at(el) & 2).pop() // preceding
-        : stops.find((el) => at(el) & 4) // following
-      // focusable JSX in the menu, which only the plate has: Tab steps through the plate, the menu open
-      if (next && stops.some(inMenu)) return
-      // else it closes. The plate sits at the end of its container: Tab moves on from the wrapper instead,
-      // from the twin of what it leaves, or past the wrapper's controls when it leaves the menu
-      const twin = twinOf(target as Element)
-      if (twin || !next)
-        return closeMenu(
-          true,
-          twin || controls(componentRef.current!).pop() || componentRef.current
-        )
-      // from an option or the listbox, back to a control: onto its twin
-      e.preventDefault()
-      closeMenu(true, twinOf(next))
-    }
+    )
+      return closeMenu()
     // our listbox, when the target is JSX in it outside the options: an empty state's button, a group title's
     const box = (target as Element).closest('[role=option],[role=listbox]')
     // chips, the clear button and that JSX handle their own keys
@@ -611,9 +508,7 @@ function MultiSelect({
       (key.length === 1 && !e.ctrlKey && !e.metaKey)
     ) {
       // Space on the wrapper would scroll the page; Enter in the search would submit a form
-      ;((key === ' ' &&
-        (target === e.currentTarget || target === plateRef.current)) ||
-        key === 'Enter') &&
+      ;((key === ' ' && target === e.currentTarget) || key === 'Enter') &&
         e.preventDefault()
       openMenu(e)
     }
@@ -633,122 +528,9 @@ function MultiSelect({
     'aria-disabled': disabled
   } as const
 
-  // on the wrapper and the plate; className and style only on the wrapper, the plate has classNames.plate
-  const state = `${disabled ? 'msl-disabled' : ''}${
-    full ? ' msl-limit-reached' : ''
-  }`
-
-  // rendered twice while open: the hidden wrapper's copy holds the space, the plate's is live
-  const control = (plate: boolean) => (
-    <div
-      data-open={plate || undefined}
-      data-up={(plate && up) || undefined}
-      className={`msl ${plate ? (up ? 'msl-active-up' : 'msl-active') : ''} ${cn.control ?? ''}`}
-    >
-      <div className={`msl-input-wrp ${cn.values ?? ''}`}>
-        {!singleSelect && !disableChip && (
-          // data-clickable: clicks and keys on any chip markup are the chip's, not the menu's.
-          // display: contents keeps this box out of the layout, styled or not
-          <div data-clickable style={{ display: 'contents' }}>
-            {value.map((val, i) => (
-              <React.Fragment key={i}>
-                {customChip({
-                  label: labelOf(val),
-                  value: valueOf(val),
-                  option: val,
-                  disabled,
-                  classNames: cn,
-                  onDelete: () => {
-                    // a custom chip may stay tabbable while disabled
-                    if (disabled) return
-                    // before the delete: an onChange that flushes sync unmounts the chip right away
-                    lost.current = keyboardFocus()
-                    deleteValue(val)
-                  }
-                })}
-              </React.Fragment>
-            ))}
-          </div>
-        )}
-        {!singleSelect && disableChip && value.length > 0 && (
-          <span className={`msl-single-value ${cn.singleValue ?? ''}`}>
-            {value.length === 1 ? (
-              labelOf(value[0])
-            ) : (
-              <>
-                {value.length} {chipAlternateText}
-              </>
-            )}
-          </span>
-        )}
-        {singleSelect && value.length === 1 && (
-          <span className={`msl-single-value ${cn.singleValue ?? ''}`}>
-            {labelOf(value[0])}
-          </span>
-        )}
-        {showSearch && (
-          <input
-            placeholder={placeholder}
-            className={`msl-input ${cn.input ?? ''}`}
-            disabled={disabled}
-            // the browser's own history list would cover the menu
-            autoComplete='off'
-            value={query}
-            onChange={(e) => {
-              setActive(null)
-              setQuery(e.target.value)
-            }}
-            ref={plate === menuOpen ? inputFld : undefined}
-            {...combobox}
-          />
-        )}
-        {!showSearch && value.length < 1 && (
-          <div
-            data-placeholder={placeholder}
-            className={`msl-input ${cn.input ?? ''}`}
-          />
-        )}
-      </div>
-      {(clearable || downArrow) && (
-        <div className={`msl-actions msl-flx ${cn.actions ?? ''}`}>
-          {clearable && value.length > 0 && (
-            <div
-              role='button'
-              // it stops the menu from opening
-              data-clickable
-              aria-label={clearLabel}
-              aria-disabled={disabled}
-              onClick={clearByUser}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  clearByUser()
-                  refocus()
-                }
-              }}
-              tabIndex={disabled ? -1 : 0}
-              className={`msl-btn msl-clear-btn msl-flx ${cn.clearButton ?? ''}`}
-            >
-              {closeIcon || <CloseIcon />}
-            </div>
-          )}
-          {downArrow && (
-            // decorative: the combobox handles the keyboard
-            <div
-              aria-hidden='true'
-              data-handle
-              className={`msl-btn msl-arrow-btn msl-flx ${cn.arrowButton ?? ''}`}
-            >
-              {downArrowIcon || <DownIcon />}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-
   const menu = (
     <div
+      ref={listRef}
       className={`msl-options ${cn.menu ?? ''}`}
       id={listId}
       role='listbox'
@@ -788,45 +570,123 @@ function MultiSelect({
       tabIndex={disabled ? -1 : 0}
       onKeyDown={onKeyDown}
       data-disabled={disabled || undefined}
-      style={{ ...style, ...(menuOpen && { visibility: 'hidden' }) }}
-      className={`msl-wrp msl-vars ${className || ''} ${state}`}
+      style={style}
+      className={`msl-wrp msl-vars ${className || ''} ${disabled ? 'msl-disabled' : ''}${
+        full ? ' msl-limit-reached' : ''
+      }`}
     >
       <input name={name} type='hidden' value={value.map(valueOf).join(',')} />
-      {control(false)}
-      {menuOpen &&
-        look &&
-        createPortal(
-          <>
-            {/* zero width, so it takes no clicks */}
-            <div
-              ref={probeRef}
-              style={{ position: look.pos, top: 0, bottom: 0, left: 0 }}
-            />
-            <div
-              ref={plateRef}
-              {...(!showSearch && combobox)}
-              tabIndex={0}
-              dir={look.dir}
-              lang={look.lang}
-              style={{
-                ...look.vars,
-                // left, top and width: set by the open menu's effect, every frame
-                position: look.pos,
-                // modal libraries (Radix) set pointer-events: none on <body>, where it renders
-                pointerEvents: 'auto',
-                // in the hidden wrapper when that is what is slotted into a dialog
-                visibility: 'visible'
-              }}
-              className={`msl-plate msl-vars ${state} ${cn.plate ?? ''}`}
-            >
-              {/* in DOM order, so it stacks right with no stylesheet */}
-              {up && menu}
-              {control(true)}
-              {!up && menu}
+      {/* the popover while open, set up by the open menu's effect. Unstyled: the box inside has the looks */}
+      <div ref={boxRef}>
+        <div
+          data-open={menuOpen || undefined}
+          data-up={(menuOpen && up) || undefined}
+          className={`msl ${menuOpen ? (up ? 'msl-active-up' : 'msl-active') : ''} ${cn.control ?? ''}`}
+        >
+          {/* in DOM order, so it stacks right with no stylesheet */}
+          {menuOpen && up && menu}
+          <div className={`msl-input-wrp ${cn.values ?? ''}`}>
+            {!singleSelect && !disableChip && (
+              // data-clickable: clicks and keys on any chip markup are the chip's, not the menu's.
+              // display: contents keeps this box out of the layout, styled or not
+              <div data-clickable style={{ display: 'contents' }}>
+                {value.map((val, i) => (
+                  <React.Fragment key={i}>
+                    {customChip({
+                      label: labelOf(val),
+                      value: valueOf(val),
+                      option: val,
+                      disabled,
+                      classNames: cn,
+                      onDelete: () => {
+                        // a custom chip may stay tabbable while disabled
+                        if (disabled) return
+                        // before the delete: an onChange that flushes sync unmounts the chip right away
+                        lost.current = keyboardFocus()
+                        deleteValue(val)
+                      }
+                    })}
+                  </React.Fragment>
+                ))}
+              </div>
+            )}
+            {!singleSelect && disableChip && value.length > 0 && (
+              <span className={`msl-single-value ${cn.singleValue ?? ''}`}>
+                {value.length === 1 ? (
+                  labelOf(value[0])
+                ) : (
+                  <>
+                    {value.length} {chipAlternateText}
+                  </>
+                )}
+              </span>
+            )}
+            {singleSelect && value.length === 1 && (
+              <span className={`msl-single-value ${cn.singleValue ?? ''}`}>
+                {labelOf(value[0])}
+              </span>
+            )}
+            {showSearch && (
+              <input
+                placeholder={placeholder}
+                className={`msl-input ${cn.input ?? ''}`}
+                disabled={disabled}
+                // the browser's own history list would cover the menu
+                autoComplete='off'
+                value={query}
+                onChange={(e) => {
+                  setActive(null)
+                  setQuery(e.target.value)
+                }}
+                ref={inputFld}
+                {...combobox}
+              />
+            )}
+            {!showSearch && value.length < 1 && (
+              <div
+                data-placeholder={placeholder}
+                className={`msl-input ${cn.input ?? ''}`}
+              />
+            )}
+          </div>
+          {(clearable || downArrow) && (
+            <div className={`msl-actions msl-flx ${cn.actions ?? ''}`}>
+              {clearable && value.length > 0 && (
+                <div
+                  role='button'
+                  // it stops the menu from opening
+                  data-clickable
+                  aria-label={clearLabel}
+                  aria-disabled={disabled}
+                  onClick={clearByUser}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      clearByUser()
+                      refocus()
+                    }
+                  }}
+                  tabIndex={disabled ? -1 : 0}
+                  className={`msl-btn msl-clear-btn msl-flx ${cn.clearButton ?? ''}`}
+                >
+                  {closeIcon || <CloseIcon />}
+                </div>
+              )}
+              {downArrow && (
+                // decorative: the combobox handles the keyboard
+                <div
+                  aria-hidden='true'
+                  data-handle
+                  className={`msl-btn msl-arrow-btn msl-flx ${cn.arrowButton ?? ''}`}
+                >
+                  {downArrowIcon || <DownIcon />}
+                </div>
+              )}
             </div>
-          </>,
-          home.current!
-        )}
+          )}
+          {menuOpen && !up && menu}
+        </div>
+      </div>
     </div>
   )
 }

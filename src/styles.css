@@ -5,7 +5,6 @@
   --msl-font-size: 14px;
   --msl-line-height: 1.4;
   --msl-border-radius: 8px;
-  --msl-menu-z-index: 9999;
 
   /* the closed box */
   --msl-background: transparent;
@@ -46,11 +45,6 @@
 
 .msl-wrp {
   width: var(--msl-input-width);
-  border-radius: var(--msl-border-radius);
-}
-
-.msl-wrp,
-.msl-plate {
   outline: none;
   line-height: var(--msl-line-height);
 }
@@ -60,7 +54,8 @@
 }
 
 .msl {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   overflow: hidden;
   border: 1px solid var(--msl-border-color);
   border-radius: var(--msl-border-radius);
@@ -73,13 +68,8 @@
   }
 }
 
-:where(.msl-disabled) > .msl {
+:where(.msl-disabled) .msl {
   background-color: var(--msl-disabled-background);
-}
-
-.msl-input-wrp {
-  flex: 1;
-  min-inline-size: 0;
 }
 
 .msl-input {
@@ -190,31 +180,12 @@
   height: 10px;
 }
 
-.msl-plate {
-  z-index: max(var(--msl-menu-z-index), var(--msl-inherited-z-index) + 1);
-  box-sizing: border-box;
-  overflow: hidden;
-  border: 1px solid var(--msl-active-menu-border-color);
+.msl-active,
+.msl-active-up {
+  border-color: var(--msl-active-menu-border-color);
   border-radius: var(--msl-active-menu-radius);
   background: var(--msl-active-menu-background);
   box-shadow: var(--msl-active-menu-shadow);
-  color: var(--msl-inherited-color);
-  font-family: var(--msl-inherited-font);
-}
-
-.msl-active,
-.msl-active-up {
-  border: 0 solid var(--msl-divider-color);
-  border-radius: 0;
-  background: none;
-}
-
-.msl-active {
-  border-block-end-width: 1px;
-}
-
-.msl-active-up {
-  border-block-start-width: 1px;
 }
 
 @property --msl-menu-room {
@@ -223,10 +194,13 @@
 }
 
 .msl-options {
+  grid-column: 1 / -1;
   overflow: auto;
   overscroll-behavior: contain;
   max-height: min(var(--msl-menu-max-height), var(--msl-menu-room));
   padding-block-end: 1px;
+  border: 0 solid var(--msl-divider-color);
+  cursor: default;
   scrollbar-width: thin;
   scrollbar-color: var(--msl-scrollbar-color) transparent;
 
@@ -244,6 +218,14 @@
   }
 }
 
+:where(.msl-active) > .msl-options {
+  border-block-start-width: 1px;
+}
+
+:where(.msl-active-up) > .msl-options {
+  border-block-end-width: 1px;
+}
+
 .msl-option,
 .msl-grp-title {
   margin: 4px 6px;
@@ -257,8 +239,7 @@
   cursor: pointer;
 }
 
-.msl-wrp:focus-visible,
-.msl-plate:focus-visible,
+:where(.msl-wrp:focus-visible) .msl,
 .msl-btn:focus-visible,
 .msl-option:focus-visible {
   outline: 2px solid var(--msl-focus-color);
