@@ -192,6 +192,52 @@ type Text = keyof typeof texts
 // the recipes of the virtual lists page, named as there
 const lists = { VirtualList, TanstackList }
 
+// title rows with a count: then the expand icon, or one of your own from open
+const titles: Record<string, MultiSelectProps['renderGroupTitle']> = {
+  count: ({ title, total, selected, icon }) => (
+    <>
+      {title}
+      <span>
+        {selected}/{total}
+      </span>
+      {icon}
+    </>
+  ),
+  open: ({ title, total, selected, open, group }) => (
+    <>
+      {title}
+      <span>
+        {selected}/{total}
+      </span>
+      <span aria-hidden style={{ marginInlineStart: 'auto' }}>
+        {open && group.type !== 'submenu' ? '▾' : '▸'}
+      </span>
+    </>
+  )
+}
+const titlesCode = {
+  count: [
+    'renderGroupTitle={({ title, total, selected, icon }) => (',
+    '  <>',
+    '    {title}',
+    '    <span>{selected}/{total}</span>',
+    '    {icon}',
+    '  </>',
+    ')}'
+  ],
+  open: [
+    'renderGroupTitle={({ title, total, selected, open, group }) => (',
+    '  <>',
+    '    {title}',
+    '    <span>{selected}/{total}</span>',
+    "    <span aria-hidden style={{ marginInlineStart: 'auto' }}>",
+    "      {open && group.type !== 'submenu' ? '▾' : '▸'}",
+    '    </span>',
+    '  </>',
+    ')}'
+  ]
+}
+
 const variants = {
   options: 'fruits' as SetName,
   value: 'onChange' as 'onChange' | 'defaultValue' | 'value',
@@ -202,6 +248,7 @@ const variants = {
   theme: 'default' as 'default' | 'dark',
   animated: false,
   renderList: 'none' as 'none' | keyof typeof lists,
+  renderGroupTitle: 'none' as 'none' | keyof typeof titlesCode,
   events: false
 }
 
@@ -278,7 +325,10 @@ export default function Playground() {
     clearLabel: !s.clearable,
     deleteOnBackspace: !chips || s.disableSearch,
     limit: s.singleSelect,
-    customChip: !chips
+    customChip: !chips,
+    // titles: groups or submenus, or customValue's group
+    renderGroupTitle:
+      !['groups', 'submenus', 'tree'].includes(s.options) && !s.customValue
   }
 
   const changed = <K extends keyof State>(name: K) => s[name] !== initial[name]
@@ -317,10 +367,13 @@ export default function Playground() {
       ...(s.icons
         ? [
             'downArrowIcon={<span aria-hidden>🔽</span>}',
-            'closeIcon={<span aria-hidden>✕</span>}'
+            'closeIcon={<span aria-hidden>✕</span>}',
+            "groupIcon='▸'",
+            "submenuIcon='→'"
           ]
         : []),
       ...(s.customChip ? chipCode : []),
+      ...(s.renderGroupTitle === 'none' ? [] : titlesCode[s.renderGroupTitle]),
       ...(List ? [`renderList={(list) => <${s.renderList} {...list} />}`] : []),
       ...(className ? [`className='${className}'`] : []),
       'onChange={setValue}',
@@ -349,7 +402,13 @@ export default function Playground() {
     </label>
   )
   const choose = <
-    K extends 'options' | 'value' | 'closeOnSelect' | 'theme' | 'renderList'
+    K extends
+      | 'options'
+      | 'value'
+      | 'closeOnSelect'
+      | 'theme'
+      | 'renderList'
+      | 'renderGroupTitle'
   >(
     name: K,
     choices: Record<State[K], string>
@@ -359,6 +418,7 @@ export default function Playground() {
       <select
         name={name}
         value={s[name]}
+        disabled={off[name]}
         onChange={(e) => update({ [name]: e.target.value })}
       >
         {Object.entries(choices).map(([v, text]) => (
@@ -416,6 +476,11 @@ export default function Playground() {
               VirtualList: 'react-window',
               TanstackList: 'TanStack Virtual'
             })}
+            {choose('renderGroupTitle', {
+              none: 'none',
+              count: 'count, then icon',
+              open: 'count, own icon from open'
+            })}
             {check('animated')}
             {check('customChip')}
             {check('icons')}
@@ -470,6 +535,13 @@ export default function Playground() {
             customChip={s.customChip ? chip : undefined}
             downArrowIcon={s.icons ? <span aria-hidden>🔽</span> : undefined}
             closeIcon={s.icons ? <span aria-hidden>✕</span> : undefined}
+            groupIcon={s.icons ? '▸' : undefined}
+            submenuIcon={s.icons ? '→' : undefined}
+            renderGroupTitle={
+              s.renderGroupTitle === 'none'
+                ? undefined
+                : titles[s.renderGroupTitle]
+            }
             renderList={List && ((list) => <List {...list} />)}
             className={className}
             onMenuOpen={s.events ? () => note('onMenuOpen') : undefined}

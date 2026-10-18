@@ -90,13 +90,51 @@ State classes:
 | `msl-option-focused`           | option  | highlighted by the keyboard           |
 | `msl-option-disable`           | option  | disabled                              |
 
-Parts: `msl-wrp` (wrapper), `msl` (input box, and the open menu), `msl-chip`, `msl-chip-delete`, `msl-single-value`, `msl-input`, `msl-search` (the search field's box with `searchInMenu`), `msl-clear-btn`, `msl-arrow-btn`, `msl-options` (menu), `msl-option`, `msl-grp` (a group), `msl-grp-title`, `msl-grp-body` (a collapsible group's childs), `msl-submenu` (a submenu's popover).
+Parts: `msl-wrp` (wrapper), `msl` (input box, and the open menu), `msl-chip`, `msl-chip-delete`, `msl-single-value`, `msl-input`, `msl-search` (the search field's box with `searchInMenu`), `msl-clear-btn`, `msl-arrow-btn`, `msl-options` (menu), `msl-option`, `msl-grp` (a group), `msl-grp-title`, `msl-grp-body` (a collapsible group's childs), `msl-submenu` (a submenu's popover), `msl-expand-icn` (the icon after a title that opens).
 
-Where the browser has CSS anchor positioning, a submenu shows in the top layer. Elsewhere it opens under its title, in the menu, with the same look. Right to left (a `dir="rtl"` attribute, which the stylesheet reads with `:dir()`, not CSS `direction` alone), it opens on the left, and Arrow Left and Right swap. The stylesheet places it with [CSS anchor positioning](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_anchor_positioning): beside its title, on the other side or above where there is no room, and over its title where neither side has room. Its title is its `position-anchor`, so your own `.msl-submenu` rules can place it elsewhere with another `position-area`, or with `anchor()` insets and `position-area: none`. Open titles and collapsible group titles have `aria-expanded`; the stylesheet draws their chevrons as `::after`.
+Where the browser has CSS anchor positioning, a submenu shows in the top layer. Elsewhere it opens under its title, in the menu, with the same look. Right to left (a `dir="rtl"` attribute, which the stylesheet reads with `:dir()`, not CSS `direction` alone), it opens on the left, and Arrow Left and Right swap. The stylesheet places it with [CSS anchor positioning](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_anchor_positioning): beside its title, on the other side or above where there is no room, and over its title where neither side has room. Its title is its `position-anchor`, so your own `.msl-submenu` rules can place it elsewhere with another `position-area`, or with `anchor()` insets and `position-area: none`. Submenu titles and collapsible group titles have `aria-expanded`, and end with an icon: see [Expand icons](#expand-icons).
 
 A single option can carry its own `classes` and `style`. To add classes to every part, Tailwind utilities for example, use the `classNames` prop: see [Tailwind](../tailwind/).
 
 The component's inline styles are behavior, not looks: `display: contents` on the chip wrapper and on the box around the options (around each row with `renderList`), which keeps those boxes out of the layout with or without the stylesheet (select options with `.msl-options .msl-option`, not `>`), and, while the menu is open, the dropdown's `min-height` (the open box left the flow) and the popover's `position`, coordinates, width and scale, and a reset of the browser's popover look (`inset`, `margin`, `padding`, `border`, `background`, `color: inherit`, `overflow`), on the unstyled `<div>` around `.msl`, and, on an open submenu and its title, the `position-anchor` and `anchor-name` that tie them together, and, on a closed submenu's copy, the position it had. Everything else is in the stylesheet: without it the markup is unstyled, and plain CSS overrides any of its rules.
+
+## Expand icons
+
+Collapsible group titles and submenu titles end with a `<span class="msl-expand-icn" aria-hidden="true">`. By default it holds the arrow button's chevron SVG, `.msl-chevron-icn`, which the stylesheet sizes, thickens (`stroke-width`) and turns to point to the end. Pass your own icon with `groupIcon` and `submenuIcon`, drawn pointing to the inline end (right): the stylesheet turns the span down while its group is open (`rotate: 90deg`) and to the left right to left (`180deg`). It goes in a `<bdo dir="ltr">`, so the browser doesn't mirror a text arrow such as `›` as well.
+
+```jsx
+<MultiSelect
+  options={options}
+  groupIcon={<ChevronRight size={14} />}
+  submenuIcon={<ArrowRight size={14} />}
+/>
+```
+
+The title is a flex row, and the icon's `margin-inline-start: auto` holds it at the end. Every rule is one class, so yours override them:
+
+```css
+/* before the title */
+.msl-grp-title > .msl-expand-icn {
+  order: -1;
+  margin-inline-start: 0;
+}
+
+/* a bigger, thinner default chevron */
+.msl-chevron-icn {
+  width: 20px;
+  height: 20px;
+  stroke-width: 1.5;
+}
+
+/* an icon that shows the state itself (+ / -): no turn */
+.msl-grp-title > .msl-expand-icn {
+  rotate: none;
+}
+```
+
+With Tailwind, the same through `classNames.groupIcon` and `classNames.submenuIcon`: `'-order-1 ms-0'`.
+
+`renderGroupTitle` places the icon in JS: it gets the span as `icon`, and `open` to draw a state of your own instead. Put first, the span still has the auto margin: give it `margin-inline-start: 0` as above.
 
 ## Animations
 

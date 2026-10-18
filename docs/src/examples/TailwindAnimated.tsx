@@ -33,9 +33,12 @@ const options = [
 
 const button =
   'inline-flex cursor-pointer items-center justify-center rounded-full'
-// a chevron after a title with aria-expanded, open or not
+// a title with aria-expanded, open or not: a row, its icon at the end
+const opens =
+  '[&[aria-expanded]]:flex [&[aria-expanded]]:items-center [&[aria-expanded]]:gap-2'
+// the icon after it: the arrow button's chevron, turned to point right
 const chevron =
-  '[&[aria-expanded]]:flex [&[aria-expanded]]:items-center [&[aria-expanded]]:justify-between [&[aria-expanded]]:after:ms-2 [&[aria-expanded]]:after:size-1.5 [&[aria-expanded]]:after:shrink-0 [&[aria-expanded]]:after:border-r-[1.5px] [&[aria-expanded]]:after:border-b-[1.5px] [&[aria-expanded]]:after:transition-[rotate]'
+  'ms-auto flex shrink-0 transition-[rotate] *:size-[15px] *:-rotate-90 *:stroke-2'
 
 const classNames = {
   // the open box grows to fit the options, and shrinks back: their grid row goes from 0fr to 1fr.
@@ -56,12 +59,15 @@ const classNames = {
   submenu:
     'm-0 -mt-1.5 inset-auto [position-area:right_span-bottom] max-h-[400px] w-max min-w-30 overflow-auto rounded-lg border border-gray-200 bg-white p-0 text-inherit shadow-lg transition-[opacity,translate] duration-150 [position-try-fallbacks:flip-inline,flip-block] starting:-translate-x-1.5 starting:opacity-0 data-closing:opacity-0 rtl:[position-area:none] rtl:top-[anchor(top)] rtl:right-[anchor(left)]',
   // in and out with the menu, a submenu, or their group
-  option: `mx-1.5 my-1 cursor-pointer rounded-md px-2 py-1 transition-[opacity,background-color] duration-150 hover:bg-gray-100 aria-selected:text-blue-600 aria-disabled:cursor-default aria-disabled:text-gray-300 aria-expanded:bg-gray-100 data-focused:bg-gray-100 starting:opacity-0 in-data-closing:opacity-0 ${chevron} [&[aria-expanded]]:after:-rotate-45`,
+  option: `mx-1.5 my-1 cursor-pointer rounded-md px-2 py-1 transition-[opacity,background-color] duration-150 hover:bg-gray-100 aria-selected:text-blue-600 aria-disabled:cursor-default aria-disabled:text-gray-300 aria-expanded:bg-gray-100 data-focused:bg-gray-100 starting:opacity-0 in-data-closing:opacity-0 ${opens}`,
+  submenuIcon: chevron,
   group: 'ps-3',
   // a collapsible group slides open and shut: the one box in its body, a grid row from 0fr to 1fr
   groupBody:
     'grid grid-rows-[1fr] transition-[grid-template-rows] duration-200 starting:grid-rows-[0fr] data-closing:grid-rows-[0fr] *:min-h-0 *:overflow-hidden',
-  groupTitle: `my-1 me-1.5 -ms-1.5 rounded-md bg-gray-50 px-2 py-1 text-xs text-gray-500 data-focused:bg-gray-100 [&[aria-expanded]]:cursor-pointer [&[aria-expanded]]:hover:bg-gray-100 ${chevron} aria-[expanded=false]:after:-rotate-45 aria-expanded:after:rotate-45`,
+  groupTitle: `my-1 me-1.5 -ms-1.5 rounded-md bg-gray-50 px-2 py-1 text-xs text-gray-500 data-focused:bg-gray-100 [&[aria-expanded]]:cursor-pointer [&[aria-expanded]]:hover:bg-gray-100 group ${opens}`,
+  // down while the group is open
+  groupIcon: `${chevron} group-aria-expanded:rotate-90`,
   empty: 'mx-1.5 my-1 px-2 py-1 text-gray-400'
 }
 
