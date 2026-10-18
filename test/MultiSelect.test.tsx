@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import type {
   MultiSelectChipProps,
+  MultiSelectListProps,
   MultiSelectOption,
   MultiSelectProps
 } from '../src/index'
@@ -520,6 +521,39 @@ describe('options', () => {
     ])
     expect(qa('.msl-option-disable i')[0].textContent).toBe('none')
     expect(error).not.toHaveBeenCalled()
+  })
+
+  it('a collapsed group hides its groups and empty label too, and its selected options stay', () => {
+    const { groupTitles, optionTexts, chips } = setup({
+      options: [
+        { label: 'Apple', value: 'apple' },
+        {
+          title: 'Group A',
+          type: 'group',
+          collapsible: true,
+          collapsed: true,
+          childs: [
+            { label: 'Banana', value: 'banana' },
+            {
+              title: 'Group B',
+              type: 'group',
+              childs: [{ label: 'Cherry', value: 'cherry' }]
+            }
+          ]
+        },
+        {
+          title: 'Empty',
+          type: 'group',
+          collapsible: true,
+          collapsed: true,
+          childs: []
+        }
+      ],
+      defaultValue: ['banana']
+    })
+    expect(chips()).toEqual(['Banana'])
+    expect(groupTitles()).toEqual(['Group A', 'Empty'])
+    expect(optionTexts()).toEqual(['Apple'])
   })
 
   it('applies option style, classes, title and value attributes', () => {
@@ -1227,11 +1261,337 @@ describe('customChip', () => {
   })
 })
 
+describe('renderList', () => {
+  // aria-posinset/aria-setsize of each
+  const places = (els: Element[]) =>
+    els.map(
+      (el) =>
+        `${el.getAttribute('aria-posinset')}/${el.getAttribute('aria-setsize')}`
+    )
+  // every row, each in a box of its own, as a virtual list positions them
+  const all = ({ count, row }: MultiSelectListProps) => (
+    <div className='my-list'>
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className='my-row'>
+          {row(i)}
+        </div>
+      ))}
+    </div>
+  )
+
+  it('renders the rows in the listbox, groups flattened, each row in a msl-grp box per group around it', () => {
+    const error = vi.spyOn(console, 'error')
+    const renderList = vi.fn(all)
+    const { root, q, qa } = setup({
+      options: [...grouped, { title: 'Empty', type: 'group', childs: [] }],
+      classNames: { group: 'grp' },
+      renderList
+    })
+    fireEvent.click(root)
+    const list = q('.msl-options')
+    expect(list.getAttribute('role')).toBe('listbox')
+    expect(list.getAttribute('data-custom')).toBe('')
+    expect(list.firstElementChild!.className).toBe('my-list')
+    const rows = qa('.my-row')
+    expect(rows.map((el) => el.textContent)).toEqual([
+      'Apple',
+      'Group A',
+      'Banana',
+      'Group B',
+      'Cherry',
+      'Empty',
+      'No Data Found'
+    ])
+    // a title is in its own group's box, as in the tree
+    expect(
+      rows.map((el) => el.querySelectorAll('.msl-grp.grp').length)
+    ).toEqual([0, 1, 1, 2, 2, 1, 1])
+    // no box holds a group's rows together
+    expect(qa('[role="group"]')).toHaveLength(0)
+    expect(qa('[role="option"]').map((el) => el.id)).toEqual(
+      [0, 1, 2].map((i) => `${list.id}-${i}`)
+    )
+    // only the rows a virtual list shows are there: each option tells its place, titles and labels not counted
+    expect(places(qa('[role="option"]'))).toEqual(['1/3', '2/3', '3/3'])
+    // a virtual list may ask for a row past the end while the rows shrink
+    const { count, row } = renderList.mock.lastCall![0]
+    expect(row(count)).toBeUndefined()
+    expect(error).not.toHaveBeenCalled()
+  })
+
+  it('the title of a collapsible group is a row: Enter toggles it, its rows come and go', () => {
+    const renderList = vi.fn(all)
+    const { root, input, qa } = setup({ options: fruits, renderList })
+    const rows = () => qa('.my-row').map((el) => el.textContent)
+    const active = () => renderList.mock.lastCall![0].activeIndex
+    fireEvent.click(root)
+    expect(rows()).toEqual(['Citrus', 'Lemon', 'Lime', 'Berries'])
+    const title = qa('.msl-grp-title')[0]
+    expect(title.getAttribute('role')).toBe('option')
+    expect(title.getAttribute('aria-expanded')).toBe('true')
+    // in its group's box, as in the tree
+    expect(title.parentElement!.className).toBe('msl-grp ')
+    press(input(), 'ArrowDown')
+    press(input())
+    expect(rows()).toEqual(['Citrus', 'Berries'])
+    expect(active()).toBe(0)
+    press(input(), 'ArrowDown')
+    press(input())
+    expect(rows()).toEqual(['Citrus', 'Berries', 'Blueberry'])
+    press(input(), 'ArrowDown')
+    expect(active()).toBe(2)
+  })
+
+  it('renders the rows of an open submenu through it too, in a popover after its title; a list without the highlight gets activeIndex -1', () => {
+    const renderList = vi.fn(all)
+    const { root, input, q, qa, onChange } = setup({
+      options: nested,
+      renderList
+    })
+    // the lists of the last render: open submenus' innermost first, the menu's last
+    const lists = (k: number) =>
+      renderList.mock.calls.slice(-k).map(([l]) => [l.count, l.activeIndex])
+    fireEvent.click(root)
+    expect(qa('.my-list')).toHaveLength(1)
+    expect(qa('.my-row').map((el) => el.textContent)).toEqual([
+      'Apple',
+      'Veg',
+      'Banana'
+    ])
+    press(input(), 'ArrowDown')
+    press(input(), 'ArrowDown')
+    press(input(), 'ArrowRight')
+    const veg = q('.msl-submenu')
+    expect(veg.getAttribute('data-custom')).toBe('')
+    expect(veg.previousElementSibling!.textContent).toBe('Veg')
+    expect(
+      [...veg.querySelectorAll('.my-row')].map((el) => el.textContent)
+    ).toEqual(['Carrot', 'Greens', 'Potato'])
+    // places in their own list: Veg is the menu's second option
+    expect(places([...veg.querySelectorAll('[role="option"]')])).toEqual([
+      '1/3',
+      '2/3',
+      '3/3'
+    ])
+    expect(places([veg.previousElementSibling!])).toEqual(['2/3'])
+    // Veg's list has the highlight, Carrot, the menu's none
+    expect(lists(2)).toEqual([
+      [3, 0],
+      [3, -1]
+    ])
+    expect(input().getAttribute('aria-activedescendant')).toBe(
+      q('[data-focused]').id
+    )
+    press(input(), 'ArrowDown')
+    press(input(), 'ArrowRight')
+    expect(qa('.msl-submenu')).toHaveLength(2)
+    expect(lists(3)).toEqual([
+      [2, 0],
+      [3, -1],
+      [3, -1]
+    ])
+    expect(q('[data-focused]').textContent).toBe('Kale')
+    press(input())
+    expect(values(onChange)).toEqual([['kale']])
+    press(input(), 'ArrowLeft')
+    expect(qa('.msl-submenu')).toHaveLength(1)
+    expect(q('[data-focused]').textContent).toBe('Greens')
+  })
+
+  it('without it, the listbox has no data-custom, and options no places: all are there to count', () => {
+    const { root, q } = setup()
+    fireEvent.click(root)
+    expect(q('.msl-options').hasAttribute('data-custom')).toBe(false)
+    expect(q('[aria-posinset],[aria-setsize]')).toBeNull()
+  })
+
+  it('activeIndex is the row of the keyboard highlight, titles counted, -1 for none', () => {
+    const renderList = vi.fn(all)
+    const { root, input, q } = setup({ options: grouped, renderList })
+    const active = () => renderList.mock.lastCall![0].activeIndex
+    fireEvent.click(root)
+    expect(active()).toBe(-1)
+    press(input(), 'ArrowDown')
+    expect(active()).toBe(0)
+    press(input(), 'ArrowDown')
+    // past Group A's title
+    expect(active()).toBe(2)
+    press(input(), 'End')
+    expect(active()).toBe(4)
+    expect(q('[data-focused]').textContent).toBe('Cherry')
+    expect(input().getAttribute('aria-activedescendant')).toBe(
+      q('[data-focused]').id
+    )
+    // search results have no titles
+    type(input(), 'rr')
+    press(input(), 'ArrowDown')
+    expect(renderList.mock.lastCall![0].count).toBe(1)
+    expect(active()).toBe(0)
+  })
+
+  const many = Array.from({ length: 1000 }, (_, i) => ({
+    label: `Item ${i}`,
+    value: `${i}`
+  }))
+
+  it('builds only the rows it asks for: a window of a long list', () => {
+    const getLabel = vi.fn((opt: MultiSelectOption) => opt.label)
+    // five rows from the highlight on, as a virtual list scrolled to it
+    const windowed = ({ count, row, activeIndex }: MultiSelectListProps) => {
+      const start = Math.max(0, Math.min(activeIndex, count - 5))
+      return Array.from({ length: 5 }, (_, i) => (
+        <div key={start + i}>{row(start + i)}</div>
+      ))
+    }
+    const { root, input, qa, option, onChange } = setup({
+      options: many,
+      getLabel,
+      renderList: windowed
+    })
+    const shown = () => qa('[role="option"]').map((el) => el.textContent)
+    const labeled = () =>
+      [...new Set(getLabel.mock.calls.map(([opt]) => opt.label))].sort()
+    fireEvent.click(root)
+    expect(shown()).toEqual(['Item 0', 'Item 1', 'Item 2', 'Item 3', 'Item 4'])
+    expect(labeled()).toEqual(shown())
+    getLabel.mockClear()
+    press(input(), 'End')
+    expect(shown()).toEqual([
+      'Item 995',
+      'Item 996',
+      'Item 997',
+      'Item 998',
+      'Item 999'
+    ])
+    expect(places(qa('[role="option"]'))).toEqual([
+      '996/1000',
+      '997/1000',
+      '998/1000',
+      '999/1000',
+      '1000/1000'
+    ])
+    expect(labeled()).toEqual(shown())
+    fireEvent.click(option('Item 996'))
+    press(input())
+    expect(values(onChange)).toEqual([['996'], ['996', '999']])
+  })
+
+  it('Enter picks the highlighted option though the list never rendered it', () => {
+    const { root, input, qa, onChange } = setup({
+      options: many,
+      renderList: ({ row }) => row(0)
+    })
+    fireEvent.click(root)
+    press(input(), 'End')
+    expect(qa('[role="option"]').map((el) => el.textContent)).toEqual([
+      'Item 0'
+    ])
+    press(input())
+    expect(values(onChange)).toEqual([['999']])
+  })
+
+  it('is not called while emptyDataLabel shows', () => {
+    const renderList = vi.fn(all)
+    const { root, input, q } = setup({ renderList })
+    fireEvent.click(root)
+    renderList.mockClear()
+    type(input(), 'zzz')
+    expect(renderList).not.toHaveBeenCalled()
+    expect(q('.msl-options').textContent).toBe('No Data Found')
+  })
+
+  it('closed with no exit CSS, the menu goes at once, its rows not built again', () => {
+    const renderList = vi.fn(all)
+    const { root, input } = setup({ renderList })
+    fireEvent.click(root)
+    renderList.mockClear()
+    press(input(), 'Escape')
+    expect(renderList).not.toHaveBeenCalled()
+    expect(box()).toBeNull()
+  })
+
+  it('keys on its scroller reach the combobox: not a tab stop, it takes focus on a click between the rows', () => {
+    const { root, q, onChange } = setup({
+      disableSearch: true,
+      renderList: (list) => (
+        <div tabIndex={-1} className='my-scroller'>
+          {all(list)}
+        </div>
+      )
+    })
+    fireEvent.click(root)
+    const scroller = q('.my-scroller')
+    scroller.focus()
+    press(scroller, 'ArrowDown')
+    expect(q('[data-focused]').textContent).toBe('Apple')
+    press(scroller)
+    expect(values(onChange)).toEqual([['apple']])
+  })
+
+  it('a focused row it unmounts, scrolled away, leaves focus in the listbox, where keys still work', () => {
+    let scroll: (start: number) => void = () => {}
+    // five rows from where it is scrolled to
+    function Windowed({ row }: MultiSelectListProps) {
+      const [start, setStart] = useState(0)
+      scroll = setStart
+      return (
+        <>
+          {Array.from({ length: 5 }, (_, i) => (
+            <div key={start + i}>{row(start + i)}</div>
+          ))}
+        </>
+      )
+    }
+    const { root, q, option, onChange } = setup({
+      options: many,
+      disableSearch: true,
+      renderList: (list) => <Windowed {...list} />
+    })
+    fireEvent.click(root)
+    // rows scrolled away with focus elsewhere leave it there
+    act(() => scroll(50))
+    expect(document.activeElement).toBe(root)
+    act(() => scroll(0))
+    // a click focuses the row, and no search field takes focus back
+    fireEvent.click(option('Item 2'))
+    option('Item 2').focus()
+    act(() => scroll(100))
+    const list = q('.msl-options')
+    expect(document.activeElement).toBe(list)
+    press(list, 'ArrowDown')
+    expect(root.getAttribute('aria-activedescendant')).toBe(`${list.id}-0`)
+    press(list)
+    expect(values(onChange)).toEqual([['2'], ['2', '0']])
+  })
+})
+
 describe('search', () => {
   it('filters by label, case-insensitive', () => {
     const { input, optionTexts } = setup()
     type(input(), 'AN')
     expect(optionTexts()).toEqual(['Banana'])
+  })
+
+  it('swaps in all the rows at once, in a new box: WebKit rechecks a :has(~ …) rule per row added to a live list', () => {
+    const many = Array.from({ length: 30 }, (_, i) => ({
+      label: `Item ${i}`,
+      value: `${i}`
+    }))
+    const { input, q, optionTexts } = setup({ options: many })
+    type(input(), 'Item 29')
+    expect(optionTexts()).toEqual(['Item 29'])
+    const list = q('.msl-options')
+    const rows = list.firstElementChild!
+    // no layout room: the rows lay out as the listbox's own
+    expect(rows.getAttribute('style')).toBe('display: contents;')
+    press(input(), 'ArrowDown')
+    expect(list.firstElementChild).toBe(rows)
+    const watch = new MutationObserver(() => {})
+    watch.observe(list, { childList: true, subtree: true })
+    fireEvent.change(input(), { target: { value: '' } })
+    const added = watch.takeRecords().flatMap((r) => [...r.addedNodes])
+    expect(added).toEqual([list.firstElementChild])
+    expect(list.querySelectorAll('.msl-option')).toHaveLength(30)
   })
 
   it('matches labels and values, in option order', () => {
@@ -2259,6 +2619,26 @@ describe('menu open / close', () => {
     expect(box()).toBeNull()
   })
 
+  it('in an older jsdom, which computes no border or padding, its sizes are numbers', () => {
+    const real = getComputedStyle
+    vi.spyOn(globalThis, 'getComputedStyle').mockImplementation(
+      (el) =>
+        ({
+          position: real(el).position,
+          borderTopWidth: '',
+          borderBottomWidth: '',
+          paddingTop: '',
+          paddingBottom: ''
+        }) as CSSStyleDeclaration
+    )
+    const { root, q } = setup()
+    fireEvent.click(root)
+    expect(root.style.minHeight).toBe('0px')
+    expect(q('.msl-options').style.getPropertyValue('--msl-menu-room')).toBe(
+      '0px'
+    )
+  })
+
   it.each([
     ['absolute, scrolling with the page', {}, 'absolute'],
     ['fixed in a fixed part of the page', { position: 'fixed' }, 'fixed'],
@@ -2943,6 +3323,17 @@ describe('keyboard', () => {
     add.focus()
     expect(press(add, 'Enter')).toBe(true)
     expect(document.activeElement).toBe(add)
+    cleanup()
+    // no tab stop, focused by a click: its keys too
+    const { q: q3, root: root3 } = setupKeys({
+      options: [],
+      emptyDataLabel: <button tabIndex={-1}>Add</button>
+    })
+    fireEvent.click(root3)
+    const add3 = q3('.msl-options button')
+    add3.focus()
+    expect(press(add3, 'Enter')).toBe(true)
+    expect(document.activeElement).toBe(add3)
   })
 
   it('Tab moves to and from focusable JSX in the menu, the menu open: focus leaving it closes it', () => {
@@ -3364,6 +3755,14 @@ function setupTree(props: MultiSelectProps = {}) {
 }
 
 describe('collapsible groups', () => {
+  it('collapsed with no exit CSS, its rows go at once: no copy of them', () => {
+    const clone = vi.spyOn(Node.prototype, 'cloneNode')
+    const { root, q } = setupTree({ options: fruits })
+    fireEvent.click(root)
+    fireEvent.click(q('.msl-grp-title'))
+    expect(clone).not.toHaveBeenCalled()
+  })
+
   it('the title shows and hides the childs, hidden at first with collapsed', () => {
     const { root, qa, optionTexts, titles, isOpen } = setupTree({
       options: fruits
@@ -3389,6 +3788,19 @@ describe('collapsible groups', () => {
     expect(titles()).toEqual(['false', 'true'])
     fireEvent.click(qa('.msl-grp-title')[1])
     expect(optionTexts()).toEqual([])
+  })
+
+  it('a toggle stays with its group: new options with another group in its place show that one as set', () => {
+    const { root, qa, titles, rerender } = setupTree({ options: fruits })
+    fireEvent.click(root)
+    fireEvent.click(qa('.msl-grp-title')[1])
+    expect(titles()).toEqual(['true', 'true'])
+    rerender(
+      <MultiSelect options={[fruits[0], { ...fruits[1], title: 'Nuts' }]} />
+    )
+    expect(titles()).toEqual(['true', 'false'])
+    rerender(<MultiSelect options={fruits} />)
+    expect(titles()).toEqual(['true', 'true'])
   })
 
   it('arrows reach the titles, Enter toggles them', () => {
@@ -3509,6 +3921,56 @@ describe('submenus', () => {
     expect(subs()).toEqual([])
   })
 
+  it('a pause in a submenu off its rows (a group title, a gap) holds it: a row crossed on the way in changes nothing', () => {
+    vi.useFakeTimers()
+    try {
+      const { root, q, option, subs } = setupTree({ options: nested })
+      fireEvent.click(root)
+      fireEvent.mouseEnter(option('Veg'))
+      act(() => vi.advanceTimersByTime(100))
+      fireEvent.mouseEnter(option('Banana'))
+      fireEvent.mouseEnter(q('.msl-submenu'))
+      act(() => vi.advanceTimersByTime(100))
+      expect(subs()).toEqual(['Veg'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('shown with the submenus open in it, as its group opens again, it shows first, they over it', () => {
+    const proto = HTMLElement.prototype as Partial<HTMLElement>
+    const shown: Element[] = []
+    proto.showPopover = function (this: HTMLElement) {
+      shown.push(this)
+    }
+    try {
+      const { input, q, qa, subs } = setupTree({
+        options: [
+          { type: 'group', title: 'All', collapsible: true, childs: nested }
+        ]
+      })
+      ;[
+        'ArrowDown',
+        'ArrowDown',
+        'ArrowDown',
+        'ArrowRight',
+        'ArrowDown',
+        'ArrowRight'
+      ].forEach((k) => press(input(), k))
+      expect(subs()).toEqual(['Veg', 'Greens'])
+      const title = q('.msl-grp-title')
+      fireEvent.click(title)
+      fireEvent.click(title)
+      expect(subs()).toEqual(['Veg', 'Greens'])
+      // effects run child first: Greens, then Veg over it, then Greens again
+      const [veg, greens] = qa('.msl-submenu')
+      expect(shown.slice(-3)).toEqual([greens, veg, greens])
+      expect(greens.getAttribute('popover')).toBe('manual')
+    } finally {
+      delete proto.showPopover
+    }
+  })
+
   it('a pause on a row opens its submenu and closes deeper ones; rows crossed on the way change nothing', () => {
     vi.useFakeTimers()
     try {
@@ -3575,6 +4037,77 @@ describe('submenus', () => {
     expect(press(input(), 'ArrowRight')).toBe(true)
     key('Escape')
     expect(isOpen()).toBe(false)
+  })
+
+  it('right to left, where submenus open on the left, Left Arrow goes in and Right Arrow back out', () => {
+    const { input, focused, subs } = setupTree({
+      options: nested,
+      attr: { dir: 'rtl' }
+    })
+    const key = (k: string) => {
+      press(input(), k)
+      return focused()
+    }
+    expect(['ArrowDown', 'ArrowDown'].map(key)).toEqual(['Apple', 'Veg'])
+    // the caret's
+    expect(press(input(), 'ArrowRight')).toBe(true)
+    expect(key('ArrowLeft')).toBe('Carrot')
+    expect(subs()).toEqual(['Veg'])
+    expect(press(input(), 'ArrowLeft')).toBe(true)
+    expect(key('ArrowRight')).toBe('Veg')
+    expect(subs()).toEqual([])
+  })
+
+  it('right to left by CSS direction alone stays left to right, as the stylesheet places submenus by :dir()', () => {
+    const { input, focused, subs } = setupTree({
+      options: nested,
+      style: { direction: 'rtl' }
+    })
+    press(input(), 'ArrowDown')
+    press(input(), 'ArrowDown')
+    expect(press(input(), 'ArrowLeft')).toBe(true)
+    expect(subs()).toEqual([])
+    press(input(), 'ArrowRight')
+    expect(focused()).toBe('Carrot')
+  })
+
+  it('a close from a focused row in a submenu leaves focus in the widget, not on the body', () => {
+    const { root, input, option } = setupTree({
+      options: nested,
+      closeOnSelect: true
+    })
+    fireEvent.click(root)
+    fireEvent.click(option('Veg'))
+    // as a click does in a browser
+    option('Carrot').focus()
+    fireEvent.click(option('Carrot'))
+    expect(document.activeElement).toBe(input())
+  })
+
+  it('a submenu closing with a focused row in it leaves focus on the listbox, where keys still work', () => {
+    vi.useFakeTimers()
+    try {
+      const { root, q, option, focused, subs } = setupTree({
+        options: nested,
+        disableSearch: true
+      })
+      fireEvent.click(root)
+      fireEvent.click(option('Veg'))
+      option('Carrot').focus()
+      fireEvent.mouseEnter(option('Apple'))
+      act(() => vi.advanceTimersByTime(100))
+      expect(subs()).toEqual([])
+      expect(document.activeElement).toBe(q('.msl-options'))
+      press(q('.msl-options'), 'ArrowDown')
+      expect(focused()).toBe('Apple')
+      // Escape from a focused row closes it all, focus on the wrapper
+      fireEvent.click(option('Veg'))
+      option('Carrot').focus()
+      press(option('Carrot'), 'Escape')
+      expect(document.activeElement).toBe(root)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('Enter on a focused title opens it, not the highlighted row', () => {
@@ -3671,6 +4204,34 @@ describe('submenus', () => {
       delete proto.showPopover
     }
   })
+
+  it('opens submenus in the flow, under their title, where the browser has no CSS anchor positioning to place them', () => {
+    const shown: Element[] = []
+    const proto = HTMLElement.prototype as Partial<HTMLElement>
+    proto.showPopover = function (this: HTMLElement) {
+      shown.push(this)
+    }
+    const supports = vi.spyOn(CSS, 'supports').mockReturnValue(false)
+    try {
+      const { root, option, q } = setupTree({ options: nested })
+      fireEvent.click(root)
+      fireEvent.click(option('Veg'))
+      expect(supports).toHaveBeenCalledWith('position-area:right')
+      const veg = q('.msl-submenu')
+      expect(veg.hasAttribute('popover')).toBe(false)
+      expect(veg.previousElementSibling!.textContent).toBe('Veg')
+      // older jsdom has no CSS
+      vi.stubGlobal('CSS', undefined)
+      fireEvent.click(option('Greens'))
+      expect(veg.querySelector('.msl-submenu')!.hasAttribute('popover')).toBe(
+        false
+      )
+      expect(shown).toEqual([pop()])
+    } finally {
+      vi.unstubAllGlobals()
+      delete proto.showPopover
+    }
+  })
 })
 
 describe('exit animations', () => {
@@ -3735,16 +4296,33 @@ describe('exit animations', () => {
     expect(a.spin.finish).not.toHaveBeenCalled()
   })
 
+  it('a search edited while it closes (Backspace, a paste: no reopen) stays once it has gone', async () => {
+    const a = animate()
+    const { root, input } = setup()
+    fireEvent.click(root)
+    type(input(), 'ban')
+    press(input(), 'Escape')
+    fireEvent.change(input(), { target: { value: 'ba' } })
+    await a.end()
+    expect(box()).toBeNull()
+    expect(input().value).toBe('ba')
+  })
+
   it('opened again mid exit, it is the same menu, as it was', async () => {
     const a = animate()
     const { root, q, input } = setup({ searchInMenu: true })
     fireEvent.click(root)
     const field = input()
     press(field, 'Escape')
-    // no inline field: the wrapper
+    // no inline field: the wrapper, the combobox again, not the inert field
     expect(document.activeElement).toBe(root)
+    expect(root.getAttribute('role')).toBe('combobox')
+    expect(root.getAttribute('aria-expanded')).toBe('false')
+    expect(field.hasAttribute('role')).toBe(false)
     expect(q('.msl-search').hasAttribute('inert')).toBe(true)
     fireEvent.click(root)
+    expect(field.getAttribute('role')).toBe('combobox')
+    expect(root.hasAttribute('role')).toBe(false)
     expect(q('.msl').hasAttribute('data-closing')).toBe(false)
     expect(q('.msl-search').hasAttribute('inert')).toBe(false)
     expect(q('.msl-options').hasAttribute('inert')).toBe(false)
@@ -3753,6 +4331,27 @@ describe('exit animations', () => {
     // the first close's end leaves it open
     await a.end()
     expect(q('.msl-options')).not.toBeNull()
+  })
+
+  it('opened again mid exit, the search its close was to clear is gone: no hidden filter, Enter picks nothing', async () => {
+    const a = animate()
+    const { root, q, input, option, optionTexts, single, onChange } = setup({
+      singleSelect: true
+    })
+    fireEvent.click(root)
+    type(input(), 'an')
+    fireEvent.click(option('Banana'))
+    // the value took the search field's place, the closing menu shows the search
+    expect(single()).toBe('Banana')
+    expect(q('input.msl-input')).toBeNull()
+    expect(optionTexts()).toEqual(['Banana'])
+    // Enter again opens it: Banana, the search's first result, isn't picked again (off)
+    press(root)
+    expect(values(onChange)).toEqual([['banana']])
+    expect(q('.msl').hasAttribute('data-closing')).toBe(false)
+    expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry'])
+    await a.end()
+    expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry'])
   })
 
   it('a closed submenu leaves a copy where it was, until it has left; open again, the copy goes', async () => {
@@ -3772,8 +4371,13 @@ describe('exit animations', () => {
       left: 10,
       top: 20
     } as DOMRect)
+    // scrolled, and a scroller in it too (a virtual list's)
+    menu.scrollTop = 40
+    menu.lastElementChild!.scrollTop = 7
     press(input(), 'ArrowLeft')
     const [copy] = qa('.msl-submenu')
+    // a clone starts at the top: it fades out as it was
+    expect([copy.scrollTop, copy.lastElementChild!.scrollTop]).toEqual([40, 7])
     expect(menu.isConnected).toBe(false)
     expect(copy.hasAttribute('data-closing')).toBe(true)
     expect(copy.hasAttribute('inert')).toBe(true)
@@ -3796,6 +4400,50 @@ describe('exit animations', () => {
     press(input(), 'ArrowLeft')
     await a.end()
     expect(qa('.msl-submenu')).toEqual([])
+  })
+
+  it("a submenu's copy goes in the listbox, out of the rows a search swaps; open again, only its own goes", async () => {
+    const a = animate()
+    ;(HTMLElement.prototype as Partial<HTMLElement>).showPopover = () => {}
+    const { input, q, qa } = setupTree({ options: nested })
+    // by their first row: Veg's Carrot, Greens' Kale
+    const copies = () =>
+      qa('.msl-options > .msl-submenu').map((el) => [
+        el.querySelector('.msl-option')!.textContent,
+        el.hasAttribute('data-closing')
+      ])
+    press(input(), 'ArrowDown')
+    press(input(), 'ArrowDown')
+    press(input(), 'ArrowRight')
+    press(input(), 'ArrowDown')
+    press(input(), 'ArrowRight')
+    press(input(), 'ArrowLeft')
+    press(input(), 'ArrowLeft')
+    expect(copies()).toEqual([
+      ['Kale', true],
+      ['Carrot', true]
+    ])
+    // Veg again, labelled as its copy
+    press(input(), 'ArrowRight')
+    expect(copies()).toEqual([['Kale', true]])
+    press(input(), 'ArrowDown')
+    press(input(), 'ArrowRight')
+    expect(copies()).toEqual([])
+    // both go with the rows' box. Veg's copy drops the Greens it held, a popover never shown that a
+    // stylesheet's display would show: Greens has a copy of its own
+    type(input(), 'a')
+    expect(copies()).toEqual([
+      ['Carrot', true],
+      ['Kale', true]
+    ])
+    expect(qa('.msl-options > .msl-submenu [popover]')).toEqual([])
+    // nor Greens' title the anchor a submenu opening at its depth would find
+    expect(qa('.msl-options > .msl-submenu [style*="anchor-name"]')).toEqual([])
+    expect(q('.msl-options > .msl-submenu').parentElement).toBe(
+      q('.msl-options')
+    )
+    await a.end()
+    expect(copies()).toEqual([])
   })
 
   it("strict mode's test unmount leaves no copy", async () => {

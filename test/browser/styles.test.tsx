@@ -5,7 +5,7 @@ import type {} from '@vitest/browser-playwright'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { cdp, server, userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
-import type { MultiSelectProps } from '../../src/index'
+import type { MultiSelectListProps, MultiSelectProps } from '../../src/index'
 import MultiSelect from '../../src/MultiSelect'
 import text from '../../src/styles.css?raw'
 
@@ -386,6 +386,38 @@ it('a long menu scrolls with a thin scrollbar of the variable color', async () =
   // Playwright hides Firefox's scrollbars
   server.browser !== 'firefox' && expect(css(list).scrollbarWidth).toBe('thin')
   expect(css(list).scrollbarColor).toContain(color('--msl-scrollbar-color'))
+})
+
+// a virtual list's scroller: its rows, placed absolutely, give it no size of its own
+const scroller = ({ count, row }: MultiSelectListProps) => (
+  <div style={{ overflow: 'auto' }}>
+    <div style={{ position: 'relative', height: count * 36 }}>
+      {Array.from({ length: count }, (_, i) => (
+        <div
+          key={i}
+          style={{ position: 'absolute', width: '100%', top: i * 36 }}
+        >
+          {row(i)}
+        </div>
+      ))}
+    </div>
+  </div>
+)
+
+it('renderList: the listbox and a submenu are flex columns that fit its scroller, a submenu as wide as the input', async () => {
+  const { root, q, option } = await setup({
+    options: [...tree, ...many],
+    renderList: scroller
+  })
+  await userEvent.click(root)
+  const list = q('.msl-options')
+  expect(css(list).display).toBe('flex')
+  expect(css(list).flexDirection).toBe('column')
+  expect(list.firstElementChild!.clientHeight).toBe(list.clientHeight - 1)
+  await userEvent.click(option('Veg'))
+  const sub = q('.msl-submenu')
+  expect(css(sub).display).toBe('flex')
+  expect(sub.clientWidth).toBe(300)
 })
 
 // Chromium draws ::-webkit-scrollbar only where scrollbar-width and scrollbar-color are unset, as older engines do
