@@ -89,6 +89,8 @@ declare namespace MultiSelect {
     group?: string
     /** `msl-grp-title`. A collapsible group's has `aria-expanded` */
     groupTitle?: string
+    /** `msl-expand-icn` in a collapsible group's title, around `groupIcon` */
+    groupIcon?: string
     /**
      * `msl-grp-body`: a collapsible group's childs, after its title, in one inner `<div>`: a grid row of that
      * from `0fr` to `1fr` animates the height. Collapsing, an inert copy with `data-closing` takes its place. Not with `renderList`
@@ -96,6 +98,8 @@ declare namespace MultiSelect {
     groupBody?: string
     /** `msl-option`, and a submenu's title, which has `aria-expanded` */
     option?: string
+    /** `msl-expand-icn` in a submenu's title, around `submenuIcon` */
+    submenuIcon?: string
     /**
      * `msl-submenu`: a submenu's `role="group"` box, a popover in the top layer. The stylesheet places it beside its title
      * with CSS anchor positioning (the title is its `position-anchor`), flipping to the other side where there is no room
@@ -124,6 +128,33 @@ declare namespace MultiSelect {
     classNames: MultiSelectClassNames
     /** removes this value; does nothing while disabled */
     onDelete: () => void
+  }
+
+  /** what `renderGroupTitle` gets for a group's or a submenu's title */
+  interface MultiSelectGroupTitleProps<
+    T = MultiSelectOption,
+    C extends boolean = boolean
+  > {
+    /** the group or submenu as in `options`; `customValue`'s group of created values too, whose options are `{ label, value }` */
+    group: MultiSelectGroup<
+      | T
+      | ([C] extends [false]
+          ? never
+          : Exclude<{ label: string; value: string }, T>)
+    >
+    /** its `title` */
+    title: React.ReactNode
+    /** the options in it, those in nested groups and submenus too, disabled ones included */
+    total: number
+    /** how many of those are selected */
+    selected: number
+    /** a collapsible group shows its childs, a submenu is open. Always `true` for a plain group */
+    open: boolean
+    /**
+     * the `msl-expand-icn` span with `groupIcon` or `submenuIcon` in it: place it, or leave it out. The stylesheet's
+     * `margin-inline-start: auto` holds it at the end of the row. `null` for a plain group
+     */
+    icon: React.ReactNode
   }
 
   /** what `renderList` gets: the rows of the open menu, or of an open submenu, for a virtual list library to render */
@@ -181,6 +212,14 @@ declare namespace MultiSelect {
     downArrow?: boolean
     downArrowIcon?: React.ReactNode
     closeIcon?: React.ReactNode
+    /**
+     * after a collapsible group's title, in `msl-expand-icn` (`aria-hidden`). Draw it pointing to the inline end: the
+     * stylesheet turns it down while the group is open, and to the left right to left. In a `<bdo dir="ltr">`, so the
+     * browser doesn't mirror a text arrow such as `›` as well. Default: the arrow button's chevron, `msl-chevron-icn`
+     */
+    groupIcon?: React.ReactNode
+    /** after a submenu's title, in `msl-expand-icn` (`aria-hidden`), pointing to the inline end. Default: the arrow button's chevron, `msl-chevron-icn` */
+    submenuIcon?: React.ReactNode
     /** on the wrapper */
     className?: string
     /** classes for each element inside, e.g. Tailwind utilities */
@@ -246,6 +285,14 @@ declare namespace MultiSelect {
      * also with `data-custom`, and as wide as `--msl-input-width`). Not called while `emptyDataLabel` shows
      */
     renderList?: (list: MultiSelectListProps) => React.ReactNode
+    /**
+     * renders a group's or a submenu's title row, in place of its `title` and the icon after it:
+     * `({ title, total, icon }) => <>{title} ({total}){icon}</>`. A render function, not a component, so no hooks in it.
+     * The row keeps its `msl-grp-title` or `msl-option` box and attributes
+     */
+    renderGroupTitle?: (
+      props: MultiSelectGroupTitleProps<T, C>
+    ) => React.ReactNode
     onMenuOpen?: () => void
     onMenuClose?: () => void
     /** after the clear button empties the value */

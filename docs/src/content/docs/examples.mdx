@@ -15,6 +15,8 @@ import Submenus from '../../examples/Submenus'
 import submenusCode from '../../examples/Submenus.tsx?raw'
 import NestedMenus from '../../examples/NestedMenus'
 import nestedMenusCode from '../../examples/NestedMenus.tsx?raw'
+import GroupTitles from '../../examples/GroupTitles'
+import groupTitlesCode from '../../examples/GroupTitles.tsx?raw'
 import Animated from '../../examples/Animated'
 import animatedCode from '../../examples/Animated.tsx?raw'
 import animatedCss from '../../examples/Animated.css?raw'
@@ -82,6 +84,32 @@ The two mix at any depth: collapsible groups inside a submenu, and a submenu ins
 <Preview code={nestedMenusCode} title='NestedMenus.tsx'>
   <NestedMenus client:visible />
 </Preview>
+
+## Group titles
+
+`renderGroupTitle` renders the title rows of groups and submenus from `{ group, title, total, selected, open, icon }`: `total` counts the options in it, nested ones too, and `selected` those picked. `icon` is the expand icon, for you to place or leave out.
+
+<Preview code={groupTitlesCode} title='GroupTitles.tsx'>
+  <GroupTitles client:visible />
+</Preview>
+
+For an icon of your own, leave `icon` out and pick one from `open`. Push it to the end yourself: the stylesheet's auto margin is on `.msl-expand-icn` only. A submenu is `open` while its popover shows, so check `group.type` to keep its icon pointing right:
+
+```jsx
+renderGroupTitle={({ title, total, selected, open, group }) => (
+  <>
+    {title}
+    <span>{selected}/{total}</span>
+    {open && group.type !== 'submenu' ? (
+      <ChevronDown aria-hidden className='ms-auto' />
+    ) : (
+      <ChevronRight aria-hidden className='ms-auto' />
+    )}
+  </>
+)}
+```
+
+The stylesheet doesn't turn or mirror your icon, so it is up to you right to left.
 
 ## Animations
 
@@ -160,6 +188,8 @@ Backspace in an empty search field removes the last chip. `deleteOnBackspace={fa
 </Preview>
 
 ## Custom icons
+
+`downArrowIcon`, `closeIcon`, and the icons after a collapsible group's title (`groupIcon`) and a submenu's (`submenuIcon`). To move or resize them with CSS, see [Expand icons](../styling/#expand-icons).
 
 <Preview code={customIconsCode} title='CustomIcons.tsx'>
   <CustomIcons client:visible />

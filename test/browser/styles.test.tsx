@@ -84,6 +84,10 @@ async function setup(props: MultiSelectProps = {}, wrap = {}) {
 }
 
 const css = (el: Element, pseudo?: string) => getComputedStyle(el, pseudo)
+// the icon after a title that opens, and the chevron in it
+const icn = (title: Element) =>
+  title.querySelector<HTMLElement>(':scope > .msl-expand-icn')!
+const chevron = (title: Element) => icn(title).firstElementChild!
 // as it ends up: options transition their background
 const now = (el: Element, pseudo?: string) => {
   el.getAnimations().forEach((a) => a.finish())
@@ -294,7 +298,7 @@ const groups = [
   }
 ]
 
-it('groups: indented rows under a smaller gray title; a collapsible title has a chevron, down when open', async () => {
+it('groups: indented rows under a smaller gray title; a collapsible title ends with a chevron, down when open', async () => {
   const { root, q } = await setup({ options: groups })
   await userEvent.click(root)
   const [grp] = box()!.querySelectorAll('.msl-grp')
@@ -306,12 +310,23 @@ it('groups: indented rows under a smaller gray title; a collapsible title has a 
   expect(css(fruit).opacity).toBe('0.7')
   expect(css(fruit).cursor).toBe('default')
   expect(css(fruit).marginInlineStart).toBe('-6px')
-  expect(css(fruit, '::after').content).toBe('none')
+  expect(icn(fruit)).toBeNull()
   expect(css(citrus).cursor).toBe('pointer')
   expect(css(citrus).display).toBe('flex')
-  expect(css(citrus, '::after').rotate).toBe('45deg')
-  expect(css(nuts, '::after').rotate).toBe('-45deg')
-  expect(css(nuts, '::after').width).toBe('5px')
+  expect(css(icn(citrus)).rotate).toBe('90deg')
+  expect(css(icn(nuts)).rotate).toBe('none')
+  // the arrow button's, turned to point to the end, its stroke 1.5px at this size
+  expect(css(chevron(nuts)).rotate).toBe('-90deg')
+  expect(css(chevron(nuts)).width).toBe('15px')
+  expect(css(chevron(nuts)).strokeWidth).toBe('2px')
+  // at the end, inside the title's padding: or at the start, by order and no auto margin
+  const end = (el: HTMLElement) => el.offsetLeft + el.offsetWidth
+  expect(Math.abs(end(nuts) - end(icn(nuts)) - 8)).toBeLessThanOrEqual(1)
+  icn(nuts).style.cssText = 'order: -1; margin-inline-start: 0'
+  expect(
+    Math.abs(icn(nuts).offsetLeft - nuts.offsetLeft - 8)
+  ).toBeLessThanOrEqual(1)
+  icn(nuts).style.cssText = ''
   await userEvent.hover(nuts)
   expect(css(nuts).backgroundColor).toBe(color('--msl-option-hover-background'))
   await userEvent.unhover(nuts)
@@ -339,10 +354,8 @@ it('submenus: a title with a chevron, shaded while open, its box shaped as the m
   await userEvent.click(root)
   const veg = option('Veg')
   expect(css(veg).display).toBe('flex')
-  expect(css(veg, '::after').rotate).toBe('-45deg')
-  // its width rounds to device pixels
-  expect(css(veg, '::after').borderRightStyle).toBe('solid')
-  expect(css(veg, '::after').borderTopWidth).toBe('0px')
+  expect(css(icn(veg)).rotate).toBe('none')
+  expect(css(chevron(veg)).rotate).toBe('-90deg')
   await userEvent.click(veg)
   expect(veg.getAttribute('aria-expanded')).toBe('true')
   await userEvent.unhover(veg)
@@ -364,7 +377,7 @@ it('right to left: chevrons point left, a submenu opens on the left', async () =
   )
   await userEvent.click(root)
   const veg = option('Veg')
-  expect(css(veg, '::after').rotate).toBe('135deg')
+  expect(css(icn(veg)).rotate).toBe('180deg')
   await userEvent.click(veg)
   const sub = document.querySelector('.msl-submenu')!
   expect(sub.getBoundingClientRect().right).toBeCloseTo(

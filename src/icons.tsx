@@ -21,9 +21,10 @@ export function CloseIcon() {
   )
 }
 
-export function DownIcon() {
+// the arrow button's, and turned by the stylesheet, the chevron after a title that opens
+export function DownIcon({ c = 'msl-arrow-icn' }: { c?: string }) {
   return (
-    <svg viewBox='0 0 20 20' className='msl-arrow-icn'>
+    <svg viewBox='0 0 20 20' className={c}>
       <line
         stroke='currentColor'
         strokeLinecap='round'

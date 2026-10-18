@@ -77,7 +77,7 @@
   }
 
   /* the chevrons turn */
-  .animated [aria-expanded]::after {
+  .animated .msl-expand-icn {
     transition: rotate 150ms;
   }
 }
