@@ -14,7 +14,7 @@ import type {
   MultiSelectOption,
   MultiSelectProps
 } from './index'
-import Options, { exits, isGroup, leave, pop, walk } from './Options'
+import Options, { exits, flatten, isGroup, leave, pop, walk } from './Options'
 import type { Row } from './Options'
 
 type Item = MultiSelectOption | MultiSelectGroup
@@ -38,14 +38,6 @@ const ourOpt = (value: string, label = value) => {
   ours.add(opt)
   return opt
 }
-// every option, groups and submenus unwrapped, open or not
-function flatten(items: readonly Item[], out: MultiSelectOption[] = []) {
-  for (const opt of items) {
-    if (isGroup(opt)) flatten((opt as MultiSelectGroup).childs, out)
-    else out.push(opt as MultiSelectOption)
-  }
-  return out
-}
 // runs run while mounted, its cleanup in the commit that unmounts it: a layout effect, never on the server
 // (where React 18 warns about one) as it mounts on a user action
 function During({ run }: { run: EffectCallback }) {
@@ -57,6 +49,9 @@ function MultiSelect({
   options: userOptions,
   downArrowIcon,
   closeIcon,
+  groupIcon,
+  submenuIcon,
+  renderGroupTitle,
   clearable = true,
   downArrow = true,
   onChange = noop,
@@ -742,7 +737,10 @@ function MultiSelect({
             textOf,
             cn,
             renderList,
-            term
+            term,
+            groupIcon,
+            submenuIcon,
+            renderGroupTitle
           }}
         />
       ) : (

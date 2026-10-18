@@ -1,8 +1,10 @@
 import { useLayoutEffect, useRef } from 'react'
 import type { HTMLAttributes, KeyboardEvent, ReactNode } from 'react'
+import { DownIcon } from './icons'
 import type {
   MultiSelectClassNames,
   MultiSelectGroup,
+  MultiSelectGroupTitleProps,
   MultiSelectListProps,
   MultiSelectOption
 } from './index'
@@ -14,6 +16,17 @@ export type Row = { opt: Item; key: string; level: string }
 
 export const isGroup = (opt: MultiSelectOption | MultiSelectGroup) =>
   opt.type === 'group' || opt.type === 'submenu'
+// every option, groups and submenus unwrapped, open or not
+export function flatten(
+  items: ReadonlyArray<MultiSelectOption | MultiSelectGroup>,
+  out: MultiSelectOption[] = []
+) {
+  for (const opt of items as Item[]) {
+    if (isGroup(opt)) flatten(opt.childs, out)
+    else out.push(opt)
+  }
+  return out
+}
 // the title of a collapsible group or a submenu is a row: the keyboard reaches it
 const titled = (g: Item) => g.type === 'submenu' || !!g.collapsible
 
@@ -194,7 +207,10 @@ function Options({
   textOf,
   cn,
   renderList,
-  term
+  term,
+  groupIcon,
+  submenuIcon,
+  renderGroupTitle
 }: {
   opts: ReadonlyArray<MultiSelectOption | MultiSelectGroup>
   isOpen: (g: MultiSelectGroup, key: string) => boolean
@@ -211,6 +227,9 @@ function Options({
   cn: MultiSelectClassNames
   renderList?: (list: MultiSelectListProps) => ReactNode
   term: string
+  groupIcon?: ReactNode
+  submenuIcon?: ReactNode
+  renderGroupTitle?: (props: MultiSelectGroupTitleProps) => ReactNode
 }) {
   // counts rows, like walk
   let n = 0
@@ -288,6 +307,41 @@ function Options({
         const inner: List = sub ? { rows: [], active: -1, size: 0 } : to
         const ins = sub ? 0 : groups + 1
         const childs: ReactNode[] = []
+        // the title, then the icon of one that opens: yours, or the arrow button's chevron. Yours goes left to
+        // right: the stylesheet turns it right to left, which would undo the browser's mirror of a text arrow such
+        // as ›. renderGroupTitle places them itself
+        const head = () => {
+          const own = sub ? submenuIcon : groupIcon
+          const icon =
+            idx < 0 ? null : (
+              <span
+                aria-hidden
+                className={`msl-expand-icn ${(sub ? cn.submenuIcon : cn.groupIcon) ?? ''}`}
+              >
+                {own ? (
+                  <bdo dir='ltr'>{own}</bdo>
+                ) : (
+                  <DownIcon c='msl-chevron-icn' />
+                )}
+              </span>
+            )
+          if (!renderGroupTitle)
+            return (
+              <>
+                {opt.title}
+                {icon}
+              </>
+            )
+          const all = flatten(opt.childs)
+          return renderGroupTitle({
+            group: opt,
+            title: opt.title,
+            total: all.length,
+            selected: all.filter(checkValueExist).length,
+            open: shown,
+            icon
+          })
+        }
         // built as it renders: with renderList, once its list's size is known
         const title = () =>
           sub ? (
@@ -299,7 +353,7 @@ function Options({
               style={shown ? { anchorName: anchor } : undefined}
               className={`msl-option${focused(idx)} ${cn.option ?? ''}`}
             >
-              {opt.title}
+              {head()}
             </div>
           ) : (
             <div
@@ -311,7 +365,7 @@ function Options({
                   })}
               className={`msl-grp-title${focused(idx)} ${cn.groupTitle ?? ''}`}
             >
-              {opt.title}
+              {head()}
             </div>
           )
         // with renderList a row: a group's title, in its own box as in the tree, or a submenu's with its popover,

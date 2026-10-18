@@ -291,23 +291,29 @@
   &[aria-expanded] {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 8px;
   }
+}
 
-  &[aria-expanded]::after {
-    content: '';
-    flex: none;
-    width: 5px;
-    height: 5px;
-    margin-inline: 8px 2px;
-    border: solid;
-    border-width: 0 1.5px 1.5px 0;
-    rotate: -45deg;
-  }
+.msl-expand-icn {
+  display: flex;
+  flex: none;
+  margin-inline-start: auto;
 
-  &[aria-expanded]:dir(rtl)::after {
-    rotate: 135deg;
+  &:where(:dir(rtl)) {
+    rotate: 180deg;
   }
+}
+
+.msl-chevron-icn {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2;
+  rotate: -90deg;
+}
+
+:where(.msl-grp-title[aria-expanded='true']) .msl-expand-icn {
+  rotate: 90deg;
 }
 
 :where(.msl-wrp:focus-visible) .msl,
@@ -359,9 +365,5 @@
   &[aria-expanded]:hover,
   &[data-focused] {
     background: var(--msl-option-hover-background);
-  }
-
-  &[aria-expanded='true']::after {
-    rotate: 45deg;
   }
 }
