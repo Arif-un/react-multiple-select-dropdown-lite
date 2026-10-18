@@ -1,4 +1,11 @@
-import React, { useState, useEffect, useRef, useId } from 'react'
+import React, {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useId
+} from 'react'
+import type { EffectCallback } from 'react'
 import Chip from './Chip'
 import { CloseIcon, DownIcon } from './icons'
 import type PublicMultiSelect from './index'
@@ -7,7 +14,8 @@ import type {
   MultiSelectOption,
   MultiSelectProps
 } from './index'
-import Options from './Options'
+import Options, { exits, isGroup, leave, pop, walk } from './Options'
+import type { Row } from './Options'
 
 type Item = MultiSelectOption | MultiSelectGroup
 
@@ -20,6 +28,8 @@ const createText = (text: string) => `Create "${text}"`
 // the viewport less a classic scrollbar. innerHeight too: quirks mode makes the root as tall as the page
 const viewHeight = () =>
   Math.min(innerHeight, document.documentElement.clientHeight)
+// a computed length: older jsdom leaves what no stylesheet sets ''
+const px = (v: string) => parseFloat(v) || 0
 
 // options we create, { label, value }: the user's getters only know their own shape
 const ours = new WeakSet<MultiSelectOption>()
@@ -28,13 +38,19 @@ const ourOpt = (value: string, label = value) => {
   ours.add(opt)
   return opt
 }
-// options in render order, groups unwrapped, the way Options.tsx walks them
+// every option, groups and submenus unwrapped, open or not
 function flatten(items: readonly Item[], out: MultiSelectOption[] = []) {
   for (const opt of items) {
-    if (opt.type === 'group') flatten((opt as MultiSelectGroup).childs, out)
+    if (isGroup(opt)) flatten((opt as MultiSelectGroup).childs, out)
     else out.push(opt as MultiSelectOption)
   }
   return out
+}
+// runs run while mounted, its cleanup in the commit that unmounts it: a layout effect, never on the server
+// (where React 18 warns about one) as it mounts on a user action
+function During({ run }: { run: EffectCallback }) {
+  useLayoutEffect(run, [])
+  return null
 }
 
 function MultiSelect({
@@ -73,6 +89,7 @@ function MultiSelect({
   searchInMenu = false,
   searchPlaceholder = 'Search...',
   deleteOnBackspace = true,
+  renderList,
   classNames: cn = noStyle
 }: MultiSelectProps) {
   // selected values; defaultValue is initial only, as in an uncontrolled input
@@ -94,21 +111,33 @@ function MultiSelect({
     typeof x === 'string' || typeof x === 'number' ? String(x) : null
   const textOf = (opt: MultiSelectOption, label = labelOf(opt)) =>
     text(label) ?? text(opt.label) ?? ''
+  // the options of these values, by value, the first of each: one pass, done once all are found, not one per value.
   // String(): untyped JS often passes numbers
-  const findOpt = (opts: MultiSelectOption[], key: string) =>
-    opts.find((opt) => String(valueOf(opt)) === String(key))
+  const lookup = (opts: MultiSelectOption[], want: readonly string[]) => {
+    const left = new Set(want.map(String))
+    const out = new Map<string, MultiSelectOption>()
+    for (const opt of opts) {
+      if (!left.size) break
+      const v = String(valueOf(opt))
+      left.delete(v) && out.set(v, opt)
+    }
+    return out
+  }
   // listed after the user's options: created values, plus with customValue the selected
   // ones the options lack. Once the options have one (they may arrive late, #12), it moves there
-  const customOpts = [...custom, ...(customValue ? keys : [])]
-    .filter((key, i, arr) => arr.indexOf(key) === i && !findOpt(known, key))
+  const extra = [...custom, ...(customValue ? keys : [])]
+  const listed = lookup(known, extra)
+  const customOpts = extra
+    .filter((key, i, arr) => arr.indexOf(key) === i && !listed.has(String(key)))
     .map((key) => ourOpt(key))
   const options: readonly Item[] = customOpts.length
     ? [...base, { title: customValuesTitle, type: 'group', childs: customOpts }]
     : base
   const all = [...known, ...customOpts]
   // looked up at render, so options arriving after mount resolve with no effect
+  const byValue = lookup(all, keys)
   const resolved = keys
-    .map((key) => findOpt(all, key))
+    .map((key) => byValue.get(String(key)))
     .filter((opt) => opt !== undefined)
   const value = singleSelect ? resolved.slice(0, 1) : resolved
   // no limit (null) is Infinity: one comparison checks it
@@ -131,7 +160,7 @@ function MultiSelect({
   const create =
     customValue &&
     term &&
-    !findOpt(all, term) &&
+    !lookup(all, [term]).size &&
     ourOpt(term, createLabel(term))
   const found = term
     ? all.filter((opt) => matches(opt, term)).concat(create || [])
@@ -148,8 +177,13 @@ function MultiSelect({
   const boxRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  // closed, the menu stays until its exit animations end
+  const [closing, setClosing] = useState(false)
+  const present = menuOpen || closing
   // or with searchInMenu atop the open menu, next to any value
-  const showSearch = inline || (!disableSearch && searchInMenu && menuOpen)
+  const showSearch = inline || (!disableSearch && searchInMenu && present)
+  // the combobox: the search field while it takes keys, else the wrapper. Closing, a searchInMenu field is inert
+  const host = inline || (!disableSearch && searchInMenu && menuOpen)
   const searchRef = useRef<HTMLDivElement>(null)
   // picked on open: the menu goes above the input
   const [up, setUp] = useState(false)
@@ -157,13 +191,30 @@ function MultiSelect({
   const onClose = useRef(onMenuClose)
   onClose.current = onMenuClose
 
-  const shown = flatten(items)
-  // by value once the list changes under it (search, pick)
+  // the deepest open submenu, by key: the ones around it are open too
+  const [sub, setSub] = useState('')
+  // collapsible groups the user toggled, by key and title text: open unless `collapsed`. New options may put
+  // another group in that place.
+  // ponytail: a JSX title has no text, so groups with them that swap places swap states too; a group id if that matters
+  const [flipped, setFlipped] = useState<string[]>([])
+  const tag = (g: MultiSelectGroup, key: string) => key + '\0' + text(g.title)
+  const opener = (s: string) => (g: MultiSelectGroup, key: string) =>
+    g.type === 'submenu'
+      ? (s + '.').startsWith(key + '.')
+      : !g.collapsible || !g.collapsed !== flipped.includes(tag(g, key))
+  const isOpen = opener(sub)
+  // the rows the keyboard moves over: options, and the titles of submenus and collapsible groups. None while closed.
+  // ponytail: walks every open row each render (a key, a hover), renderList's too; memoize on items, sub, flipped if 100k lag
+  const shown = present ? walk(items, isOpen) : []
+  // an option by value, a title by its place in the tree: either holds through a search or a pick
+  const idOf = ({ opt, key }: Row) => (isGroup(opt) ? '\0' + key : valueOf(opt))
+  // by id once the list changes under it (search, pick, a submenu opening above it)
   const activeIdx = !active
     ? -1
-    : shown[active.idx] && valueOf(shown[active.idx]) === active.value
+    : shown[active.idx] && idOf(shown[active.idx]) === active.value
       ? active.idx
-      : shown.findIndex((opt) => valueOf(opt) === active.value)
+      : shown.findIndex((r) => idOf(r) === active.value)
+  const row = shown[activeIdx]
 
   useEffect(() => {
     !menuOpen && setActive(null)
@@ -173,8 +224,7 @@ function MultiSelect({
   const opened = useRef(false)
   // the selection as last set or rendered: a chip's onDelete may run late (after an exit animation)
   const latest = useRef(value)
-  // the element with keyboard focus (focus-visible) when a chip was deleted, the search field a pick may remove,
-  // or the element focused when the menu closed (an option)
+  // the element with keyboard focus (focus-visible) when a chip was deleted, or the search field a pick may remove
   const lost = useRef<Element | null>(null)
 
   const open = () => {
@@ -184,29 +234,56 @@ function MultiSelect({
     // up only if that has more room: else it goes off the top of the page
     setUp(below < 200 && r.top > below)
     setMenuOpen(true)
+    // back mid exit: the same menu, without the search its close was to clear. A pick hides the field in single select
+    closing && setQuery('')
+    setClosing(false)
   }
 
-  // focus moves to `to` first. back: if the close removes the focused element (an option),
-  // the effect after it brings focus back to the search field or the wrapper.
-  // No ref while a Suspense boundary hides it: focus left with it
-  const closeMenu = (back?: boolean, to?: HTMLElement | null) => {
+  // focus moves to `to` first, then out of the menu: an inert or removed focused element drops it to the body.
+  // Submenus close with it, each leaving on its own
+  const closeMenu = (to?: HTMLElement | null) => {
     if (!opened.current) return
     opened.current = false
     to?.focus({ preventScroll: true })
-    back &&
-      componentRef.current &&
-      (lost.current = (
-        componentRef.current.getRootNode() as Document
-      ).activeElement)
+    // no refs while a Suspense boundary hides it: nothing in it has focus, and it closes as React shows it again
+    const ctl = boxRef.current?.firstChild as HTMLElement | undefined
+    ctl &&
+      [listRef.current, searchRef.current].some((el) =>
+        el?.contains((ctl.getRootNode() as Document).activeElement)
+      ) &&
+      ((inline && inputFld.current) || componentRef.current!).focus({
+        preventScroll: true
+      })
+    // without exit CSS it goes now, with the search it shows: no render of it closing
+    !ctl || exits(ctl) ? setClosing(true) : setQuery('')
     setMenuOpen(false)
-    // the search text goes with the menu
-    setQuery('')
+    setSub('')
     onClose.current()
   }
 
-  // listen only while open, so onMenuClose fires once per open -> closed
+  // while closing: data-closing on the box, its menu inert. Then it goes, with the search text it shows, unless that
+  // changed meanwhile: edited (Backspace, a paste), not cleared by a reopen
+  const whileClosing = () => {
+    const ctl = boxRef.current!.firstChild as HTMLElement
+    const parts = [listRef.current!, searchRef.current]
+    parts.forEach((el) => el?.setAttribute('inert', ''))
+    const was = query
+    let on = true
+    leave(ctl, () => {
+      if (!on) return
+      setClosing(false)
+      setQuery((q) => (q === was ? '' : q))
+    })
+    return () => {
+      on = false
+      ctl.removeAttribute('data-closing')
+      parts.forEach((el) => el?.removeAttribute('inert'))
+    }
+  }
+
+  // placed while shown, open or closing
   useEffect(() => {
-    if (!menuOpen) return
+    if (!present) return
     const root = componentRef.current!
     const box = boxRef.current!
     const list = listRef.current!
@@ -228,10 +305,7 @@ function MultiSelect({
     // The UA's popover look undone inline, so it inherits and shows nothing of its own: the box inside has the looks
     box.style.cssText = `position:${pinned ? 'fixed' : 'absolute'};inset:auto;margin:0;padding:0;border:0;background:none;color:inherit;overflow:visible;transform-origin:0 ${up ? '100%' : 0}`
     // missing in jsdom, whose UA stylesheet would still hide a [popover]: a user's tests couldn't focus or query the menu
-    if (box.showPopover) {
-      box.setAttribute('popover', 'manual')
-      box.showPopover()
-    }
+    pop(box)
     // over the wrapper, the menu below (or above) it, as tall as the viewport leaves room for.
     // Follows the wrapper through scrolls, resizes, its own growth and layout shifts.
     // ponytail: three rects (four with searchInMenu) read per frame while open; scroll/resize listeners + ResizeObserver if it ever shows in a profile
@@ -245,13 +319,20 @@ function MultiSelect({
       // first: the control's height depends on them
       box.style.width = width / s + 'px'
       box.style.setProperty('scale', s == 1 ? '' : s + '')
-      // the control's own height, the box less the options and a searchInMenu field: the wrapper keeps it,
-      // as the box left the flow. Drawn: offsetHeight rounds
+      // the control's own height: the wrapper keeps it, as the box left the flow. From the box's edge to the menu's
+      // (a searchInMenu field heads it opening down), plus the border and padding there: not the box less the menu,
+      // which may overflow its grid row as CSS animates the row from 0fr. Drawn: offsetHeight rounds
       const sh = searchRef.current?.getBoundingClientRect().height || 0
-      const row =
-        box.getBoundingClientRect().height -
-        list.getBoundingClientRect().height -
-        sh
+      const b = box.getBoundingClientRect()
+      const m = (up ? list : searchRef.current || list).getBoundingClientRect()
+      const css = getComputedStyle(box.firstChild as Element)
+      const row = up
+        ? b.bottom -
+          m.bottom +
+          (px(css.borderTopWidth) + px(css.paddingTop)) * s
+        : m.top -
+          b.top +
+          (px(css.borderBottomWidth) + px(css.paddingBottom)) * s
       root.style.minHeight = row / s + 'px'
       // then where it stands: its height back, it may move (in a centered dialog)
       const r = root.getBoundingClientRect()
@@ -272,6 +353,19 @@ function MultiSelect({
     }
     // now, not next frame: placed before it paints
     follow()
+    return () => {
+      frame && cancelAnimationFrame(frame)
+      // without the attribute it is hidden, and back in the flow
+      box.removeAttribute('popover')
+      box.removeAttribute('style')
+      root.style.minHeight = minHeight
+    }
+  }, [present, up])
+
+  // listen only while open, so onMenuClose fires once per open -> closed
+  useEffect(() => {
+    if (!menuOpen) return
+    const root = componentRef.current!
     // a scrolling parent clipped it away: close rather than float over that parent's edge.
     // Opened out of view (a key on the focused dropdown, scrolled away): scroll it back instead, or the top layer
     // would show it outside that parent. Missing in jsdom: a user's tests would crash on every open
@@ -283,7 +377,7 @@ function MultiSelect({
         const vis = es[es.length - 1].isIntersecting
         first && !vis
           ? root.scrollIntoView?.({ block: 'nearest' })
-          : vis || closeMenu(true)
+          : vis || closeMenu()
         first = false
       })
     seen && seen.observe(root)
@@ -294,7 +388,7 @@ function MultiSelect({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || inside(e)) return
       e.preventDefault()
-      closeMenu(true)
+      closeMenu()
     }
     // clicks, and focus moving out
     const onOutside = (e: Event) => inside(e) || closeMenu()
@@ -302,15 +396,10 @@ function MultiSelect({
     document.addEventListener('click', onOutside, true)
     document.addEventListener('focusin', onOutside, true)
     return () => {
-      frame && cancelAnimationFrame(frame)
       seen && seen.disconnect()
       document.removeEventListener('keydown', onKey, true)
       document.removeEventListener('click', onOutside, true)
       document.removeEventListener('focusin', onOutside, true)
-      // without the attribute it is hidden, and back in the flow
-      box.removeAttribute('popover')
-      box.removeAttribute('style')
-      root.style.minHeight = minHeight
     }
   }, [menuOpen])
 
@@ -348,6 +437,8 @@ function MultiSelect({
   const full = !singleSelect && value.length >= max
   const isDisabled = (opt: MultiSelectOption) =>
     !!opt.disabled || (full && !checkValueExist(opt))
+  // titles are never disabled
+  const live = (r: Row) => isGroup(r.opt) || !isDisabled(r.opt)
 
   const addValue = (newValObj: MultiSelectOption) => {
     // past the limit an unselected pick only calls onChange, the value as it is: no Create, the search and menu stay
@@ -365,17 +456,16 @@ function MultiSelect({
           ? [newValObj]
           : [...value, newValObj]
     )
-    setQuery('')
     // unset closeOnSelect: single select closes, multi select stays open.
     // The value takes the search field's place, maybe in a later commit: focus the wrapper, not the field.
-    // Left open, focus goes to the wrapper if the field goes (click, Enter, comma).
-    // opened, not menuOpen: Enter in the closed field opens the menu in this same event
-    opened.current && (closeOnSelect ?? singleSelect)
-      ? closeMenu(
-          true,
-          singleSelect || disableChip ? componentRef.current : null
-        )
-      : (lost.current = inputFld.current)
+    // Left open, the search clears (closing, it does once the menu goes) and focus goes to the wrapper
+    // if the field goes (click, Enter, comma). opened, not menuOpen: Enter in the closed field opens the menu in this same event
+    if (opened.current && (closeOnSelect ?? singleSelect))
+      return closeMenu(
+        singleSelect || disableChip ? componentRef.current : null
+      )
+    setQuery('')
+    lost.current = inputFld.current
   }
 
   const deleteValue = (opt: MultiSelectOption) =>
@@ -410,7 +500,7 @@ function MultiSelect({
   // disabled while open: it closes, so no pick comes from the open menu, styled or not.
   // Focus moves to the wrapper: a disabled field or a removed option would drop it
   useEffect(() => {
-    disabled && closeMenu(false, componentRef.current)
+    disabled && closeMenu(componentRef.current)
   }, [disabled])
 
   // Not document.activeElement: in a shadow root that is the host. A focused shadow host only
@@ -435,25 +525,66 @@ function MultiSelect({
   const openMenu = ({ target }: React.SyntheticEvent) => {
     if (disabled || marked(target, 'data-clickable')) return
     if (!menuOpen) open()
-    else if (marked(target, 'data-handle')) closeMenu(true)
+    else if (marked(target, 'data-handle')) closeMenu()
     // not a close: an option click bubbles here and must not undo closeOnSelect.
     // Nor a refocus once closed: an onChange may have moved focus out
     else opened.current && inputFld.current?.focus()
   }
 
-  // moves the highlight over enabled options, staying put at either end
+  // moves the highlight over the enabled rows of its submenu (or the top), staying put at either end
   const highlight = (key: string) => {
     const dir = key === 'ArrowDown' || key === 'Home' ? 1 : -1
+    const level = row?.level ?? ''
+    // closed: the rows it opens with
+    const rows = present ? shown : walk(items, isOpen)
     let i =
       key === 'Home'
         ? -1
         : key === 'End' || (activeIdx < 0 && dir < 0)
-          ? shown.length
+          ? rows.length
           : activeIdx
-    for (i += dir; i >= 0 && i < shown.length; i += dir) {
-      if (!isDisabled(shown[i]))
-        return setActive({ value: valueOf(shown[i]), idx: i })
+    for (i += dir; i >= 0 && i < rows.length; i += dir) {
+      if (rows[i].level === level && live(rows[i]))
+        return setActive({ value: idOf(rows[i]), idx: i })
     }
+  }
+
+  // a title's click or Enter: a submenu opens, a collapsible group toggles
+  const expand = (r: Row) => {
+    const t = tag(r.opt, r.key)
+    r.opt.type === 'submenu'
+      ? setSub(r.key)
+      : setFlipped(
+          flipped.includes(t) ? flipped.filter((k) => k !== t) : [...flipped, t]
+        )
+  }
+
+  // the keyboard opens a submenu, the highlight on its first enabled row: found in the rows the next render has
+  const enter = (r: Row) => {
+    setSub(r.key)
+    const rows = walk(items, opener(r.key))
+    const i = rows.findIndex((x) => x.level === r.key && live(x))
+    i >= 0 && setActive({ value: idOf(rows[i]), idx: i })
+  }
+
+  // closes submenu k, and any in it, the highlight back on its title
+  const back = (k: string) => {
+    const i = shown.findIndex((r) => r.key === k)
+    setSub(shown[i].level)
+    setActive({ value: idOf(shown[i]), idx: i })
+  }
+
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  // a pause on a row opens its submenu and closes the others at and below its level.
+  // A pause: rows the pointer crosses on its way into a submenu leave it open
+  const hover = (i: number) => {
+    const r = shown[i]
+    clearTimeout(timer.current)
+    timer.current = setTimeout(
+      () =>
+        opened.current && setSub(r.opt.type === 'submenu' ? r.key : r.level),
+      100
+    )
   }
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -464,10 +595,11 @@ function MultiSelect({
     const { key, target } = e
     if (menuOpen && key === 'Escape') {
       // it closes the menu, not a surrounding <dialog> or popover too. Stopped too: a modal
-      // library's onKeyDown above it in the React tree may ignore defaultPrevented (MUI's does)
+      // library's onKeyDown above it in the React tree may ignore defaultPrevented (MUI's does).
+      // In a submenu, it closes that one
       e.preventDefault()
       e.stopPropagation()
-      return closeMenu(true)
+      return row?.level ? back(row.level) : closeMenu()
     }
     // Tab moves focus on in page order, and closes the menu. Unless the menu has stops of its own (focusable JSX):
     // then Tab steps through the open box, and focus leaving it closes the menu.
@@ -479,27 +611,46 @@ function MultiSelect({
         (el) => el.tabIndex >= 0
       )
     )
-      // From in the listbox (a clicked option) or a searchInMenu field, which the close removes: focus moves to the listbox,
+      // From in the listbox (a clicked option) or a searchInMenu field, which the close makes inert: focus moves to the listbox,
       // the browser tabs on from it, then it closes. Firefox and Safari lose the place of a removed focused element, Firefox of a clicked option.
-      // Shift+Tab may land back on a searchInMenu field: back, so the close brings focus to the wrapper
+      // Shift+Tab may land back on a searchInMenu field: the close brings focus to the wrapper
       return listRef.current!.contains(target as Node) ||
         searchRef.current?.contains(target as Node)
-        ? (listRef.current!.focus(), setTimeout(() => closeMenu(true)))
+        ? (listRef.current!.focus(), setTimeout(() => closeMenu()))
         : closeMenu()
     // our listbox, when the target is JSX in it outside the options: an empty state's button, a group title's
     const box = (target as Element).closest('[role=option],[role=listbox]')
-    // chips, the clear button and that JSX handle their own keys
+    // chips, the clear button and that JSX handle their own keys. Not JSX that holds rows: renderList's scroller,
+    // which a click between them focuses
     if (
       disabled ||
       marked(target, 'data-clickable') ||
-      (box?.id === listId && box !== target)
+      (box?.id === listId &&
+        box !== target &&
+        !(target as Element).querySelector('[role=option]'))
     )
       return
-    // the first result a click could pick
-    const first = found?.find((opt) => !opt.disabled)
-    if (key === 'Enter' && activeIdx >= 0) {
+    // the first result a click could pick. Closing, none: that search goes with the menu
+    const first = !closing && found?.find((opt) => !opt.disabled)
+    // into a submenu toward its side, as the stylesheet places it: left where its :dir(rtl) matches (a dir attribute,
+    // not CSS direction). In :is(), which drops it where unknown (before Chrome 120, as the stylesheet does) rather than throw
+    const [into, out] = e.currentTarget.matches(':is(:dir(rtl))')
+      ? ['ArrowLeft', 'ArrowRight']
+      : ['ArrowRight', 'ArrowLeft']
+    if (key === 'Enter' && row) {
       e.preventDefault()
-      addValue(shown[activeIdx])
+      row.opt.type === 'submenu'
+        ? enter(row)
+        : isGroup(row.opt)
+          ? expand(row)
+          : addValue(row.opt)
+    } else if (
+      (key === into && row?.opt.type === 'submenu') ||
+      (key === out && row?.level)
+    ) {
+      // else the caret moves in the search field
+      e.preventDefault()
+      key === into ? enter(row) : back(row.level)
     } else if ((key === 'Enter' || key === ',') && first) {
       // Prevented: no form submit, and the comma stays out of the field.
       // Opened first, as any key on the closed field opens it (text pasted there)
@@ -558,7 +709,7 @@ function MultiSelect({
         setQuery(e.target.value)
       }}
       ref={inputFld}
-      {...combobox}
+      {...(host && combobox)}
     />
   )
 
@@ -571,11 +722,16 @@ function MultiSelect({
       aria-multiselectable={!singleSelect}
       // else Chrome makes this scroller a tab stop, as no option is tabbable
       tabIndex={-1}
+      // a flex column in the stylesheet: a scroller of renderList's shrinks to the menu's height
+      data-custom={renderList && ''}
     >
       {items.length ? (
         <Options
           opts={items}
+          expand={(i) => expand(shown[i])}
           {...{
+            isOpen,
+            hover,
             addValue,
             checkValueExist,
             isDisabled,
@@ -584,7 +740,9 @@ function MultiSelect({
             valueOf,
             labelOf,
             textOf,
-            cn
+            cn,
+            renderList,
+            term
           }}
         />
       ) : (
@@ -611,7 +769,7 @@ function MultiSelect({
     <div
       ref={componentRef}
       {...attr}
-      {...(!showSearch && combobox)}
+      {...(!host && combobox)}
       onClick={openMenu}
       tabIndex={disabled ? -1 : 0}
       onKeyDown={onKeyDown}
@@ -625,12 +783,12 @@ function MultiSelect({
       {/* the popover while open, set up by the open menu's effect. Unstyled: the box inside has the looks */}
       <div ref={boxRef}>
         <div
-          data-open={menuOpen || undefined}
-          data-up={(menuOpen && up) || undefined}
-          className={`msl ${menuOpen ? (up ? 'msl-active-up' : 'msl-active') : ''} ${cn.control ?? ''}`}
+          data-open={present || undefined}
+          data-up={(present && up) || undefined}
+          className={`msl ${present ? (up ? 'msl-active-up' : 'msl-active') : ''} ${cn.control ?? ''}`}
         >
           {/* in DOM order, so it stacks right with no stylesheet */}
-          {menuOpen && up && menu}
+          {present && up && menu}
           <div className={`msl-input-wrp ${cn.values ?? ''}`}>
             {chips && (
               // data-clickable: clicks and keys on any chip markup are the chip's, not the menu's.
@@ -715,9 +873,11 @@ function MultiSelect({
               )}
             </div>
           )}
-          {menuOpen && !up && menu}
+          {present && !up && menu}
         </div>
       </div>
+      {/* after the box: a Suspense reveal runs layout effects in order, so its refs are back by then */}
+      {closing && <During run={whileClosing} />}
     </div>
   )
 }

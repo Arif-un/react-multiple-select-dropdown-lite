@@ -73,7 +73,13 @@ export default defineConfig({
             headless: true,
             provider: playwright(),
             instances: [
-              { browser: 'chromium' },
+              // scrollbars as on Windows: the stylesheet's ::-webkit-scrollbar rules apply
+              {
+                browser: 'chromium',
+                provider: playwright({
+                  launchOptions: { ignoreDefaultArgs: ['--hide-scrollbars'] }
+                })
+              },
               { browser: 'webkit' },
               { browser: 'firefox' }
             ]

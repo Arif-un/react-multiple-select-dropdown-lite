@@ -10,10 +10,12 @@
   "dependencies": {
     "@astrojs/react": "^7.0.1",
     "@astrojs/starlight": "^0.42.6",
+    "@tanstack/react-virtual": "^3.14.21",
     "astro": "^7.3.8",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "react-multiple-select-dropdown-lite": "link:.."
+    "react-multiple-select-dropdown-lite": "link:..",
+    "react-window": "^2.3.4"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",

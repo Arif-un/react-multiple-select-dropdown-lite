@@ -8,6 +8,9 @@ import Preview from '../../components/Preview.astro'
 import Theming from '../../examples/Theming'
 import themingCode from '../../examples/Theming.tsx?raw'
 import themingCss from '../../examples/Theming.css?raw'
+import Animated from '../../examples/Animated'
+import animatedCode from '../../examples/Animated.tsx?raw'
+import animatedCss from '../../examples/Animated.css?raw'
 
 Import the stylesheet once:
 
@@ -87,8 +90,36 @@ State classes:
 | `msl-option-focused`           | option  | highlighted by the keyboard           |
 | `msl-option-disable`           | option  | disabled                              |
 
-Parts: `msl-wrp` (wrapper), `msl` (input box, and the open menu), `msl-chip`, `msl-chip-delete`, `msl-single-value`, `msl-input`, `msl-search` (the search field's box with `searchInMenu`), `msl-clear-btn`, `msl-arrow-btn`, `msl-options` (menu), `msl-option`, `msl-grp` (a group), `msl-grp-title`.
+Parts: `msl-wrp` (wrapper), `msl` (input box, and the open menu), `msl-chip`, `msl-chip-delete`, `msl-single-value`, `msl-input`, `msl-search` (the search field's box with `searchInMenu`), `msl-clear-btn`, `msl-arrow-btn`, `msl-options` (menu), `msl-option`, `msl-grp` (a group), `msl-grp-title`, `msl-grp-body` (a collapsible group's childs), `msl-submenu` (a submenu's popover).
+
+Where the browser has CSS anchor positioning, a submenu shows in the top layer. Elsewhere it opens under its title, in the menu, with the same look. Right to left (a `dir="rtl"` attribute, which the stylesheet reads with `:dir()`, not CSS `direction` alone), it opens on the left, and Arrow Left and Right swap. The stylesheet places it with [CSS anchor positioning](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_anchor_positioning): beside its title, on the other side or above where there is no room, and over its title where neither side has room. Its title is its `position-anchor`, so your own `.msl-submenu` rules can place it elsewhere with another `position-area`, or with `anchor()` insets and `position-area: none`. Open titles and collapsible group titles have `aria-expanded`; the stylesheet draws their chevrons as `::after`.
 
 A single option can carry its own `classes` and `style`. To add classes to every part, Tailwind utilities for example, use the `classNames` prop: see [Tailwind](../tailwind/).
 
-The component's inline styles are behavior, not looks: `display: contents` on the chip wrapper, which keeps that box out of the layout with or without the stylesheet, and, while the menu is open, the dropdown's `min-height` (the open box left the flow) and the popover's `position`, coordinates, width and scale, and a reset of the browser's popover look (`inset`, `margin`, `padding`, `border`, `background`, `color: inherit`, `overflow`), on the unstyled `<div>` around `.msl`. Everything else is in the stylesheet: without it the markup is unstyled, and plain CSS overrides any of its rules.
+The component's inline styles are behavior, not looks: `display: contents` on the chip wrapper and on the box around the options (around each row with `renderList`), which keeps those boxes out of the layout with or without the stylesheet (select options with `.msl-options .msl-option`, not `>`), and, while the menu is open, the dropdown's `min-height` (the open box left the flow) and the popover's `position`, coordinates, width and scale, and a reset of the browser's popover look (`inset`, `margin`, `padding`, `border`, `background`, `color: inherit`, `overflow`), on the unstyled `<div>` around `.msl`, and, on an open submenu and its title, the `position-anchor` and `anchor-name` that tie them together, and, on a closed submenu's copy, the position it had. Everything else is in the stylesheet: without it the markup is unstyled, and plain CSS overrides any of its rules.
+
+## Animations
+
+Animate opening and closing with CSS, or with Tailwind's variants. The component sets no durations.
+
+**Opening** needs nothing from the component. The options, a submenu and the rows of an expanding group are new elements, so `@starting-style` (Tailwind's `starting:`) or a keyframe animation brings them in. State changes transition as any CSS does: `aria-expanded`, `aria-selected`, `data-focused`, `data-open`.
+
+**Closing** is where the component helps. Whatever closes stays until the CSS animations and transitions that its `data-closing` starts have ended:
+
+| Closing                      | Marked                                                                   |
+| ---------------------------- | ------------------------------------------------------------------------ |
+| the menu                     | `.msl[data-closing]`, the open box, still `.msl-active` and `data-open`  |
+| a submenu                    | a copy of its `.msl-submenu`, with `data-closing`, where the submenu was |
+| a collapsible group's childs | a copy of its `.msl-grp-body`, with `data-closing`, where it was         |
+
+- Without exit CSS, things close at once, as they always have. Transitions already running when it closes, such as an option's hover background, don't hold it, and neither does an infinite animation.
+- A closing menu and the copies are inert: no clicks, out of the accessibility tree. Focus leaves the menu as it starts to close. `onMenuClose` fires then too, and the combobox reports itself collapsed.
+- Opening the menu again before it has gone brings the same menu back, mid animation. A submenu or group that opens again replaces its copy.
+- A keyframe exit animation needs `forwards`, so its end state holds until the element goes.
+- Heights animate through a grid row from `0fr` to `1fr`, as below. The open box: `.msl` is a grid, the options its second row. Give the control's row `max-content`: an `auto` row would take the space a part `fr` row leaves. A collapsible group: `.msl-grp-body` holds one `<div>` for this. Make the body a grid with one `1fr` row, `0fr` in `@starting-style` and with `data-closing`, and give the `<div>` `overflow: hidden; min-height: 0`.
+
+<Preview code={animatedCode} title='Animated.tsx'>
+  <Animated client:visible />
+</Preview>
+
+<Code code={animatedCss} lang='css' title='Animated.css' />

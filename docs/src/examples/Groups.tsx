@@ -22,6 +22,8 @@ const options = [
   {
     type: 'group',
     title: 'Asia',
+    collapsible: true,
+    collapsed: true,
     childs: [
       { label: 'Dhaka', value: 'dhaka' },
       { label: 'Tokyo', value: 'tokyo' }

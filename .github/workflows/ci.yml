@@ -35,7 +35,7 @@ jobs:
       - if: matrix.react == 18
         run: pnpm add -D react@18 react-dom@18 @types/react@18 @types/react-dom@18
       - run: pnpm typecheck
-      # builds dist; jsdom suite on src (100% coverage gate) + every bundle; then the real-browser suite in Chromium, WebKit and Firefox
+      # builds dist; jsdom suite on src (100% coverage gate) + every bundle; then the real-browser suite in Chromium, WebKit and Firefox (every styles.css rule used)
       - run: pnpm test
       # dist is committed: fail if it was not rebuilt (React 19 leaves the lockfile untouched)
       - if: matrix.react == 19

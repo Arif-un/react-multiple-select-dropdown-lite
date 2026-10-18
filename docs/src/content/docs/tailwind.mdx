@@ -6,6 +6,8 @@ description: Style every part of the select with Tailwind utilities.
 import Preview from '../../components/Preview.astro'
 import Tailwind from '../../examples/Tailwind'
 import tailwindCode from '../../examples/Tailwind.tsx?raw'
+import TailwindAnimated from '../../examples/TailwindAnimated'
+import tailwindAnimatedCode from '../../examples/TailwindAnimated.tsx?raw'
 
 Skip `dist/index.css` and pass Tailwind classes for each part through `classNames`. Each string goes after the part's `msl-*` class. With no stylesheet the markup is unstyled, and the select still works: opening, the menu above or below, disabled.
 
@@ -15,24 +17,26 @@ Skip `dist/index.css` and pass Tailwind classes for each part through `className
 
 ## Parts
 
-| Key           | Element                                                                             |
-| ------------- | ----------------------------------------------------------------------------------- |
-| `className`   | the wrapper only (a prop of its own, not in `classNames`)                           |
-| `control`     | `msl`: the box with the values and buttons; open, the options too, in the top layer |
-| `values`      | `msl-input-wrp`: chips, single value and search field                               |
-| `input`       | `msl-input`: the search field, or the placeholder when there is none                |
-| `search`      | `msl-search`: the box around the search field with `searchInMenu`, atop the options |
-| `singleValue` | `msl-single-value`: the value with `singleSelect`, the count with `disableChip`     |
-| `chip`        | `msl-chip` (default chips; a `customChip` gets `classNames` in its props)           |
-| `chipDelete`  | `msl-chip-delete`                                                                   |
-| `actions`     | `msl-actions`: the clear and arrow buttons                                          |
-| `clearButton` | `msl-clear-btn`                                                                     |
-| `arrowButton` | `msl-arrow-btn`                                                                     |
-| `menu`        | `msl-options`: the listbox                                                          |
-| `group`       | `msl-grp`: a group's box                                                            |
-| `groupTitle`  | `msl-grp-title`                                                                     |
-| `option`      | `msl-option`                                                                        |
-| `empty`       | `emptyDataLabel`, and an empty group's                                              |
+| Key           | Element                                                                              |
+| ------------- | ------------------------------------------------------------------------------------ |
+| `className`   | the wrapper only (a prop of its own, not in `classNames`)                            |
+| `control`     | `msl`: the box with the values and buttons; open, the options too, in the top layer  |
+| `values`      | `msl-input-wrp`: chips, single value and search field                                |
+| `input`       | `msl-input`: the search field, or the placeholder when there is none                 |
+| `search`      | `msl-search`: the box around the search field with `searchInMenu`, atop the options  |
+| `singleValue` | `msl-single-value`: the value with `singleSelect`, the count with `disableChip`      |
+| `chip`        | `msl-chip` (default chips; a `customChip` gets `classNames` in its props)            |
+| `chipDelete`  | `msl-chip-delete`                                                                    |
+| `actions`     | `msl-actions`: the clear and arrow buttons                                           |
+| `clearButton` | `msl-clear-btn`                                                                      |
+| `arrowButton` | `msl-arrow-btn`                                                                      |
+| `menu`        | `msl-options`: the listbox                                                           |
+| `group`       | `msl-grp`: a group's box                                                             |
+| `groupTitle`  | `msl-grp-title`; a collapsible group's has `aria-expanded`                           |
+| `groupBody`   | `msl-grp-body`: a collapsible group's childs, in one `<div>` (for height animations) |
+| `option`      | `msl-option`, and a submenu's title, which has `aria-expanded`                       |
+| `submenu`     | `msl-submenu`: a submenu's popover, placed beside its title by the stylesheet        |
+| `empty`       | `emptyDataLabel`, and an empty group's                                               |
 
 ## State
 
@@ -42,24 +46,43 @@ State is in attributes, so Tailwind's variants reach it:
 | ------------------- | ------------------------------------------------------------ |
 | `aria-selected:`    | a selected option                                            |
 | `aria-disabled:`    | a disabled option                                            |
-| `data-focused:`     | the option highlighted by the keyboard                       |
+| `data-focused:`     | the option or title highlighted by the keyboard              |
+| `aria-expanded:`    | an open submenu's title, an expanded group's title           |
 | `data-open:`        | the open control; `in-data-open:` for parts inside it        |
 | `data-up:`          | the open control, opened upward                              |
+| `data-closing:`     | what is closing: the control, a submenu's copy               |
+| `in-data-closing:`  | parts inside it, the rows of a collapsing group too          |
 | `in-data-disabled:` | parts of a disabled select (the wrapper has `data-disabled`) |
 
 ## The open menu
 
 - Open, the control holds the options and shows in the top layer, over the wrapper. Give it a background (`data-open:bg-white`): nothing is behind it. A grid with the options across both columns (`col-span-full`) puts them under the values and buttons.
 - It stays in place in the DOM, so it inherits the text color and font around the select, and needs no z-index.
+- Without `renderList`, the options sit in a `display: contents` box in the menu, made anew for each search: style them through `option`, not with `*:` or `space-y-*` on `menu`.
 - Opening upward, the options come before the values in the DOM, and the control gets `data-up`. A divider on the options' `border-t in-data-up:border-t-0 in-data-up:border-b` lands next to the control either way. With `searchInMenu`, the search field's box (`search`) heads the options, on the side away from the control when opening upward, and takes the same divider.
-- `--msl-menu-room` on the options (`classNames.menu`) is the room the viewport leaves on the menu's side. Cap the options with it: `max-h-[min(400px,var(--msl-menu-room))]`. Register it as non-inherited, as the example's CSS does, so a scroll restyles the listbox, not every option:
+- `--msl-menu-room` on the options (`classNames.menu`) is the room the viewport leaves on the menu's side. Cap the options with it: `max-h-[min(400px,var(--msl-menu-room))]`. Register it as non-inherited, as the example's CSS does, so a scroll restyles the listbox, not every option. Its initial value caps the menu before it first measures the room, for a [virtual list](../virtual-lists/) that measures itself on mount:
 
 ```css
 @property --msl-menu-room {
   syntax: '*';
   inherits: false;
+  initial-value: 100vh;
 }
 ```
+
+- With `renderList`, the options and submenus get `data-custom`. Make them flex columns, `data-custom:flex data-custom:flex-col`, so a virtual list's scroller shrinks to the menu's height, and give submenus a width, `data-custom:w-75`: their rows have none of their own.
+
+## Animations
+
+`starting:` animates parts in, and `data-closing:` / `in-data-closing:` out: whatever closes stays until its transitions end. The menu in the example above fades in and out with `transition-opacity duration-150 starting:opacity-0 in-data-closing:opacity-0`.
+
+Below, the open box also grows to fit the options and shrinks back (a grid row from `0fr` to `1fr`), submenus slide in and fade out, a collapsible group slides open and shut (its body's one `<div>` as a grid row), and the chevrons turn. With no stylesheet, the submenu's classes place it too, with CSS anchor positioning: its title is its `position-anchor`.
+
+<Preview code={tailwindAnimatedCode} title='TailwindAnimated.tsx'>
+  <TailwindAnimated client:visible />
+</Preview>
+
+See [Animations](../styling/#animations) for what closes, and how.
 
 ## With the default stylesheet
 
