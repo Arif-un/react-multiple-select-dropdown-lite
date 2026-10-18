@@ -85,13 +85,13 @@ declare namespace MultiSelect {
     arrowButton?: string
     /** `msl-options`: the listbox. Its height is up to you: it gets `--msl-menu-room`, the room the viewport leaves */
     menu?: string
-    /** `msl-grp`: a group's `role="group"` box, its title and childs */
+    /** `msl-grp`: a group's `role="group"` box, its title and childs. With `renderList`, a box around each of its rows */
     group?: string
     /** `msl-grp-title`. A collapsible group's has `aria-expanded` */
     groupTitle?: string
     /**
      * `msl-grp-body`: a collapsible group's childs, after its title, in one inner `<div>`: a grid row of that
-     * from `0fr` to `1fr` animates the height. Collapsing, an inert copy with `data-closing` takes its place
+     * from `0fr` to `1fr` animates the height. Collapsing, an inert copy with `data-closing` takes its place. Not with `renderList`
      */
     groupBody?: string
     /** `msl-option`, and a submenu's title, which has `aria-expanded` */
@@ -124,6 +124,19 @@ declare namespace MultiSelect {
     classNames: MultiSelectClassNames
     /** removes this value; does nothing while disabled */
     onDelete: () => void
+  }
+
+  /** what `renderList` gets: the rows of the open menu, or of an open submenu, for a virtual list library to render */
+  interface MultiSelectListProps {
+    /** how many rows: options and the titles of groups and submenus (and an empty group's label), groups flattened */
+    count: number
+    /**
+     * renders row `index`, in a `display: contents` box. Rows in a group come in a `msl-grp` box per group in that, so they
+     * indent as in the group, but no `role="group"` holds them. Nothing for an index past the end
+     */
+    row: (index: number) => React.ReactNode
+    /** the keyboard highlight's row, -1 for none or one in another list: scroll it into view as it moves (arrow keys, Home, End) */
+    activeIndex: number
   }
 
   interface MultiSelectProps<
@@ -225,6 +238,14 @@ declare namespace MultiSelect {
     searchPlaceholder?: string
     /** Backspace in the empty search field removes the last chip. Default: `true`; `false` leaves the chip delete buttons */
     deleteOnBackspace?: boolean
+    /**
+     * renders the open list's rows yourself, e.g. through the virtual list library of your choice for long lists:
+     * `(list) => <MyVirtualList {...list} />`. A render function, not a component, so no hooks in it. What it returns goes in
+     * the listbox (`msl-options`, then with `data-custom`), which the stylesheet makes a flex column: a scroller in it
+     * shrinks to the menu's height. An open submenu's rows go through it too, in its popover after its title (`msl-submenu`,
+     * also with `data-custom`, and as wide as `--msl-input-width`). Not called while `emptyDataLabel` shows
+     */
+    renderList?: (list: MultiSelectListProps) => React.ReactNode
     onMenuOpen?: () => void
     onMenuClose?: () => void
     /** after the clear button empties the value */
