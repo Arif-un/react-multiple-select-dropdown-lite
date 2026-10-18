@@ -190,6 +190,7 @@
 @property --msl-menu-room {
   syntax: '*';
   inherits: false;
+  initial-value: 100vh;
 }
 
 .msl-options,
@@ -203,6 +204,11 @@
   cursor: default;
   scrollbar-width: thin;
   scrollbar-color: var(--msl-scrollbar-color) transparent;
+
+  &:where([data-custom]) {
+    display: flex;
+    flex-direction: column;
+  }
 
   &::-webkit-scrollbar {
     width: 8px;
@@ -220,14 +226,12 @@
 
 @position-try --msl-over {
   inset: auto;
-  top: anchor(top);
-  left: anchor(left);
+  position-area: span-right span-bottom;
 }
 
 .msl-submenu {
   inset: auto;
-  top: anchor(top);
-  left: anchor(right);
+  position-area: right span-bottom;
   width: max-content;
   min-width: 120px;
   max-width: var(--msl-input-width);
@@ -246,8 +250,13 @@
     --msl-over,
     --msl-over flip-block;
 
+  &:where([data-custom]) {
+    width: var(--msl-input-width);
+  }
+
   &:dir(rtl) {
-    left: auto;
+    position-area: none;
+    top: anchor(top);
     right: anchor(left);
   }
 }
