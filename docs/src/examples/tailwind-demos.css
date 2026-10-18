@@ -9,4 +9,5 @@
 @property --msl-menu-room {
   syntax: '*';
   inherits: false;
+  initial-value: 100vh;
 }

@@ -20,6 +20,7 @@ export default defineConfig({
       sidebar: [
         { label: 'Getting started', slug: 'getting-started' },
         { label: 'Examples', slug: 'examples' },
+        { label: 'Virtual lists', slug: 'virtual-lists' },
         { label: 'API', slug: 'api' },
         { label: 'Styling', slug: 'styling' },
         { label: 'Tailwind', slug: 'tailwind' },

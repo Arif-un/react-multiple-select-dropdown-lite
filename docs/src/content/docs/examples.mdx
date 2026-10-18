@@ -40,6 +40,8 @@ import Disabled from '../../examples/Disabled'
 import disabledCode from '../../examples/Disabled.tsx?raw'
 import LargeData from '../../examples/LargeData'
 import largeDataCode from '../../examples/LargeData.tsx?raw'
+import TanstackVirtual from '../../examples/TanstackVirtual'
+import tanstackVirtualCode from '../../examples/TanstackVirtual.tsx?raw'
 
 Every demo below runs the code under it.
 
@@ -59,7 +61,7 @@ Every demo below runs the code under it.
 
 ## Groups
 
-Groups have `type: 'group'`, a `title` and `childs`, and can nest. Options themselves can't have `type: 'group'`. `emptyDataLabel` shows when a group has no options. With `collapsible: true`, a click on the title (or Enter) shows and hides the group's options; `collapsed: true` starts it closed. Search looks inside groups, closed ones too.
+Groups have `type: 'group'`, a `title` and `childs`, and can nest. Options themselves can't have `type: 'group'` or `type: 'submenu'`. `emptyDataLabel` shows when a group has no options. With `collapsible: true`, a click on the title (or Enter) shows and hides the group's options; `collapsed: true` starts it closed. Search looks inside groups, closed ones too.
 
 <Preview code={groupsCode} title='Groups.tsx'>
   <Groups client:visible />
@@ -67,7 +69,7 @@ Groups have `type: 'group'`, a `title` and `childs`, and can nest. Options thems
 
 ## Submenus
 
-With `type: 'submenu'`, the title is a row that opens its `childs` in a popover beside the menu: on a pause over it, a click, Enter or Arrow Right. Arrow Left or Escape close it again. Submenus nest to any depth and can hold groups. Search lists their options flat.
+With `type: 'submenu'`, the title is a row that opens its `childs` in a popover beside the menu: on a pause over it, a click, Enter or Arrow Right. With the highlight in it, Arrow Left or Escape close it again. Submenus nest to any depth and can hold groups. Search lists their options flat.
 
 <Preview code={submenusCode} title='Submenus.tsx'>
   <Submenus client:visible />
@@ -171,8 +173,16 @@ Backspace in an empty search field removes the last chip. `deleteOnBackspace={fa
 
 ## Large lists
 
-Options render only while the menu is open, so long lists don't slow the page down.
+Options render only while the menu is open, so long lists don't slow the page down. For thousands of options, render only the rows in view through a [virtual list](../virtual-lists/).
 
 <Preview code={largeDataCode} title='LargeData.tsx'>
   <LargeData client:visible />
+</Preview>
+
+## Virtual list
+
+`renderList` renders the rows through a virtual list library of your choice, here [TanStack Virtual](https://tanstack.com/virtual), so only the rows in view render. Every kind of row works: groups in groups, collapsible and collapsed groups, submenus in groups and groups in submenus, an empty group, and 11,000 options in a collapsed group and a submenu. See [virtual lists](../virtual-lists/) for react-window and other libraries.
+
+<Preview code={tanstackVirtualCode} title='TanstackVirtual.tsx'>
+  <TanstackVirtual client:visible />
 </Preview>

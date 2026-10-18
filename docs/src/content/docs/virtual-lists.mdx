@@ -1,0 +1,65 @@
+---
+title: Virtual lists
+description: Render thousands of options through the virtual list library of your choice.
+---
+
+import Preview from '../../components/Preview.astro'
+import VirtualList from '../../examples/VirtualList'
+import virtualListCode from '../../examples/VirtualList.tsx?raw'
+import VirtualGroups from '../../examples/VirtualGroups'
+import virtualGroupsCode from '../../examples/VirtualGroups.tsx?raw'
+import TanstackVirtual from '../../examples/TanstackVirtual'
+import tanstackVirtualCode from '../../examples/TanstackVirtual.tsx?raw'
+
+Options render only while the menu is open, but then every one of them does. For thousands of options, render them through a virtual list library, which renders only the rows in view. Pick any: you install it, this package doesn't depend on one.
+
+`renderList` hands the library the open list's rows as `{ count, row, activeIndex }` (`MultiSelectListProps`):
+
+- `count`: how many rows there are.
+- `row(index)`: renders one row. Only the rows you ask for get built, so a long list opens at once.
+- `activeIndex`: the row the keyboard highlights, `-1` for none (or while the highlight is in a submenu's list). Scroll it into view as arrow keys, Home and End move it.
+
+`renderList` is a render function, not a component, so it can't use hooks: return a component of yours, `renderList={(list) => <VirtualList {...list} />}`. Search, picking, the keyboard, `limit` and `customValue` work as without it.
+
+## react-window
+
+<Preview code={virtualListCode} title='VirtualList.tsx'>
+  <VirtualList client:visible />
+</Preview>
+
+## TanStack Virtual
+
+It measures each row, so rows can differ in height. Here with every kind of row, groups and submenus in each other:
+
+<Preview code={tanstackVirtualCode} title='TanstackVirtual.tsx'>
+  <TanstackVirtual client:visible />
+</Preview>
+
+## Groups and submenus
+
+[Collapsible groups](../examples/#groups) and [submenus](../examples/#submenus) work as without `renderList`. A collapsible group's title is a row: while the group is closed its rows drop out of the list, so `count` shrinks, and they come back as it opens. An open submenu is a list of its own, its rows rendered through `renderList` too, in its popover beside its title row. A browser without CSS anchor positioning shows it in the flow, under its title, inside that row: a list with a fixed row height, as react-window's below, clips it there and draws the next rows over it, so there use one that measures its rows, as TanStack Virtual does. The stylesheet makes the popover as wide as `--msl-input-width`, since rows placed by a virtual list have no width of their own. If that is a percentage, such as `100%`, give `.msl-submenu` a length of its own (`.msl-submenu { width: 300px }`): in the top layer a percentage sizes the popover from the room beside its title, not from the dropdown. Here 100,000 options in 100 collapsed groups, each 100 options and a submenu of 900 more, through the react-window list above:
+
+<Preview code={virtualGroupsCode} title='VirtualGroups.tsx'>
+  <VirtualGroups client:visible />
+</Preview>
+
+[Animations](../styling/#animations) work as without `renderList`, except that a collapsible group's rows come and go at once: there is no group body (`msl-grp-body`) to slide open and shut. A submenu fades and slides as before. In Firefox, though, a submenu placed by a fallback (on the other side, or over its title) that resizes while its enter animation runs, as TanStack Virtual's does as it measures the rows, holds the frame the animation was at until it ends, then shows at once. That is a Firefox bug. To keep the fade there, animate the list (`.msl-submenu > *`) rather than the submenu.
+
+## Any other library
+
+Both recipes above run in the test suite. Another library works the same way, given:
+
+- **A scroller that fits the menu.** The listbox (`msl-options`) gets `data-custom`, and the stylesheet makes it a flex column, so a scroller in it shrinks to the menu's height: `--msl-menu-max-height`, or the room the viewport leaves. A library that needs a height of its own can take the rows' total, `count * 36`: the menu caps it.
+- **Rows placed with `top`, not `transform`.** Firefox places a submenu by its title as if the transforms around the title were not there, as the CSS anchor positioning spec first said, so a submenu opens away from a row moved by a transform. react-window moves its rows with one: both recipes place rows with `top`.
+- **No tab stop.** Give the scroller `tabIndex={-1}`, as the listbox has. Firefox makes a scroller a tab stop, and Tab would land in it instead of moving on. react-virtuoso's scroller is one by default.
+- **No roles in between.** Nothing between the listbox and its options may have a role: pass `role='none'` to a library that sets one (react-window's `List` is a `role="list"`), and leave out any ARIA props it offers for rows: the options carry their own `aria-posinset` and `aria-setsize`.
+- **Rows in boxes of their own.** The default stylesheet gives options margins. Rows positioned absolutely keep them, as in both recipes. A library that stacks rows in the flow (react-virtuoso) measures them short as the margins collapse: put each row in a `<div style={{ display: 'flow-root' }}>`.
+- **A scroll it doesn't drop.** react-virtuoso can drop a scroll called while it updates: call it in `requestAnimationFrame`.
+
+## Rows
+
+Rows are options, the titles of groups and submenus, and an empty group's label, in order, groups flattened. An open submenu's rows are not in the list it is in, but a list of their own. A search lists matching options only, flat. Group titles are shorter than options: let the library measure rows, or give titles the options' height.
+
+Each row comes in a `display: contents` box: when the library unmounts a focused row (a click focuses one) as it scrolls, focus goes to the listbox, where the keys still work. A row in a group comes in a `msl-grp` box per group around it (`classNames.group`), so it indents as in the group. There is no `role="group"` around a group's rows, so screen readers don't announce the group's name.
+
+Without the stylesheet, make the listbox and submenus flex columns yourself, `classNames={{ menu: 'data-custom:flex data-custom:flex-col', submenu: 'data-custom:flex data-custom:flex-col data-custom:w-75' }}` with Tailwind, and see [the open menu](../tailwind/#the-open-menu) for its height.

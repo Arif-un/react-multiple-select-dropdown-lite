@@ -5,7 +5,10 @@ import type {
   MultiSelectProps
 } from 'react-multiple-select-dropdown-lite'
 import 'react-multiple-select-dropdown-lite/dist/index.css'
+import './Animated.css'
+import { TanstackList, options as tree } from './TanstackVirtual'
 import './Theming.css'
+import { VirtualList } from './VirtualList'
 
 const fruits = [
   { label: 'Apple', value: 'apple' },
@@ -127,6 +130,11 @@ const sets: Record<
     options: submenus as MultiSelectOption[],
     defaultValue: ['kale']
   },
+  tree: {
+    label: 'Mixed tree (11,000 options)',
+    options: tree as MultiSelectOption[],
+    defaultValue: ['kale']
+  },
   users: {
     label: 'Any shape (getLabel / getValue)',
     options: users as unknown as MultiSelectOption[],
@@ -181,6 +189,9 @@ const texts = {
 }
 type Text = keyof typeof texts
 
+// the recipes of the virtual lists page, named as there
+const lists = { VirtualList, TanstackList }
+
 const variants = {
   options: 'fruits' as SetName,
   value: 'onChange' as 'onChange' | 'defaultValue' | 'value',
@@ -189,6 +200,8 @@ const variants = {
   customChip: false,
   icons: false,
   theme: 'default' as 'default' | 'dark',
+  animated: false,
+  renderList: 'none' as 'none' | keyof typeof lists,
   events: false
 }
 
@@ -243,6 +256,11 @@ export default function Playground() {
   const [value, setValue] = useState<string[]>([])
   const [log, setLog] = useState<string[]>([])
   const set = sets[s.options]
+  const List = s.renderList === 'none' ? undefined : lists[s.renderList]
+  const className =
+    [s.theme === 'dark' && 'dark-msl', s.animated && 'animated']
+      .filter(Boolean)
+      .join(' ') || undefined
   const update = (patch: Partial<State>) => {
     const next = { ...s, ...patch }
     setS(next)
@@ -303,7 +321,8 @@ export default function Playground() {
           ]
         : []),
       ...(s.customChip ? chipCode : []),
-      ...(s.theme === 'dark' ? ["className='dark-msl'"] : []),
+      ...(List ? [`renderList={(list) => <${s.renderList} {...list} />}`] : []),
+      ...(className ? [`className='${className}'`] : []),
       'onChange={setValue}',
       ...(s.events
         ? [
@@ -316,7 +335,9 @@ export default function Playground() {
     '/>'
   ].join('\n')
 
-  const check = (name: Flag | 'customChip' | 'icons' | 'events') => (
+  const check = (
+    name: Flag | 'customChip' | 'icons' | 'animated' | 'events'
+  ) => (
     <label key={name}>
       <input
         type='checkbox'
@@ -327,7 +348,9 @@ export default function Playground() {
       {name}
     </label>
   )
-  const choose = <K extends 'options' | 'value' | 'closeOnSelect' | 'theme'>(
+  const choose = <
+    K extends 'options' | 'value' | 'closeOnSelect' | 'theme' | 'renderList'
+  >(
     name: K,
     choices: Record<State[K], string>
   ) => (
@@ -388,6 +411,12 @@ export default function Playground() {
               default: 'default',
               dark: 'dark (CSS variables)'
             })}
+            {choose('renderList', {
+              none: 'none',
+              VirtualList: 'react-window',
+              TanstackList: 'TanStack Virtual'
+            })}
+            {check('animated')}
             {check('customChip')}
             {check('icons')}
             {check('events')}
@@ -441,7 +470,8 @@ export default function Playground() {
             customChip={s.customChip ? chip : undefined}
             downArrowIcon={s.icons ? <span aria-hidden>🔽</span> : undefined}
             closeIcon={s.icons ? <span aria-hidden>✕</span> : undefined}
-            className={s.theme === 'dark' ? 'dark-msl' : undefined}
+            renderList={List && ((list) => <List {...list} />)}
+            className={className}
             onMenuOpen={s.events ? () => note('onMenuOpen') : undefined}
             onMenuClose={s.events ? () => note('onMenuClose') : undefined}
             onClear={s.events ? () => note('onClear') : undefined}

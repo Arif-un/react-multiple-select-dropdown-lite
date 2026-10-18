@@ -54,7 +54,7 @@ const classNames = {
   menu: 'col-span-full max-h-[min(400px,var(--msl-menu-room))] overflow-auto border-t border-gray-200 transition-opacity duration-200 in-data-up:border-t-0 in-data-up:border-b starting:opacity-0 in-data-closing:opacity-0',
   // a popover with no stylesheet: placed beside its title with CSS anchor positioning, on the other side without room
   submenu:
-    'm-0 -mt-1.5 inset-auto top-[anchor(top)] left-[anchor(right)] max-h-[400px] w-max min-w-30 overflow-auto rounded-lg border border-gray-200 bg-white p-0 text-inherit shadow-lg transition-[opacity,translate] duration-150 [position-try-fallbacks:flip-inline,flip-block] starting:-translate-x-1.5 starting:opacity-0 data-closing:opacity-0 rtl:left-auto rtl:right-[anchor(left)]',
+    'm-0 -mt-1.5 inset-auto [position-area:right_span-bottom] max-h-[400px] w-max min-w-30 overflow-auto rounded-lg border border-gray-200 bg-white p-0 text-inherit shadow-lg transition-[opacity,translate] duration-150 [position-try-fallbacks:flip-inline,flip-block] starting:-translate-x-1.5 starting:opacity-0 data-closing:opacity-0 rtl:[position-area:none] rtl:top-[anchor(top)] rtl:right-[anchor(left)]',
   // in and out with the menu, a submenu, or their group
   option: `mx-1.5 my-1 cursor-pointer rounded-md px-2 py-1 transition-[opacity,background-color] duration-150 hover:bg-gray-100 aria-selected:text-blue-600 aria-disabled:cursor-default aria-disabled:text-gray-300 aria-expanded:bg-gray-100 data-focused:bg-gray-100 starting:opacity-0 in-data-closing:opacity-0 ${chevron} [&[aria-expanded]]:after:-rotate-45`,
   group: 'ps-3',
