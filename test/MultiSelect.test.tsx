@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import type {
   MultiSelectChipProps,
+  MultiSelectGroupTitleProps,
   MultiSelectListProps,
   MultiSelectOption,
   MultiSelectProps
@@ -222,7 +223,9 @@ describe('render', () => {
       group: '[role="group"]',
       groupTitle: '.msl-grp-title',
       groupBody: '.msl-grp-body',
+      groupIcon: '.msl-grp-title .msl-expand-icn',
       option: '[role="option"]',
+      submenuIcon: '.msl-option .msl-expand-icn',
       empty: '.msl-option-disable:not([role])'
     }
     const classNames = Object.fromEntries(
@@ -239,7 +242,8 @@ describe('render', () => {
         ...opts,
         { type: 'group', title: 'G', childs: [{ label: 'Kiwi', value: 'k' }] },
         { type: 'group', title: 'None', childs: [] },
-        { type: 'group', title: 'C', collapsible: true, childs: [] }
+        { type: 'group', title: 'C', collapsible: true, childs: [] },
+        { type: 'submenu', title: 'S', childs: [] }
       ]
     })
     fireEvent.click(root)
@@ -337,6 +341,122 @@ describe('render', () => {
     expect(q('.msl-clear-btn .my-close')).not.toBeNull()
     expect(q('.msl-arrow-btn .my-arrow')).not.toBeNull()
     expect(q('.msl-close-icn')).not.toBeNull() // chip delete keeps default icon
+  })
+
+  it("renders an icon after the titles that open: the arrow button's chevron, or groupIcon and submenuIcon left to right", () => {
+    const options = [
+      { type: 'group', title: 'G', childs: [] },
+      { type: 'group', title: 'C', collapsible: true, childs: [] },
+      { type: 'submenu', title: 'S', childs: [] }
+    ]
+    const plain = setup({ options })
+    plain.groupTitles()
+    const [g, c] = plain.qa('.msl-grp-title')
+    const chevron = (title: Element) =>
+      title.querySelector(
+        ':scope > .msl-expand-icn[aria-hidden="true"] > svg.msl-chevron-icn'
+      )!
+    expect(g.innerHTML).toBe('G')
+    expect(chevron(c).innerHTML).toBe(plain.q('.msl-arrow-icn').innerHTML)
+    expect(c.textContent).toBe('C')
+    expect(chevron(plain.option('S'))).not.toBeNull()
+    plain.unmount()
+    const own = setup({
+      options,
+      groupIcon: <i className='my-grp' />,
+      submenuIcon: <i className='my-sub' />
+    })
+    expect(own.groupTitles()).toEqual(['G', 'C'])
+    // not mirrored right to left, where the stylesheet turns it
+    expect(
+      own.q('.msl-grp-title > .msl-expand-icn > bdo[dir="ltr"] > .my-grp')
+    ).not.toBeNull()
+    expect(
+      own.q('.msl-option > .msl-expand-icn > bdo[dir="ltr"] > .my-sub')
+    ).not.toBeNull()
+    expect(own.qa('.my-grp, .my-sub')).toHaveLength(2)
+  })
+
+  it('renderGroupTitle renders the title rows of groups and submenus, from their counts, state and icon', () => {
+    const renderGroupTitle = vi.fn(
+      ({ title, total, selected, icon }: MultiSelectGroupTitleProps) => (
+        <>
+          {icon}
+          {title} {selected}/{total}
+        </>
+      )
+    )
+    const b = { label: 'B', value: 'b' }
+    const options = [
+      {
+        type: 'group',
+        title: 'G',
+        childs: [
+          { label: 'A', value: 'a' },
+          { type: 'group', title: 'Inner', childs: [b] }
+        ]
+      },
+      {
+        type: 'group',
+        title: 'C',
+        collapsible: true,
+        collapsed: true,
+        childs: [{ label: 'D', value: 'd', disabled: true }]
+      },
+      {
+        type: 'submenu',
+        title: 'S',
+        childs: [
+          { label: 'E', value: 'e' },
+          { type: 'submenu', title: 'S2', childs: [{ label: 'F', value: 'f' }] }
+        ]
+      }
+    ]
+    const { groupTitles, option } = setup({
+      options,
+      renderGroupTitle,
+      defaultValue: ['b', 'f']
+    })
+    // nested options count, disabled ones too
+    expect(groupTitles()).toEqual(['G 1/2', 'Inner 1/1', 'C 0/1'])
+    const sub = option('S 1/2')
+    expect((sub.firstChild as Element).className).toBe('msl-expand-icn ')
+    const last = (title: string) =>
+      renderGroupTitle.mock.calls
+        .map(([p]) => p)
+        .filter((p) => p.title === title)
+        .at(-1)!
+    expect(last('G')).toEqual({
+      group: options[0],
+      title: 'G',
+      total: 2,
+      selected: 1,
+      open: true,
+      icon: null
+    })
+    expect(last('Inner').group).toBe(options[0].childs[1])
+    expect(last('C')).toMatchObject({ open: false, icon: expect.anything() })
+    expect(last('S').open).toBe(false)
+    fireEvent.click(sub)
+    expect(last('S').open).toBe(true)
+    expect(option('S2 1/1')).toBeDefined()
+  })
+
+  it("types renderGroupTitle's group as holding T, plus { label, value } with customValue", () => {
+    const ada = { id: '1', name: 'Ada' }
+    const names = ({ group }: MultiSelectGroupTitleProps<typeof ada, false>) =>
+      group.childs.map((p) => ('childs' in p ? p.title : p.name))
+    const props = {
+      options: [ada],
+      getLabel: (p: typeof ada) => p.name,
+      getValue: (p: typeof ada) => p.id
+    }
+    const elements = [
+      <MultiSelect key='a' {...props} renderGroupTitle={names} />,
+      // @ts-expect-error the group of created values holds { label, value }, not people
+      <MultiSelect key='b' {...props} customValue renderGroupTitle={names} />
+    ]
+    expect(elements).toHaveLength(2)
   })
 })
 
