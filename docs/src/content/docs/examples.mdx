@@ -28,6 +28,8 @@ import Controlled from '../../examples/Controlled'
 import controlledCode from '../../examples/Controlled.tsx?raw'
 import Limit from '../../examples/Limit'
 import limitCode from '../../examples/Limit.tsx?raw'
+import Fixed from '../../examples/Fixed'
+import fixedCode from '../../examples/Fixed.tsx?raw'
 import SearchInMenu from '../../examples/SearchInMenu'
 import searchInMenuCode from '../../examples/SearchInMenu.tsx?raw'
 import DeleteOnBackspace from '../../examples/DeleteOnBackspace'
@@ -153,6 +155,14 @@ Pass `value` and update it from `onChange` to own the selection, for example to 
 
 <Preview code={limitCode} title='Limit.tsx'>
   <Limit client:visible />
+</Preview>
+
+## Fixed values
+
+`fixed: true` on an option keeps it once selected: its chip has no delete button, and Backspace, the clear button and the menu leave it. In single select it locks the value. Tint its chip with `--msl-chip-fixed-background`, style `.msl-chip[data-fixed]` (Tailwind's `data-fixed:` on `classNames.chip`), or read `fixed` in a `customChip`.
+
+<Preview code={fixedCode} title='Fixed.tsx'>
+  <Fixed client:visible />
 </Preview>
 
 ## Search in the menu

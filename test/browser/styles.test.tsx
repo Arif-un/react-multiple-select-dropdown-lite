@@ -162,6 +162,20 @@ it('chips, their delete buttons and the clear button', async () => {
   await userEvent.unhover(q('.msl-clear-btn'))
 })
 
+it("a fixed value's chip: no delete button, as much padding at its end, its own background variable", async () => {
+  const { q, root } = await setup({
+    options: [{ label: 'Apple', value: 'apple', fixed: true }],
+    defaultValue: ['apple']
+  })
+  const chip = q('.msl-chip')
+  expect(chip.querySelector('.msl-chip-delete')).toBeNull()
+  expect(css(chip).paddingInlineEnd).toBe('6px')
+  // the chip's by default
+  expect(css(chip).backgroundColor).toBe(color('--msl-chip-background'))
+  root.style.setProperty('--msl-chip-fixed-background', 'rgb(1 2 3)')
+  expect(css(chip).backgroundColor).toBe(color('rgb(1 2 3)'))
+})
+
 it('the single value stays on one line', async () => {
   const { q } = await setup({ singleSelect: true, defaultValue: ['apple'] })
   const el = q('.msl-single-value')

@@ -1381,6 +1381,172 @@ describe('customChip', () => {
   })
 })
 
+describe('fixed values', () => {
+  const fixedOpts = [
+    { label: 'Apple', value: 'apple', fixed: true },
+    { label: 'Banana', value: 'banana' },
+    { label: 'Cherry', value: 'cherry', fixed: true },
+    { label: 'Date', value: 'date' }
+  ]
+  const fixed = (props: MultiSelectProps = {}) =>
+    setup({
+      options: fixedOpts,
+      defaultValue: ['apple', 'banana', 'cherry'],
+      ...props
+    })
+
+  it('a fixed value has a data-fixed chip with no delete button', () => {
+    const { q, qa } = fixed()
+    // multi select can still change: not read-only
+    expect(q('[role="combobox"]').hasAttribute('aria-readonly')).toBe(false)
+    expect(
+      qa('.msl-chip').map((el) => [
+        el.textContent,
+        el.hasAttribute('data-fixed'),
+        !!el.querySelector('.msl-chip-delete')
+      ])
+    ).toEqual([
+      ['Apple', true, false],
+      ['Banana', false, true],
+      ['Cherry', true, false]
+    ])
+  })
+
+  it('the clear button keeps fixed values, and shows only while one can go', () => {
+    const onClear = vi.fn()
+    const { q, chips, onChange } = fixed({ onClear })
+    fireEvent.click(q('.msl-clear-btn'))
+    expect(chips()).toEqual(['Apple', 'Cherry'])
+    expect(onChange).toHaveBeenLastCalledWith(
+      ['apple', 'cherry'],
+      [fixedOpts[0], fixedOpts[2]]
+    )
+    expect(onClear).toHaveBeenCalledTimes(1)
+    expect(q('.msl-clear-btn')).toBeNull()
+  })
+
+  it('Backspace removes the last chip that is not fixed', () => {
+    const { input, chips, onChange } = fixed({
+      defaultValue: ['banana', 'apple', 'date', 'cherry']
+    })
+    press(input(), 'Backspace')
+    expect(chips()).toEqual(['Banana', 'Apple', 'Cherry'])
+    press(input(), 'Backspace')
+    expect(chips()).toEqual(['Apple', 'Cherry'])
+    press(input(), 'Backspace')
+    expect(chips()).toEqual(['Apple', 'Cherry'])
+    expect(values(onChange)).toEqual([
+      ['banana', 'apple', 'cherry'],
+      ['apple', 'cherry']
+    ])
+  })
+
+  it('in the menu a selected one is disabled: no click, Enter or highlight deselects it', () => {
+    const { option, input, chips, onChange } = fixed()
+    expect(option('Apple').getAttribute('aria-selected')).toBe('true')
+    expect(option('Apple').getAttribute('aria-disabled')).toBe('true')
+    expect(option('Apple').className).toContain('msl-option-disable')
+    expect(option('Banana').getAttribute('aria-disabled')).toBe('false')
+    fireEvent.click(option('Apple'))
+    press(option('Apple'))
+    press(input(), 'ArrowDown')
+    expect(option('Banana').hasAttribute('data-focused')).toBe(true)
+    expect(chips()).toEqual(['Apple', 'Banana', 'Cherry'])
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('an unselected one is picked as any other, then stays, though still highlighted', () => {
+    const { input, chips, onChange } = fixed({ defaultValue: [] })
+    press(input(), 'ArrowDown')
+    press(input())
+    expect(chips()).toEqual(['Apple'])
+    press(input())
+    expect(chips()).toEqual(['Apple'])
+    expect(values(onChange)).toEqual([['apple']])
+  })
+
+  it('Enter in the search skips a selected fixed match for the next', () => {
+    const { input, chips } = fixed({
+      options: [
+        { label: 'Apple', value: 'apple', fixed: true },
+        { label: 'Apricot', value: 'apricot' }
+      ],
+      defaultValue: ['apple']
+    })
+    type(input(), 'ap', 'Enter')
+    expect(chips()).toEqual(['Apple', 'Apricot'])
+  })
+
+  it("customChip gets fixed; a fixed value's onDelete does nothing", () => {
+    const customChip = vi.fn(({ value, onDelete }: MultiSelectChipProps) => (
+      <button type='button' className='my-chip' onClick={onDelete}>
+        {value}
+      </button>
+    ))
+    const { qa, onChange } = fixed({ customChip })
+    expect(customChip).toHaveBeenCalledWith(
+      expect.objectContaining({ value: 'apple', fixed: true })
+    )
+    expect(customChip).toHaveBeenCalledWith(
+      expect.objectContaining({ value: 'banana', fixed: false })
+    )
+    fireEvent.click(qa('.my-chip')[0])
+    expect(onChange).not.toHaveBeenCalled()
+    fireEvent.click(qa('.my-chip')[1])
+    expect(values(onChange)).toEqual([['apple', 'cherry']])
+  })
+
+  it('a repeated value goes by the selected one: its other rows are fixed or not with it', () => {
+    const { option, onChange } = fixed({
+      options: [
+        { label: 'Apple', value: 'apple', fixed: true },
+        { label: 'Apple again', value: 'apple' }
+      ],
+      defaultValue: ['apple']
+    })
+    expect(option('Apple again').getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(option('Apple again'))
+    expect(onChange).not.toHaveBeenCalled()
+    cleanup()
+    const swapped = fixed({
+      options: [
+        { label: 'Apple', value: 'apple' },
+        { label: 'Apple pinned', value: 'apple', fixed: true }
+      ],
+      defaultValue: ['apple']
+    })
+    expect(swapped.q('.msl-chip-delete')).not.toBeNull()
+    expect(swapped.option('Apple pinned').getAttribute('aria-disabled')).toBe(
+      'false'
+    )
+  })
+
+  it('single select: a fixed value locks it, as a reached limit would, with no clear button', () => {
+    const { option, root, q, single, onChange } = fixed({
+      singleSelect: true,
+      defaultValue: ['apple']
+    })
+    expect(q('.msl-clear-btn')).toBeNull()
+    expect(q('[role="combobox"]').getAttribute('aria-readonly')).toBe('true')
+    expect(root.classList).not.toContain('msl-limit-reached')
+    expect(option('Banana').getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(option('Banana'))
+    fireEvent.click(option('Apple'))
+    expect(single()).toBe('Apple')
+    expect(values(onChange)).toEqual([['apple']])
+  })
+
+  it('with disableChip and a controlled value, clear keeps them too', () => {
+    const { q, single, onChange } = fixed({
+      disableChip: true,
+      value: ['apple', 'banana']
+    })
+    expect(single()).toBe('2 Item Selected')
+    fireEvent.click(q('.msl-clear-btn'))
+    expect(values(onChange)).toEqual([['apple']])
+  })
+})
+
 describe('renderList', () => {
   // aria-posinset/aria-setsize of each
   const places = (els: Element[]) =>

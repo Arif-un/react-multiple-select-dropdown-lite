@@ -26,6 +26,13 @@ declare namespace MultiSelect {
     label: string
     value: string
     disabled?: boolean
+    /**
+     * selected, it stays: its chip has no delete button (`data-fixed` on default chips), and Backspace, the clear button
+     * and the menu skip it, where it shows `aria-disabled`. In single select it locks the value: the other options are
+     * disabled, picking one only calls `onChange`, the value unchanged, and the combobox has `aria-readonly`.
+     * Unselected, it can still be picked
+     */
+    fixed?: boolean
     style?: React.CSSProperties
     /** extra class names */
     classes?: string
@@ -55,7 +62,7 @@ declare namespace MultiSelect {
    * classes per element, added after its `msl-*` class: style every part with Tailwind or other utility CSS.
    * State is in attributes: options have `aria-selected`, `aria-disabled` and `data-focused` (the keyboard highlight),
    * submenu titles (options too) and collapsible group titles `aria-expanded` and `data-focused`,
-   * the open control `data-open` and, opening upward, `data-up`, the wrapper `data-disabled`.
+   * the open control `data-open` and, opening upward, `data-up`, the wrapper `data-disabled`, a fixed value's chip `data-fixed`.
    * What closes has `data-closing` until the CSS animations and transitions that starts end: the control,
    * still `data-open`, a closed submenu's inert copy, and the inert copy of a collapsed group's rows
    */
@@ -73,7 +80,7 @@ declare namespace MultiSelect {
     search?: string
     /** `msl-single-value`: the value with `singleSelect`, or the count with `disableChip` */
     singleValue?: string
-    /** `msl-chip`, default chips only */
+    /** `msl-chip`, default chips only. A `fixed` value's has `data-fixed` and no delete button */
     chip?: string
     /** `msl-chip-delete`, default chips only */
     chipDelete?: string
@@ -124,9 +131,11 @@ declare namespace MultiSelect {
           : Exclude<{ label: string; value: string }, T>)
     /** the select is disabled: take delete buttons out of the tab order */
     disabled: boolean
+    /** the option is `fixed`: render no delete button */
+    fixed: boolean
     /** the select's `classNames` (`{}` when unset) */
     classNames: MultiSelectClassNames
-    /** removes this value; does nothing while disabled */
+    /** removes this value; does nothing while disabled or fixed */
     onDelete: () => void
   }
 
@@ -174,7 +183,7 @@ declare namespace MultiSelect {
     T = MultiSelectOption,
     C extends boolean = boolean
   > {
-    /** any shape T, read by `getLabel` and `getValue`; its `disabled`, `style`, `classes` and `type` keep their meaning */
+    /** any shape T, read by `getLabel` and `getValue`; its `disabled`, `fixed`, `style`, `classes` and `type` keep their meaning */
     options?: ReadonlyArray<T | MultiSelectGroup<T>>
     /**
      * initial selection, as option values. Later changes are ignored: use `value`, or a new `key` to reset.
@@ -275,7 +284,7 @@ declare namespace MultiSelect {
     searchInMenu?: boolean
     /** the search field's placeholder with `searchInMenu`. Default: `'Search...'` */
     searchPlaceholder?: string
-    /** Backspace in the empty search field removes the last chip. Default: `true`; `false` leaves the chip delete buttons */
+    /** Backspace in the empty search field removes the last chip that isn't `fixed`. Default: `true`; `false` leaves the chip delete buttons */
     deleteOnBackspace?: boolean
     /**
      * renders the open list's rows yourself, e.g. through the virtual list library of your choice for long lists:
@@ -295,7 +304,7 @@ declare namespace MultiSelect {
     ) => React.ReactNode
     onMenuOpen?: () => void
     onMenuClose?: () => void
-    /** after the clear button empties the value */
+    /** after the clear button empties the value, but for `fixed` values. It shows only while there is one to remove */
     onClear?: () => void
   }
 }
