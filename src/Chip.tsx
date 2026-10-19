@@ -7,12 +7,14 @@ export default function Chip({
   label,
   option,
   disabled,
+  fixed,
   classNames,
   onDelete
 }: {
   label: ReactNode
   option: { label?: unknown }
   disabled: boolean
+  fixed: boolean
   classNames: MultiSelectClassNames
   onDelete: () => void
 }) {
@@ -21,24 +23,29 @@ export default function Chip({
     (x) => typeof x === 'string' || typeof x === 'number'
   )
   return (
-    <div className={`msl-chip ${classNames.chip ?? ''}`}>
+    <div
+      data-fixed={fixed || undefined}
+      className={`msl-chip ${classNames.chip ?? ''}`}
+    >
       {label}
-      <div
-        role='button'
-        aria-label={text === undefined ? 'Remove' : `Remove ${text}`}
-        aria-disabled={disabled}
-        onClick={onDelete}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            onDelete()
-          }
-        }}
-        tabIndex={disabled ? -1 : 0}
-        className={`msl-btn msl-chip-delete ${classNames.chipDelete ?? ''}`}
-      >
-        <CloseIcon />
-      </div>
+      {!fixed && (
+        <div
+          role='button'
+          aria-label={text === undefined ? 'Remove' : `Remove ${text}`}
+          aria-disabled={disabled}
+          onClick={onDelete}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              onDelete()
+            }
+          }}
+          tabIndex={disabled ? -1 : 0}
+          className={`msl-btn msl-chip-delete ${classNames.chipDelete ?? ''}`}
+        >
+          <CloseIcon />
+        </div>
+      )}
     </div>
   )
 }

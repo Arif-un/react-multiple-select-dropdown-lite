@@ -428,14 +428,23 @@ function MultiSelect({
   // valueOf once per selected value: Options asks this twice for every option
   const selected = new Set(value.map(valueOf))
   const checkValueExist = (opt: MultiSelectOption) => selected.has(valueOf(opt))
-  // past the limit, unselected options show and announce as disabled. Single select replaces its value, so never
-  const full = !singleSelect && value.length >= max
+  // selected fixed values: no chip delete, Backspace, clear or pick removes them
+  const kept = value.filter((opt) => opt.fixed)
+  // by value, as the chips read it: a repeated value's other rows stay in step
+  const keptVals = new Set(kept.map(valueOf))
+  // past the limit, unselected options show and announce as disabled. Single select replaces its value, so only
+  // once that is fixed
+  const full = singleSelect ? kept.length > 0 : value.length >= max
+  // nothing changes these: a disabled option, a selected fixed one
+  const stuck = (opt: MultiSelectOption) =>
+    !!opt.disabled || keptVals.has(valueOf(opt))
   const isDisabled = (opt: MultiSelectOption) =>
-    !!opt.disabled || (full && !checkValueExist(opt))
+    stuck(opt) || (full && !checkValueExist(opt))
   // titles are never disabled
   const live = (r: Row) => isGroup(r.opt) || !isDisabled(r.opt)
 
   const addValue = (newValObj: MultiSelectOption) => {
+    if (stuck(newValObj)) return
     // past the limit an unselected pick only calls onChange, the value as it is: no Create, the search and menu stay
     if (full && !checkValueExist(newValObj)) return setNewValue(value)
     // picking Create (click, Enter or comma) adds the typed text as an option
@@ -470,7 +479,7 @@ function MultiSelect({
   const clearByUser = () => {
     // without the stylesheet's pointer-events: none it is still clickable
     if (disabled) return
-    setNewValue([])
+    setNewValue(kept)
     onClear()
   }
 
@@ -626,7 +635,7 @@ function MultiSelect({
     )
       return
     // the first result a click could pick. Closing, none: that search goes with the menu
-    const first = !closing && found?.find((opt) => !opt.disabled)
+    const first = !closing && found?.find((opt) => !stuck(opt))
     // into a submenu toward its side, as the stylesheet places it: left where its :dir(rtl) matches (a dir attribute,
     // not CSS direction). In :is(), which drops it where unknown (before Chrome 120, as the stylesheet does) rather than throw
     const [into, out] = e.currentTarget.matches(':is(:dir(rtl))')
@@ -653,11 +662,10 @@ function MultiSelect({
       openMenu(e)
       addValue(first)
     } else if (key === 'Backspace' && target === inputFld.current && !query) {
-      // chips only: with searchInMenu the field is there next to a single value or count too
-      deleteOnBackspace &&
-        chips &&
-        value.length &&
-        deleteValue(value[value.length - 1])
+      // chips only: with searchInMenu the field is there next to a single value or count too.
+      // The last that isn't fixed
+      const last = value.filter((opt) => !opt.fixed).at(-1)
+      deleteOnBackspace && chips && last && deleteValue(last)
     } else if (
       /^Arrow(Down|Up)$/.test(key) ||
       // with search text, Home/End move the caret
@@ -688,7 +696,9 @@ function MultiSelect({
     'aria-controls': menuOpen ? listId : undefined,
     'aria-activedescendant':
       activeIdx < 0 ? undefined : `${listId}-${activeIdx}`,
-    'aria-disabled': disabled
+    'aria-disabled': disabled,
+    // a fixed single value: no option in the menu can change it
+    'aria-readonly': (singleSelect && full) || undefined
   } as const
 
   const search = showSearch && (
@@ -774,7 +784,7 @@ function MultiSelect({
       data-disabled={disabled || undefined}
       style={style}
       className={`msl-wrp msl-vars ${className || ''} ${disabled ? 'msl-disabled' : ''}${
-        full ? ' msl-limit-reached' : ''
+        full && !singleSelect ? ' msl-limit-reached' : ''
       }`}
     >
       <input name={name} type='hidden' value={value.map(valueOf).join(',')} />
@@ -799,10 +809,11 @@ function MultiSelect({
                       value: valueOf(val),
                       option: val,
                       disabled,
+                      fixed: !!val.fixed,
                       classNames: cn,
                       onDelete: () => {
-                        // a custom chip may stay tabbable while disabled
-                        if (disabled) return
+                        // a custom chip may stay tabbable while disabled, or keep its delete when fixed
+                        if (disabled || val.fixed) return
                         // before the delete: an onChange that flushes sync unmounts the chip right away
                         lost.current = keyboardFocus()
                         deleteValue(val)
@@ -838,7 +849,7 @@ function MultiSelect({
           </div>
           {(clearable || downArrow) && (
             <div className={`msl-actions ${cn.actions ?? ''}`}>
-              {clearable && value.length > 0 && (
+              {clearable && value.length > kept.length && (
                 <div
                   role='button'
                   // it stops the menu from opening

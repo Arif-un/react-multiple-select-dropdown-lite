@@ -16,6 +16,7 @@
 
   /* chips and buttons */
   --msl-chip-background: rgb(238 238 238);
+  --msl-chip-fixed-background: var(--msl-chip-background);
   --msl-chip-delete-background: transparent;
   --msl-chip-delete-color: rgb(0 0 0 / 0.6);
   --msl-button-hover-background: lightgray;
@@ -121,6 +122,11 @@
   font-size: var(--msl-font-size);
   white-space: break-spaces;
   line-break: anywhere;
+
+  &:where([data-fixed]) {
+    padding-inline-end: 6px;
+    background: var(--msl-chip-fixed-background);
+  }
 }
 
 .msl-btn {

@@ -446,10 +446,8 @@ function Options({
           const off = isDisabled(opt)
           return (
             <div
-              {...row(idx, () => {
-                // opt.disabled, not off: past the limit a pick still calls onChange, the value unchanged
-                !opt.disabled && addValue(opt)
-              })}
+              // off or not: addValue skips disabled and fixed ones, and past the limit a pick still calls onChange
+              {...row(idx, () => addValue(opt))}
               aria-selected={checkValueExist(opt)}
               aria-disabled={off}
               key={`${i}-${valueOf(opt)}`}
