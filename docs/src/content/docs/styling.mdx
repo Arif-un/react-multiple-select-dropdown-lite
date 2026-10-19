@@ -39,6 +39,7 @@ The defaults live on `.msl-vars`, the wrapper of every dropdown. Override them o
 | `--msl-hover-border-color`       | `rgb(80 80 80)`                | border on hover                               |
 | `--msl-disabled-background`      | `rgb(246 246 246)`             | background when `disabled`                    |
 | `--msl-chip-background`          | `rgb(238 238 238)`             | chip                                          |
+| `--msl-chip-fixed-background`    | `var(--msl-chip-background)`   | chip of a `fixed` value                       |
 | `--msl-chip-delete-background`   | `transparent`                  | chip delete button                            |
 | `--msl-chip-delete-color`        | `rgb(0 0 0 / 0.6)`             | chip delete icon                              |
 | `--msl-button-hover-background`  | `lightgray`                    | clear, arrow and chip delete buttons on hover |
@@ -90,7 +91,7 @@ State classes:
 | `msl-option-focused`           | option  | highlighted by the keyboard           |
 | `msl-option-disable`           | option  | disabled                              |
 
-Parts: `msl-wrp` (wrapper), `msl` (input box, and the open menu), `msl-chip`, `msl-chip-delete`, `msl-single-value`, `msl-input`, `msl-search` (the search field's box with `searchInMenu`), `msl-clear-btn`, `msl-arrow-btn`, `msl-options` (menu), `msl-option`, `msl-grp` (a group), `msl-grp-title`, `msl-grp-body` (a collapsible group's childs), `msl-submenu` (a submenu's popover), `msl-expand-icn` (the icon after a title that opens).
+Parts: `msl-wrp` (wrapper), `msl` (input box, and the open menu), `msl-chip`, `msl-chip-delete`, `msl-single-value`, `msl-input`, `msl-search` (the search field's box with `searchInMenu`), `msl-clear-btn`, `msl-arrow-btn`, `msl-options` (menu), `msl-option`, `msl-grp` (a group), `msl-grp-title`, `msl-grp-body` (a collapsible group's childs), `msl-submenu` (a submenu's popover), `msl-expand-icn` (the icon after a title that opens). A `fixed` value's chip has `data-fixed` and no delete button.
 
 Where the browser has CSS anchor positioning, a submenu shows in the top layer. Elsewhere it opens under its title, in the menu, with the same look. Right to left (a `dir="rtl"` attribute, which the stylesheet reads with `:dir()`, not CSS `direction` alone), it opens on the left, and Arrow Left and Right swap. The stylesheet places it with [CSS anchor positioning](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_anchor_positioning): beside its title, on the other side or above where there is no room, and over its title where neither side has room. Its title is its `position-anchor`, so your own `.msl-submenu` rules can place it elsewhere with another `position-area`, or with `anchor()` insets and `position-area: none`. Submenu titles and collapsible group titles have `aria-expanded`, and end with an icon: see [Expand icons](#expand-icons).
 

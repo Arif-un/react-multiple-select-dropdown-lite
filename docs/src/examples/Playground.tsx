@@ -15,6 +15,7 @@ const fruits = [
   { label: 'Banana', value: 'banana' },
   { label: 'Cherry', value: 'cherry' },
   { label: 'Dragon fruit (out of season)', value: 'dragon', disabled: true },
+  { label: 'Kiwi (fixed)', value: 'kiwi', fixed: true },
   { label: 'Mango', value: 'mango' },
   { label: 'Orange', value: 'orange' }
 ]
@@ -116,9 +117,10 @@ const sets: Record<
   }
 > = {
   fruits: {
-    label: 'Flat, one disabled',
+    label: 'Flat, one disabled, one fixed',
     options: fruits,
-    defaultValue: ['apple', 'banana']
+    // the fixed one last: single select keeps the first
+    defaultValue: ['apple', 'banana', 'kiwi']
   },
   groups: {
     label: 'Nested and collapsible groups',
@@ -255,37 +257,42 @@ const variants = {
 const initial = { ...flags, ...texts, ...variants }
 type State = typeof initial
 
-// a JSX label (the statuses) names the button by its value
+// a JSX label (the statuses) names the button by its value. A fixed value gets none
 const chip: MultiSelectProps['customChip'] = ({
   label,
   value,
   disabled,
+  fixed,
   onDelete
 }) => (
   <span className='pg-chip'>
     {label}
-    <button
-      type='button'
-      aria-label={`Remove ${typeof label == 'string' ? label : value}`}
-      disabled={disabled}
-      onClick={onDelete}
-    >
-      ×
-    </button>
+    {!fixed && (
+      <button
+        type='button'
+        aria-label={`Remove ${typeof label == 'string' ? label : value}`}
+        disabled={disabled}
+        onClick={onDelete}
+      >
+        ×
+      </button>
+    )}
   </span>
 )
 const chipCode = [
-  'customChip={({ label, value, disabled, onDelete }) => (',
+  'customChip={({ label, value, disabled, fixed, onDelete }) => (',
   "  <span className='pg-chip'>",
   '    {label}',
-  '    <button',
-  "      type='button'",
-  "      aria-label={`Remove ${typeof label == 'string' ? label : value}`}",
-  '      disabled={disabled}',
-  '      onClick={onDelete}',
-  '    >',
-  '      ×',
-  '    </button>',
+  '    {!fixed && (',
+  '      <button',
+  "        type='button'",
+  "        aria-label={`Remove ${typeof label == 'string' ? label : value}`}",
+  '        disabled={disabled}',
+  '        onClick={onDelete}',
+  '      >',
+  '        ×',
+  '      </button>',
+  '    )}',
   '  </span>',
   ')}'
 ]
