@@ -176,6 +176,18 @@ it("a fixed value's chip: no delete button, as much padding at its end, its own 
   expect(css(chip).backgroundColor).toBe(color('rgb(1 2 3)'))
 })
 
+it("maxChips' chip of the rest: as much padding at its end, the chip's background", async () => {
+  const { q, root } = await setup({
+    maxChips: 1,
+    defaultValue: ['apple', 'banana']
+  })
+  const more = q('.msl-chip[data-more]')
+  expect(more.textContent).toBe('+1')
+  expect(css(more).paddingInlineEnd).toBe('6px')
+  root.style.setProperty('--msl-chip-fixed-background', 'rgb(1 2 3)')
+  expect(css(more).backgroundColor).toBe(color('--msl-chip-background'))
+})
+
 it('the single value stays on one line', async () => {
   const { q } = await setup({ singleSelect: true, defaultValue: ['apple'] })
   const el = q('.msl-single-value')
@@ -256,6 +268,18 @@ it('searchInMenu: the field gets the divider, below the values or above them ope
   const search = box()!.querySelector('.msl-search')!
   expect(css(search).borderBottomWidth).toBe('1px')
   expect(css(search).borderTopWidth).toBe('0px')
+})
+
+it('menuHeader and menuFooter span the open box, as the options do', async () => {
+  const { root, q } = await setup({ menuHeader: 'Head', menuFooter: 'Foot' })
+  await userEvent.click(root)
+  for (const el of [q('.msl-menu-header'), q('.msl-menu-footer')]) {
+    expect(css(el).gridColumnStart).toBe('1')
+    expect(css(el).gridColumnEnd).toBe('-1')
+    expect(el.getBoundingClientRect().width).toBeCloseTo(
+      q('.msl-options').getBoundingClientRect().width
+    )
+  }
 })
 
 it('the keyboard highlight, and focus rings where focus is visible', async () => {

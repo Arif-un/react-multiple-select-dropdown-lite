@@ -1,7 +1,7 @@
 // Real-browser characterization tests: layout, CSS, focus and typing that jsdom fakes.
 // Like test/MultiSelect.test.tsx, "current behavior: ..." pins known quirks.
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { Suspense, useEffect, useRef } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { List, useListCallbackRef } from 'react-window'
 import type { RowComponentProps } from 'react-window'
 import { describe, expect, it, vi } from 'vitest'
@@ -9,6 +9,8 @@ import { server, userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 import type {
   MultiSelectListProps,
+  MultiSelectLoadRequest,
+  MultiSelectMenuProps,
   MultiSelectOption,
   MultiSelectProps
 } from '../../src/index'
@@ -1869,6 +1871,24 @@ describe.each([
       }
     ))
 
+  it("loadOptions: the next part loads as the scroller reaches the list's end", async () => {
+    const api = paged(50)
+    const { root, visibleOptions } = await setup({
+      options: undefined,
+      loadOptions: api,
+      renderList
+    })
+    await userEvent.click(root)
+    await expect.poll(() => visibleOptions()[0]).toBe('Item 0')
+    expect(api).toHaveBeenCalledTimes(1)
+    scroller().scrollTop = 36 * 60
+    await expect.poll(() => api.mock.calls.length).toBe(2)
+    expect(api.mock.lastCall![0].next).toBe(50)
+    await expect.poll(() => scroller().scrollHeight).toBeGreaterThan(36 * 99)
+    scroller().scrollTop = 36 * 99
+    await expect.poll(() => visibleOptions()).toContain('Item 99')
+  })
+
   it('Tab closes the menu and moves on in page order, from the search field or a clicked option', async () => {
     const { root, after, menuHeight } = await setup({
       options: long,
@@ -1890,5 +1910,583 @@ describe.each([
     await userEvent.tab()
     await expect.poll(other.menuHeight).toBe(0)
     expect(document.activeElement).toBe(other.after)
+  })
+})
+
+// a paged API over `long`, `per` options a part, after `wait` ms: `next` the offset of the next part
+const paged = (per: number, wait = 20) =>
+  vi.fn(async ({ search, next = 0, signal }: MultiSelectLoadRequest) => {
+    await new Promise((r) => setTimeout(r, wait))
+    signal.throwIfAborted()
+    const hits = long.filter((o) => o.label.includes(search))
+    const end = next + per
+    return { options: hits.slice(next, end), next: end < hits.length && end }
+  })
+
+describe('async loading', () => {
+  // the row at a list's end, while it loads or has more
+  const end = () => box()!.querySelector<HTMLElement>('.msl-loading')
+  // the bottom of el in view, in the menu's box or a submenu
+  const bottom = (el: HTMLElement) => {
+    el.scrollTop = el.scrollHeight
+  }
+
+  it("loads as the menu opens, then each part as the list's end scrolls into view", async () => {
+    const api = paged(50)
+    const { root, q, visibleOptions } = await setup({
+      options: undefined,
+      loadOptions: api
+    })
+    await userEvent.click(root)
+    await expect.poll(() => visibleOptions()[0]).toBe('Item 0')
+    // the end row is out of view below 50 options: no second load
+    expect(end()!.textContent).toBe('Loading...')
+    expect(api).toHaveBeenCalledTimes(1)
+    bottom(q('.msl-options'))
+    await expect.poll(() => visibleOptions()).toContain('Item 99')
+    bottom(q('.msl-options'))
+    await expect.poll(() => visibleOptions()).toContain('Item 149')
+    expect(api.mock.calls.map(([r]) => r.next)).toEqual([undefined, 50, 100])
+  })
+
+  it('short parts load on while the end stays in view, until they fill the menu', async () => {
+    const api = paged(3)
+    const { root, q, visibleOptions } = await setup({
+      options: undefined,
+      loadOptions: api
+    })
+    await userEvent.click(root)
+    const menu = q('.msl-options')
+    // filled: the end below the menu's bottom
+    await expect
+      .poll(
+        () =>
+          !!end() &&
+          end()!.getBoundingClientRect().top >
+            menu.getBoundingClientRect().bottom
+      )
+      .toBe(true)
+    const calls = api.mock.calls.length
+    expect(calls).toBeGreaterThan(2)
+    expect(visibleOptions().length).toBeLessThan(30)
+    await new Promise((r) => setTimeout(r, 100))
+    expect(api).toHaveBeenCalledTimes(calls)
+  })
+
+  it('typing aborts the loads of the texts before it; the last one shows', async () => {
+    const api = paged(50, 300)
+    const { root, input, visibleOptions } = await setup({
+      options: undefined,
+      loadOptions: api
+    })
+    await userEvent.click(root)
+    await userEvent.type(input(), 'Item 199')
+    await expect
+      .poll(visibleOptions)
+      .toEqual([
+        'Item 199',
+        ...Array.from({ length: 10 }, (_, i) => `Item 199${i}`)
+      ])
+    const signals = api.mock.calls.map(([r]) => r.signal)
+    expect(signals.slice(0, -1).every((s) => s.aborted)).toBe(true)
+    expect(signals.at(-1)!.aborted).toBe(false)
+  })
+
+  it('a submenu loads its childs as it opens, and on as its end scrolls into view', async () => {
+    const api = paged(30)
+    const { root, option, visibleOptions } = await setup({
+      options: [{ type: 'submenu', title: 'More', childs: api }, ...opts]
+    })
+    await userEvent.click(root)
+    await userEvent.click(option('More'))
+    await expect.poll(() => visibleOptions()).toContain('Item 29')
+    const sub = box()!.querySelector<HTMLElement>('.msl-submenu')!
+    expect(sub.scrollHeight).toBeGreaterThan(sub.clientHeight)
+    bottom(sub)
+    await expect.poll(() => visibleOptions()).toContain('Item 59')
+    expect(api.mock.calls.map(([r]) => r.next)).toEqual([undefined, 30])
+  })
+
+  it("a collapsible group loads as it opens; its end in the menu's scroll loads the next part", async () => {
+    const api = paged(30)
+    const { root, q, visibleOptions } = await setup({
+      options: [
+        {
+          type: 'group',
+          title: 'Items',
+          collapsible: true,
+          collapsed: true,
+          childs: api
+        },
+        ...opts
+      ]
+    })
+    await userEvent.click(root)
+    expect(api).not.toHaveBeenCalled()
+    await userEvent.click(q('.msl-grp-title'))
+    await expect.poll(() => visibleOptions()).toContain('Item 29')
+    end()!.scrollIntoView()
+    await expect.poll(() => visibleOptions()).toContain('Item 59')
+    // in the group, before the options after it
+    expect(visibleOptions().indexOf('Item 59')).toBeLessThan(
+      visibleOptions().indexOf('Apple')
+    )
+  })
+})
+
+// a data layer of your own, as React Query's: a search's pages of `per`, 20 ms each. Page `fail` fails once
+function Remote({
+  per,
+  fail = -1,
+  calls
+}: {
+  per: number
+  fail?: number
+  calls: (search: string, page: number) => void
+}) {
+  const [search, setSearch] = useState('')
+  const [pages, setPages] = useState<MultiSelectOption[][]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const failed = useRef(false)
+  // the latest request: a later one drops what an earlier one returns
+  const asked = useRef(0)
+  const fetchPage = (s: string, page: number) => {
+    const me = ++asked.current
+    calls(s, page)
+    setLoading(true)
+    setTimeout(() => {
+      if (me !== asked.current) return
+      setLoading(false)
+      if (page === fail && !failed.current) {
+        failed.current = true
+        return setError(true)
+      }
+      setError(false)
+      const hits = long.filter((o) => o.label.includes(s))
+      setPages((p) => [
+        ...(page ? p : []),
+        hits.slice(page * per, (page + 1) * per)
+      ])
+    }, 20)
+  }
+  useEffect(() => fetchPage(search, 0), [search])
+  const options = pages.flat()
+  const total = long.filter((o) => o.label.includes(search)).length
+  return (
+    <MultiSelect
+      options={options}
+      onSearch={setSearch}
+      loading={loading}
+      loadError={error}
+      onLoadMore={
+        error || options.length < total
+          ? () => fetchPage(search, pages.length)
+          : undefined
+      }
+    />
+  )
+}
+
+describe('your own loading', () => {
+  const end = () => box()!.querySelector<HTMLElement>('.msl-loading')
+  const shown = () =>
+    [...(box()?.querySelectorAll('.msl-option') ?? [])].map(
+      (el) => el.textContent
+    )
+  const menu = () => box()!.querySelector<HTMLElement>('.msl-options')!
+  const bottom = () => {
+    menu().scrollTop = menu().scrollHeight
+  }
+  const open = async (props: { per: number; fail?: number }) => {
+    const calls = vi.fn()
+    const screen = await render(<Remote {...props} calls={calls} />)
+    await userEvent.click(screen.container.querySelector('.msl-wrp')!)
+    return {
+      calls,
+      input: () => screen.container.querySelector('input.msl-input')!
+    }
+  }
+
+  it('the next page loads as the end scrolls into view; a search starts over', async () => {
+    const { calls, input } = await open({ per: 50 })
+    await expect.poll(() => shown()[0]).toBe('Item 0')
+    expect(end()!.textContent).toBe('Loading...')
+    expect(calls.mock.calls).toEqual([['', 0]])
+    bottom()
+    await expect.poll(shown).toContain('Item 99')
+    expect(calls.mock.calls).toEqual([
+      ['', 0],
+      ['', 1]
+    ])
+    await userEvent.type(input(), 'Item 19')
+    await expect
+      .poll(() => shown().slice(0, 2))
+      .toEqual(['Item 19', 'Item 190'])
+    // from its first page: the menu still scrolled down, its end may load the next one too
+    expect(calls).toHaveBeenCalledWith('Item 19', 0)
+    expect(calls).not.toHaveBeenCalledWith('Item 19', 2)
+  })
+
+  it('short pages load on while the end stays in view, until they fill the menu', async () => {
+    const { calls } = await open({ per: 3 })
+    await expect
+      .poll(
+        () =>
+          !!end() &&
+          end()!.getBoundingClientRect().top >
+            menu().getBoundingClientRect().bottom
+      )
+      .toBe(true)
+    const n = calls.mock.calls.length
+    expect(n).toBeGreaterThan(2)
+    await new Promise((r) => setTimeout(r, 100))
+    expect(calls).toHaveBeenCalledTimes(n)
+  })
+
+  it('a failed page shows errorLabel and loads no more by itself; a click loads it again', async () => {
+    const { calls } = await open({ per: 50, fail: 1 })
+    await expect.poll(() => shown()[0]).toBe('Item 0')
+    bottom()
+    await expect.poll(() => end()?.textContent).toBe('Failed to load. Retry')
+    expect(end()!.hasAttribute('data-error')).toBe(true)
+    await new Promise((r) => setTimeout(r, 100))
+    expect(calls).toHaveBeenCalledTimes(2)
+    await userEvent.click(end()!)
+    await expect.poll(shown).toContain('Item 99')
+    expect(calls).toHaveBeenLastCalledWith('', 1)
+  })
+})
+
+// an accordion of childs you load, and a submenu's loader, each ending in a Load more button
+function Buttons({ calls }: { calls: (what: string) => void }) {
+  const [n, setN] = useState(2)
+  return (
+    <MultiSelect
+      loadMoreLabel='Load more'
+      options={[
+        {
+          type: 'group',
+          title: 'Accordion',
+          collapsible: true,
+          collapsed: true,
+          childs: long.slice(0, n),
+          onLoadMore:
+            n < 4
+              ? () => {
+                  calls('accordion')
+                  setN(n + 2)
+                }
+              : undefined
+        },
+        {
+          type: 'submenu',
+          title: 'Submenu',
+          childs: async ({ next = 0 }) => {
+            calls(`submenu ${next}`)
+            const at = 100 + (next as number) * 2
+            return {
+              options: long.slice(at, at + 2),
+              next: next ? undefined : 1
+            }
+          }
+        }
+      ]}
+    />
+  )
+}
+
+describe('load more buttons', () => {
+  const shown = () =>
+    [...(box()?.querySelectorAll('.msl-option') ?? [])].map(
+      (el) => el.textContent
+    )
+  const more = (s: string) =>
+    box()!.querySelector<HTMLElement>(`${s} [data-more]`)!
+
+  it('an accordion and a submenu load their next part on a click, not as their end shows, and stay open', async () => {
+    const calls = vi.fn()
+    const screen = await render(<Buttons calls={calls} />)
+    await userEvent.click(screen.container.querySelector('.msl-wrp')!)
+    await userEvent.click(box()!.querySelector('.msl-grp-title')!)
+    await expect
+      .poll(shown)
+      .toEqual(['Item 0', 'Item 1', 'Load more', 'Submenu'])
+    expect(calls).not.toHaveBeenCalled()
+    await userEvent.click(more('.msl-grp-body'))
+    await expect.poll(shown).toContain('Item 3')
+    expect(shown()).not.toContain('Load more')
+    expect(calls.mock.calls).toEqual([['accordion']])
+    // the first part loads as the submenu opens
+    await userEvent.click(
+      [...box()!.querySelectorAll('.msl-option')].find(
+        (el) => el.textContent === 'Submenu'
+      )!
+    )
+    await expect.poll(shown).toContain('Item 101')
+    expect(more('.msl-submenu').textContent).toBe('Load more')
+    await new Promise((r) => setTimeout(r, 100))
+    expect(calls.mock.calls).toEqual([['accordion'], ['submenu 0']])
+    await userEvent.click(more('.msl-submenu'))
+    await expect.poll(shown).toContain('Item 103')
+    expect(calls.mock.calls).toEqual([
+      ['accordion'],
+      ['submenu 0'],
+      ['submenu 1']
+    ])
+    expect(box()!.querySelector('.msl-submenu [data-more]')).toBeNull()
+    expect(box()!.querySelector('.msl-submenu')).not.toBeNull()
+  })
+})
+
+// open and search yours: a pick keeps the search, a toggle outside opens it
+function Yours({ calls }: { calls: (e: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  return (
+    <>
+      <button onClick={() => setOpen(!open)}>toggle</button>
+      <MultiSelect
+        options={opts}
+        open={open}
+        onMenuOpen={() => {
+          calls('open')
+          setOpen(true)
+        }}
+        onMenuClose={() => {
+          calls('close')
+          setOpen(false)
+        }}
+        search={search}
+        onSearchChange={(text, reason) => reason !== 'pick' && setSearch(text)}
+      />
+    </>
+  )
+}
+
+describe('controlled open and search', () => {
+  const open = async () => {
+    const calls = vi.fn()
+    const screen = await render(<Yours calls={calls} />)
+    const c = screen.container
+    return {
+      calls,
+      root: c.querySelector<HTMLElement>('.msl-wrp')!,
+      toggle: c.querySelector('button')!,
+      input: () => c.querySelector<HTMLInputElement>('input.msl-input')!,
+      shown: () =>
+        [...(box()?.querySelectorAll('.msl-option') ?? [])].map(
+          (el) => el.textContent
+        )
+    }
+  }
+
+  it('a click opens it and focuses the field; typing searches; a pick keeps the search; Tab closes it and clears it', async () => {
+    const { calls, root, input, shown } = await open()
+    await userEvent.click(root)
+    expect(box()).not.toBeNull()
+    // in once your open has committed: an effect of the render it makes
+    await expect.poll(() => document.activeElement).toBe(input())
+    await userEvent.keyboard('an')
+    expect(shown()).toEqual(['Banana'])
+    await userEvent.keyboard('{ArrowDown}{Enter}')
+    expect(root.querySelector('.msl-chip')!.textContent).toBe('Banana')
+    expect(input().value).toBe('an')
+    expect(shown()).toEqual(['Banana'])
+    await userEvent.tab()
+    expect(box()).toBeNull()
+    expect(document.activeElement).toBe(root.querySelector('.msl-clear-btn'))
+    expect(input().value).toBe('')
+    expect(calls.mock.calls).toEqual([['open'], ['close']])
+  })
+
+  // as without open: yours opens it in an effect whose updates are sync, before the browser types the key
+  it.skipIf(server.browser === 'firefox')(
+    'the key on the wrapper that asks to open types into the search field',
+    async () => {
+      const { toggle, root, input, shown } = await open()
+      toggle.focus()
+      await userEvent.tab()
+      expect(document.activeElement).toBe(root)
+      await userEvent.keyboard('ch')
+      expect(box()).not.toBeNull()
+      expect(input().value).toBe('ch')
+      expect(shown()).toEqual(['Cherry'])
+    }
+  )
+
+  it('opened from outside, focus stays there; a click outside closes it', async () => {
+    const { calls, toggle, root } = await open()
+    await userEvent.click(toggle)
+    expect(box()).not.toBeNull()
+    expect(root.contains(document.activeElement)).toBe(false)
+    await userEvent.click(document.body)
+    expect(box()).toBeNull()
+    expect(calls.mock.calls).toEqual([['close']])
+  })
+})
+
+describe('loadAhead', () => {
+  // 50 options, then more
+  const open = async (loadAhead?: number) => {
+    const calls = vi.fn()
+    const screen = await render(
+      <MultiSelect
+        loadAhead={loadAhead}
+        // the next part never comes: its end row, and the box over it, stay
+        loadOptions={({ next = 0 }: MultiSelectLoadRequest) => {
+          calls(next)
+          return next
+            ? new Promise<never>(() => {})
+            : { options: long.slice(0, 50), next: 1 }
+        }}
+      />
+    )
+    await userEvent.click(screen.container.querySelector('.msl-wrp')!)
+    await expect
+      .poll(() => box()?.querySelector('.msl-option')?.textContent)
+      .toBe('Item 0')
+    return { calls, screen }
+  }
+
+  it('the next part loads while the end row is still that far out of view; the rows under its box take clicks', async () => {
+    const { calls, screen } = await open(3000)
+    await expect.poll(() => calls.mock.calls).toEqual([[0], [1]])
+    await userEvent.click(
+      [...box()!.querySelectorAll('.msl-option')].find(
+        (el) => el.textContent === 'Item 1'
+      )!
+    )
+    expect(
+      [...screen.container.querySelectorAll('.msl-chip')].map(
+        (el) => el.textContent
+      )
+    ).toEqual(['Item 1'])
+  })
+
+  it('without it, not until the end row comes into view', async () => {
+    const { calls } = await open()
+    await new Promise((r) => setTimeout(r, 100))
+    expect(calls).toHaveBeenCalledTimes(1)
+  })
+})
+
+it("Space on a checkbox in a collapsible group's title toggles it, focus staying; Enter leaves the group open", async () => {
+  const toggle = vi.fn()
+  const { root, after, focused } = await setup({
+    options: [{ type: 'group', title: 'G', collapsible: true, childs: opts }],
+    renderGroupTitle: ({ title }) => (
+      <>
+        <input
+          type='checkbox'
+          aria-label='All'
+          onClick={(e) => {
+            e.stopPropagation()
+            toggle()
+          }}
+        />
+        {title}
+      </>
+    )
+  })
+  await userEvent.click(root)
+  await userEvent.tab()
+  expect(focused()).toBe('')
+  await userEvent.keyboard(' ')
+  expect(toggle).toHaveBeenCalledOnce()
+  expect(focused()).toBe('')
+  expect(
+    box()!.querySelector<HTMLInputElement>('[aria-label="All"]')!.checked
+  ).toBe(true)
+  await userEvent.keyboard('{Enter}')
+  expect(
+    box()!.querySelector('.msl-grp-title')!.getAttribute('aria-expanded')
+  ).toBe('true')
+  await userEvent.tab()
+  expect(document.activeElement).toBe(after)
+})
+
+describe('menu header and footer', () => {
+  const many = Array.from({ length: 50 }, (_, i) => ({
+    label: `Option ${i}`,
+    value: `${i}`
+  }))
+  const parts = {
+    menuHeader: ({ selectAll }: MultiSelectMenuProps) => (
+      <button style={{ height: 30 }} onClick={selectAll}>
+        All
+      </button>
+    ),
+    menuFooter: <div style={{ height: 20 }}>Foot</div>
+  }
+
+  it('they sit around the options; the wrapper keeps its size, the options leave them room', async () => {
+    const { root, q, menuHeight, focused, chips } = await setup(
+      { options: many, ...parts },
+      { offsetTop: document.documentElement.clientHeight - 300 }
+    )
+    const closed = root.getBoundingClientRect()
+    const values = q('.msl-input-wrp').getBoundingClientRect()
+    await userEvent.click(root)
+    await expect.poll(menuHeight).toBeGreaterThan(0)
+    expect(box()!.className).toContain('msl-active')
+    expect(root.getBoundingClientRect()).toEqual(closed)
+    const head = q('.msl-menu-header').getBoundingClientRect()
+    const foot = q('.msl-menu-footer').getBoundingClientRect()
+    const list = q('.msl-options').getBoundingClientRect()
+    // as wide as the box, under the control
+    expect(head.width).toBeCloseTo(list.width)
+    expect(head.top).toBeCloseTo(values.bottom)
+    expect(foot.top).toBeCloseTo(list.bottom)
+    const room = document.documentElement.clientHeight - closed.bottom
+    expect(
+      parseFloat(getComputedStyle(q('.msl-options')).maxHeight)
+    ).toBeCloseTo(room - head.height - foot.height, 2)
+    // a click on its button keeps focus in the field
+    await userEvent.click(q('.msl-menu-header button'))
+    expect(focused()).toBe('search')
+    expect(chips()).toHaveLength(50)
+    expect(menuHeight()).toBeGreaterThan(0)
+  })
+
+  it('a field in the header takes clicks and typing; Tab steps from the search through the clear button to the header, then the footer', async () => {
+    const { root, q, focused, chips, menuHeight } = await setup({
+      defaultValue: ['apple'],
+      menuHeader: <input aria-label='filter' />,
+      menuFooter: <button>Done</button>
+    })
+    await userEvent.click(root)
+    const field = q('.msl-menu-header input') as HTMLInputElement
+    await userEvent.click(field)
+    await userEvent.keyboard('ab{Backspace}{Enter}')
+    expect(document.activeElement).toBe(field)
+    expect(field.value).toBe('a')
+    expect(chips()).toEqual(['Apple'])
+    expect(menuHeight()).toBeGreaterThan(0)
+    q('input.msl-input').focus()
+    await userEvent.tab()
+    expect(focused()).toBe('clear')
+    await userEvent.tab()
+    expect(document.activeElement).toBe(field)
+    await userEvent.tab()
+    expect(focused()).toBe('Done')
+    expect(menuHeight()).toBeGreaterThan(0)
+  })
+
+  it('opening upward: the footer above the control, which stays put', async () => {
+    const { root, q, menuHeight } = await setup(parts, {
+      offsetTop: window.innerHeight - 80
+    })
+    const closed = root.getBoundingClientRect()
+    const values = q('.msl-input-wrp').getBoundingClientRect()
+    await userEvent.click(root)
+    await expect.poll(menuHeight).toBeGreaterThan(0)
+    expect(box()!.className).toContain('msl-active-up')
+    expect(q('.msl-input-wrp').getBoundingClientRect()).toEqual(values)
+    expect(root.getBoundingClientRect()).toEqual(closed)
+    expect(q('.msl-menu-footer').getBoundingClientRect().bottom).toBeCloseTo(
+      values.top,
+      0
+    )
   })
 })
