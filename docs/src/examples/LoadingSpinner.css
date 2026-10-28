@@ -1,0 +1,31 @@
+/* a spinner before the end row's label while it loads: not after a failure, nor on a Load more button */
+.spinner .msl-loading:not([data-error], [data-more])::before,
+/* and in place of the arrow while any list loads, the menu open or closed */
+.spinner[data-loading] .msl-arrow-btn::before {
+  content: '';
+  display: inline-block;
+  width: 0.8em;
+  height: 0.8em;
+  margin-inline-end: 0.5em;
+  border: 2px solid currentColor;
+  border-inline-end-color: transparent;
+  border-radius: 50%;
+  vertical-align: -0.1em;
+  animation: msl-spin 0.8s linear infinite;
+}
+
+.spinner[data-loading] .msl-arrow-btn {
+  & > * {
+    display: none;
+  }
+
+  &::before {
+    margin: 0;
+  }
+}
+
+@keyframes msl-spin {
+  to {
+    rotate: 1turn;
+  }
+}

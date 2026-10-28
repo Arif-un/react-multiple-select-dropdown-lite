@@ -56,6 +56,7 @@
   display: grid;
   gap: 0.35rem;
   align-content: start;
+  min-width: 0;
   margin: 0;
   padding: 0;
   border: 0;
@@ -86,6 +87,7 @@
 .pg-field input,
 .pg-field select {
   min-width: 0;
+  width: 100%;
   padding: 0.25rem 0.4rem;
   border: 1px solid #c4c8d0;
   border-radius: 0.375rem;
@@ -149,6 +151,34 @@
   border: 0;
   border-radius: 999px;
   background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.pg-log {
+  white-space: pre-line;
+}
+/* the open and loadKey recipes' controls, over the dropdown */
+.playground-demo > .demo-row {
+  margin-bottom: 1rem;
+}
+.playground-demo.dark .demo-row button {
+  border-color: #3a4150;
+  background: #1f2430;
+}
+/* the menuHeader and menuFooter recipes' bar */
+.pg-bar {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+.pg-bar button {
+  padding: 2px 8px;
+  border: 1px solid #c4c8d0;
+  border-radius: 0.375rem;
+  background: transparent;
   color: inherit;
   font: inherit;
   cursor: pointer;

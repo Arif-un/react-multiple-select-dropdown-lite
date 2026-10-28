@@ -1,0 +1,252 @@
+---
+title: Async options
+description: Load options from a server, search there, load more as the list scrolls, and lazy load groups and submenus, by itself or through React Query, Apollo or SWR.
+---
+
+import Preview from '../../components/Preview.astro'
+import AsyncOptions from '../../examples/AsyncOptions'
+import asyncOptionsCode from '../../examples/AsyncOptions.tsx?raw'
+import LazyGroups from '../../examples/LazyGroups'
+import lazyGroupsCode from '../../examples/LazyGroups.tsx?raw'
+import LoadErrors from '../../examples/LoadErrors'
+import loadErrorsCode from '../../examples/LoadErrors.tsx?raw'
+import AsyncVirtual from '../../examples/AsyncVirtual'
+import asyncVirtualCode from '../../examples/AsyncVirtual.tsx?raw'
+import ReactQuery from '../../examples/ReactQuery'
+import LoadMore from '../../examples/LoadMore'
+import loadMoreCode from '../../examples/LoadMore.tsx?raw'
+import reactQueryCode from '../../examples/ReactQuery.tsx?raw'
+import DependentSelects from '../../examples/DependentSelects'
+import dependentSelectsCode from '../../examples/DependentSelects.tsx?raw'
+import LoadAhead from '../../examples/LoadAhead'
+import loadAheadCode from '../../examples/LoadAhead.tsx?raw'
+import ShortSearches from '../../examples/ShortSearches'
+import shortSearchesCode from '../../examples/ShortSearches.tsx?raw'
+import ErrorRetry from '../../examples/ErrorRetry'
+import errorRetryCode from '../../examples/ErrorRetry.tsx?raw'
+import LoadingSpinner from '../../examples/LoadingSpinner'
+import loadingSpinnerCode from '../../examples/LoadingSpinner.tsx?raw'
+import loadingSpinnerCss from '../../examples/LoadingSpinner.css?raw'
+import { Code } from '@astrojs/starlight/components'
+
+There are two ways to load options:
+
+- **A loader** (`loadOptions`, or a group's `childs`): the dropdown calls it, searches and pages through it, and keeps each list for its life. No dependencies, nothing else to write.
+- **[Your own data layer](#your-own-data-layer-react-query-apollo-swr)** (React Query, Apollo, SWR, RTK Query): it loads, caches, refetches and invalidates as it does everywhere else in your app, and tells the dropdown with `loading`, `onLoadMore` and `loadError`; `onSearch` tells it the search text.
+
+A loader is a function that loads a list of options, a part at a time. Pass one as `loadOptions` for the menu, or as the `childs` of a group or a submenu. It gets `{ search, next, signal }` (`MultiSelectLoadRequest`) and returns the options, or a promise of them:
+
+- `search`: the search text, trimmed, commas removed. `''` without one.
+- `next`: what the list's last part came with, `undefined` for the first part.
+- `signal`: an `AbortSignal` for `fetch`, aborted once another search takes its place, or the dropdown unmounts.
+
+It returns, or resolves to, the options, or `{ options, next }` while there are more. A truthy `next` comes back in the call for the next part, so it can be a page number, an offset or a cursor. A loader can be async or not: one that throws, rejects or returns no options fails.
+
+## Server search and infinite scroll
+
+`loadOptions` loads the menu's list as the menu first opens, then each search text's list as it is typed: the dropdown filters nothing itself, and `filterOption` is unused. The next part loads as the list's end scrolls into view, or as Arrow Down passes it, until a part comes without `next`. The row at the end, `msl-loading`, shows `loadingLabel` meanwhile.
+
+<Preview code={asyncOptionsCode} title='AsyncOptions.tsx'>
+  <AsyncOptions client:visible />
+</Preview>
+
+With `loadOptions`, `options` are not listed: they name values the loads haven't, such as the selected ones before their list loads, in an edit form. The options loaded keep naming values too: pick one, search for something else, and its chip stays.
+
+### Waiting for typing to pause
+
+Each search text loads, and starts by aborting the load of the one before it. To skip the texts typed on the way, wait at the start of the loader, then check the signal: a later search has aborted it by then.
+
+```ts
+loadOptions={async ({ search, signal }) => {
+  await new Promise((r) => setTimeout(r, 300))
+  signal.throwIfAborted()
+  // ...
+}}
+```
+
+An aborted load counts for nothing: what it returns or throws is dropped, and its search loads again once typed again. A load of more parts that a search aborts keeps the parts loaded before it.
+
+### Loading again
+
+A list loads once, and stays for the life of the dropdown: closing and opening the menu, or typing a search again, shows it at once. To load afresh, as when another field changes what the options are, change `loadKey`: every loaded list goes, `loadOptions`' and groups' loaders', loads on the way stop, and the lists showing load again. The selection, the open menu and focus stay, and the dropped options keep naming the values picked from them. A new `key` resets everything, the selection too.
+
+Below, the cities load for the country picked. Cities picked in one country are no cities of the next, so changing the country clears them too: the dropdown keeps them otherwise.
+
+<Preview code={dependentSelectsCode} title='DependentSelects.tsx'>
+  <DependentSelects client:visible />
+</Preview>
+
+### Loading ahead
+
+`preload` loads `loadOptions`' first list before the menu first opens: on mount, and as `loadKey` changes, with `true`, or as the pointer enters the dropdown or focus arrives with `'intent'`. The menu then opens on it.
+
+`loadAhead` loads the next part that many px before the list's end comes into view, so scrolling seldom waits on it. The end row gets a box over it that much taller upward, with `pointer-events: none`, and the dropdown observes that box: it works in any scroller, a virtual list's too, and for every list, groups' loaders and `onLoadMore` as well. Not with a [Load more button](#show-some-load-more-on-a-click).
+
+<Preview code={loadAheadCode} title='LoadAhead.tsx'>
+  <LoadAhead client:visible />
+</Preview>
+
+### Short searches
+
+`emptyDataLabel` can be a function of the search text, for a loader that loads nothing until there are enough letters to search for:
+
+<Preview code={shortSearchesCode} title='ShortSearches.tsx'>
+  <ShortSearches client:visible />
+</Preview>
+
+## Your own data layer: React Query, Apollo, SWR
+
+A loader's lists stay for the life of the dropdown: your data layer's cache doesn't reach them once loaded, nor do its stale times and invalidations. To have it own the options, pass them as `options`, and tell the dropdown what it does:
+
+| Prop               |                                                                                                                                                                                                                                   |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `onSearch(search)` | The search text as it changes: trimmed, commas removed, `''` once cleared. The dropdown filters nothing then: `options` are the results.                                                                                          |
+| `loading`          | Options are on the way: the end row shows `loadingLabel`, the listbox has `aria-busy`.                                                                                                                                            |
+| `onLoadMore()`     | There are more: the end row calls it as it scrolls into view, as Arrow Down passes it, and again as `loading` ends with it still in view, so short pages fill the menu. Never while `loading`. Pass it only while there are more. |
+| `loadError`        | The last load failed: the error itself (`q.error`) or `true`. The end row shows `errorLabel`, which gets it, and calls `onLoadMore` on a click, Arrow Down past it, or the menu opening, not as it scrolls into view.             |
+
+<Preview code={reactQueryCode} title='ReactQuery.tsx'>
+  <ReactQuery client:visible />
+</Preview>
+
+With React Query, `onLoadMore` is `fetchNextPage` while there are more pages, and `refetch` once the first page failed. To wait for typing to pause, debounce the search before it goes in the query key.
+
+The options of every search keep naming their values after it moves on: pick someone, search for someone else, and their chip stays. A selected value that no search has listed yet, as in an edit form, needs its option: pass it as the value. `value` and `defaultValue` take options as well as values, and `onChange`'s second argument hands them back, as above.
+
+The same with Apollo Client, its cache merging the pages (`typePolicies: { Query: { fields: { people: relayStylePagination(['search']) } } }`):
+
+```tsx
+const PEOPLE = gql`
+  query People($search: String!, $after: String) {
+    people(search: $search, first: 20, after: $after) {
+      edges {
+        node {
+          id
+          name
+        }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+`
+
+function PeoplePicker() {
+  const [search, setSearch] = useState('')
+  const { data, loading, error, fetchMore, refetch } = useQuery(PEOPLE, {
+    variables: { search },
+    notifyOnNetworkStatusChange: true
+  })
+  const people = data?.people
+  return (
+    <MultiSelect
+      options={people?.edges.map((edge) => edge.node) ?? []}
+      getLabel={(person) => person.name}
+      getValue={(person) => person.id}
+      onSearch={setSearch}
+      loading={loading}
+      loadError={error}
+      onLoadMore={
+        people?.pageInfo.hasNextPage
+          ? () => fetchMore({ variables: { after: people.pageInfo.endCursor } })
+          : error
+            ? () => refetch()
+            : undefined
+      }
+    />
+  )
+}
+```
+
+And with SWR's `useSWRInfinite`:
+
+```tsx
+const { data, size, setSize, mutate, isValidating, error } = useSWRInfinite(
+  (i, last) =>
+    last && !last.hasMore ? null : `/api/people?q=${encodeURIComponent(search)}&page=${i + 1}`,
+  (url) => fetch(url).then((r) => r.json())
+)
+
+<MultiSelect
+  options={data?.flatMap((page) => page.people) ?? []}
+  onSearch={setSearch}
+  loading={isValidating}
+  loadError={error}
+  onLoadMore={
+    error
+      ? () => mutate()
+      : data?.at(-1)?.hasMore
+        ? () => setSize(size + 1)
+        : undefined
+  }
+/>
+```
+
+`loading`, `onLoadMore` and `loadError` work without `onSearch` too, for infinite scroll over options the dropdown searches itself. With `loadOptions` they are unused, and `onSearch` only tells.
+
+## Lazy groups and submenus
+
+A group's `childs` can be a loader too, or an array you load more of: see [load more on a click](#show-some-load-more-on-a-click). It loads them the first time they show: a collapsible group as its title opens it, a submenu as it opens, a plain group as the menu opens. They load in parts as their end scrolls into view, as the menu's do, and a loader's options can be groups and submenus with loaders of their own. Closing a group or a submenu doesn't stop its load: it is there the next time it opens.
+
+<Preview code={lazyGroupsCode} title='LazyGroups.tsx'>
+  <LazyGroups client:visible />
+</Preview>
+
+A group's list goes by its place in the options and its title. Search finds the options groups have loaded, not those of groups that haven't. Inside what `loadOptions` loaded, or in `options` with `onSearch`, a group's loader gets the search text as its `search`, so it can narrow its options too; elsewhere `search` is `''`.
+
+`renderGroupTitle` gets a copy of a group with a loader in it, its loaders' `childs` the options loaded so far, and counts those in `total` and `selected`.
+
+## Show some, load more on a click
+
+`loadMoreLabel` turns the end row into a button: a list with more to load ends in it, and it loads the next part on a click, or as Arrow Down passes it, not as it scrolls into view. It works for every list: `loadOptions`, `onLoadMore`, a group's loader and a group you load. A group's own `loadMoreLabel` labels its button.
+
+The options you have show at once, two ways:
+
+- **In your state.** `options` hold them, with `loading` and `onLoadMore` for more. A group takes the same `loading`, `onLoadMore` and `loadError` for an array of `childs`, so an accordion or a submenu of options you hold loads more of them too.
+- **In a loader.** It returns them as its first part, with no request, and fetches from the second: `childs: async ({ next, signal }) => next ? fetchPage(next, signal) : { options: first, next: 2 }`.
+
+<Preview code={loadMoreCode} title='LoadMore.tsx'>
+  <LoadMore client:visible />
+</Preview>
+
+While a part loads the row shows `loadingLabel`, after a failure `errorLabel`. A loader's first part loads as its list shows, button or not. The dropdown's own search hides a group's button, as it searches the options the group has; the end of `options` you load yourself stays after the results.
+
+## Errors
+
+A load that throws or rejects shows `errorLabel` in the end row, which gets `data-error`. It loads again on a click on that row, Arrow Down past it, or the list showing again (the menu, the group or the submenu opening). A failed part after others keeps them, and loads again from the same `next`.
+
+<Preview code={loadErrorsCode} title='LoadErrors.tsx'>
+  <LoadErrors client:visible />
+</Preview>
+
+A load that never settles shows `loadingLabel` for good: give your `fetch` a timeout, `AbortSignal.any([signal, AbortSignal.timeout(10_000)])`.
+
+`errorLabel` can be a function of what the load threw or rejected with, and a retry: show the server's message, and a button of your own. The row then doesn't load again on a click, so your button doesn't load twice; Arrow Down past it and the list showing again still do. A load that rejects with nothing gets `true`, one that returns no options a `TypeError`. With your own data layer it gets `loadError`, so pass the error itself: `loadError={q.error}`.
+
+<Preview code={errorRetryCode} title='ErrorRetry.tsx'>
+  <ErrorRetry client:visible />
+</Preview>
+
+## With renderList
+
+The end row is a row of the list, the last, so a [virtual list](../virtual-lists/) renders it as it scrolls there, and it loads the next part as it comes into view. `count` grows with each part.
+
+<Preview code={asyncVirtualCode} title='AsyncVirtual.tsx'>
+  <AsyncVirtual client:visible />
+</Preview>
+
+## Styling the end row
+
+The end row is `.msl-loading`, also `.msl-option.msl-option-disable` like an empty list's label, and `data-error` once its load failed. A Load more button is `.msl-loading[data-more]`, also `.msl-option` without `.msl-option-disable`, so it looks like an option and highlights on hover. With Tailwind, `classNames.loading` and the `data-error:` and `data-more:` variants. While `loadOptions` loads, or with `loading`, the listbox has `aria-busy`. While any list loads, a group's too, the wrapper has `data-loading`, the menu open or closed (Tailwind's `data-loading:` on the wrapper, `in-data-loading:` inside it). A spinner before the label, and in place of the arrow while anything loads: here `preload` loads on mount, the menu closed, and again with each `loadKey`.
+
+<Preview code={loadingSpinnerCode} title='LoadingSpinner.tsx'>
+  <LoadingSpinner client:visible />
+</Preview>
+
+<Code code={loadingSpinnerCss} lang='css' title='LoadingSpinner.css' />
+
+## Keyboard and screen readers
+
+The highlight passes the end row, a Load more button too: it is no option. Arrow Down past it loads the next part, or loads again after a failure, so the keyboard reaches every option without scrolling. While a submenu's options load, Arrow Right leaves the highlight on its title: once they are in, Arrow Right goes in. With `renderList`, options carry `aria-setsize="-1"`, an unknown size, while their list may have more.
