@@ -22,7 +22,7 @@ import Playground from '../../examples/Playground'
 
 ## Try it
 
-Toggle props on the left; the JSX updates to match. `renderList` renders through the lists of [virtual lists](virtual-lists/), `animated` adds the CSS of [the animations example](examples/#animations).
+Toggle props on the left; the JSX updates to match. `renderList` renders through the lists of [virtual lists](virtual-lists/), `animated` adds the CSS of [the animations example](examples/#animations). The Menu controls mark the search in labels, add a select all row, header and footer slots, group checkboxes and notes, open the menu from a button, and keep the search after a pick; Chips folds the rest into one chip past `maxChips`. The async sets load from a pretend server: the Server controls slow it down, fail its calls or shorten its pages, and the request log under the demo shows each load as it starts and ends, or is aborted. Type a `loadMoreLabel` to load the next part on a click instead of on scroll. The people set also preloads, waits for 2 letters, and reloads in place for a name filter (`loadKey`): the selection stays. With `customValue`, `onCreate` can save through the same server, and pasting `a, b, c` creates three.
 
 <div class='not-content'>
   <Playground client:load />
@@ -32,7 +32,7 @@ Toggle props on the left; the JSX updates to match. `renderList` renders through
 
 <CardGrid>
   <Card title='Lightweight' icon='rocket'>
-    About 7 kB gzipped. No dependencies besides React 18 or 19.
+    About 10 kB gzipped. No dependencies besides React 18 or 19.
   </Card>
   <Card title='Search and create' icon='magnifier'>
     Filter as you type, or let users add their own values with `customValue`.

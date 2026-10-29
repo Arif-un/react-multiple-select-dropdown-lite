@@ -35,27 +35,37 @@ Skip `dist/index.css` and pass Tailwind classes for each part through `className
 | `groupTitle`  | `msl-grp-title`; a collapsible group's has `aria-expanded`                           |
 | `groupIcon`   | `msl-expand-icn` after a collapsible group's title, around `groupIcon`               |
 | `groupBody`   | `msl-grp-body`: a collapsible group's childs, in one `<div>` (for height animations) |
+| `groupHeader` | `msl-grp-header`: a group's `header` row, also `msl-option msl-option-disable`       |
+| `groupFooter` | `msl-grp-footer`: a group's `footer` row, as `groupHeader`                           |
 | `option`      | `msl-option`, and a submenu's title, which has `aria-expanded`                       |
+| `selectAll`   | `msl-select-all`: the `selectAll` row, also `option`; `aria-selected` when it drops  |
 | `submenuIcon` | `msl-expand-icn` after a submenu's title, around `submenuIcon`                       |
 | `submenu`     | `msl-submenu`: a submenu's popover, placed beside its title by the stylesheet        |
 | `empty`       | `emptyDataLabel`, and an empty group's                                               |
+| `loading`     | `msl-loading`: the row at a list's end while it loads, or after it failed            |
+| `menuHeader`  | `msl-menu-header`: `menuHeader`'s box, before the listbox                            |
+| `menuFooter`  | `msl-menu-footer`: `menuFooter`'s box, after the listbox                             |
 
 ## State
 
 State is in attributes, so Tailwind's variants reach it:
 
-| Variant             | Matches                                                      |
-| ------------------- | ------------------------------------------------------------ |
-| `aria-selected:`    | a selected option                                            |
-| `aria-disabled:`    | a disabled option                                            |
-| `data-fixed:`       | a `fixed` value's chip (`chip`)                              |
-| `data-focused:`     | the option or title highlighted by the keyboard              |
-| `aria-expanded:`    | an open submenu's title, an expanded group's title           |
-| `data-open:`        | the open control; `in-data-open:` for parts inside it        |
-| `data-up:`          | the open control, opened upward                              |
-| `data-closing:`     | what is closing: the control, a submenu's copy               |
-| `in-data-closing:`  | parts inside it, the rows of a collapsing group too          |
-| `in-data-disabled:` | parts of a disabled select (the wrapper has `data-disabled`) |
+| Variant             | Matches                                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------------------ |
+| `aria-selected:`    | a selected option                                                                                |
+| `aria-disabled:`    | a disabled option                                                                                |
+| `data-error:`       | the row at a list's end once its load failed (`loading`)                                         |
+| `data-more:`        | the row at a list's end as a Load more button (`loading`), `maxChips`' chip of the rest (`chip`) |
+| `aria-busy:`        | the listbox while `loadOptions` loads (`menu`)                                                   |
+| `data-fixed:`       | a `fixed` value's chip (`chip`)                                                                  |
+| `data-focused:`     | the option or title highlighted by the keyboard                                                  |
+| `aria-expanded:`    | an open submenu's title, an expanded group's title                                               |
+| `data-open:`        | the open control; `in-data-open:` for parts inside it                                            |
+| `data-up:`          | the open control, opened upward                                                                  |
+| `data-closing:`     | what is closing: the control, a submenu's copy                                                   |
+| `in-data-closing:`  | parts inside it, the rows of a collapsing group too                                              |
+| `in-data-disabled:` | parts of a disabled select (the wrapper has `data-disabled`)                                     |
+| `data-loading:`     | the wrapper while a list loads; `in-data-loading:` for parts inside it                           |
 
 ## The open menu
 

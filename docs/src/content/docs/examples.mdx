@@ -22,22 +22,36 @@ import animatedCode from '../../examples/Animated.tsx?raw'
 import animatedCss from '../../examples/Animated.css?raw'
 import Creatable from '../../examples/Creatable'
 import creatableCode from '../../examples/Creatable.tsx?raw'
+import CreateAsync from '../../examples/CreateAsync'
+import createAsyncCode from '../../examples/CreateAsync.tsx?raw'
 import OptionObjects from '../../examples/OptionObjects'
 import optionObjectsCode from '../../examples/OptionObjects.tsx?raw'
 import Controlled from '../../examples/Controlled'
 import controlledCode from '../../examples/Controlled.tsx?raw'
+import ControlledMenu from '../../examples/ControlledMenu'
+import controlledMenuCode from '../../examples/ControlledMenu.tsx?raw'
 import Limit from '../../examples/Limit'
 import limitCode from '../../examples/Limit.tsx?raw'
 import Fixed from '../../examples/Fixed'
 import fixedCode from '../../examples/Fixed.tsx?raw'
+import SelectAll from '../../examples/SelectAll'
+import selectAllCode from '../../examples/SelectAll.tsx?raw'
 import SearchInMenu from '../../examples/SearchInMenu'
 import searchInMenuCode from '../../examples/SearchInMenu.tsx?raw'
+import MenuSlots from '../../examples/MenuSlots'
+import menuSlotsCode from '../../examples/MenuSlots.tsx?raw'
 import DeleteOnBackspace from '../../examples/DeleteOnBackspace'
 import deleteOnBackspaceCode from '../../examples/DeleteOnBackspace.tsx?raw'
 import DisableChip from '../../examples/DisableChip'
 import disableChipCode from '../../examples/DisableChip.tsx?raw'
+import MaxChips from '../../examples/MaxChips'
+import maxChipsCode from '../../examples/MaxChips.tsx?raw'
 import JsxLabels from '../../examples/JsxLabels'
 import jsxLabelsCode from '../../examples/JsxLabels.tsx?raw'
+import HideSelected from '../../examples/HideSelected'
+import hideSelectedCode from '../../examples/HideSelected.tsx?raw'
+import LabelMeta from '../../examples/LabelMeta'
+import labelMetaCode from '../../examples/LabelMeta.tsx?raw'
 import CustomIcons from '../../examples/CustomIcons'
 import customIconsCode from '../../examples/CustomIcons.tsx?raw'
 import Disabled from '../../examples/Disabled'
@@ -65,7 +79,7 @@ Every demo below runs the code under it.
 
 ## Groups
 
-Groups have `type: 'group'`, a `title` and `childs`, and can nest. Options themselves can't have `type: 'group'` or `type: 'submenu'`. `emptyDataLabel` shows when a group has no options. With `collapsible: true`, a click on the title (or Enter) shows and hides the group's options; `collapsed: true` starts it closed. Search looks inside groups, closed ones too.
+Groups have `type: 'group'`, a `title` and `childs`, and can nest. Options themselves can't have `type: 'group'` or `type: 'submenu'`. `emptyDataLabel` shows when a group has no options. With `collapsible: true`, a click on the title (or Enter) shows and hides the group's options; `collapsed: true` starts it closed. Search looks inside groups, closed ones too. `header` and `footer` go first and last in a group's rows, a submenu's popover or a collapsible group's body: text, not options, so the keyboard passes them and they have no role (controls go in [the menu's header and footer](#menu-header-and-footer)). Style them with `.msl-grp-header` and `.msl-grp-footer`.
 
 <Preview code={groupsCode} title='Groups.tsx'>
   <Groups client:visible />
@@ -113,6 +127,26 @@ renderGroupTitle={({ title, total, selected, open, group }) => (
 
 The stylesheet doesn't turn or mirror your icon, so it is up to you right to left.
 
+A group or a submenu carries your own fields, typed, for `renderGroupTitle` to read back, and its own `classes` and `style`, as an option does. They go on its title row; the rest of it is reachable from there: `.msl-grp:has(> .vip)` the group's box, `.vip + .msl-grp-body` a collapsible group's rows, `.vip + .msl-submenu` a submenu's popover.
+
+```jsx
+const options = [
+  { type: 'submenu', title: 'Team', icon: <UsersIcon />, classes: 'vip', childs: team },
+  { type: 'group', title: 'Archive', style: { opacity: 0.6 }, collapsible: true, childs: old }
+]
+
+<MultiSelect
+  options={options}
+  renderGroupTitle={({ group, title, icon }) => (
+    <>
+      {group.icon}
+      {title}
+      {icon}
+    </>
+  )}
+/>
+```
+
 ## Animations
 
 All in CSS: the open box grows to fit the options and shrinks back as they fade, submenus slide in and fade out, a collapsible group slides open and shut, and the chevrons turn. Whatever closes has `data-closing` until its exit transitions end. See [Animations](../styling/#animations) for how.
@@ -133,9 +167,19 @@ With `customValue`, typing text that matches no option offers **Create "..."**. 
   <Creatable client:visible />
 </Preview>
 
+`canCreate` says which text can be created: without it, no Create row, and Enter or comma creates nothing. `onCreate` makes the value: an option of your shape, named by your getters, or a value string, both listed under Custom Values until your `options` have them. `false` or nothing creates nothing, and the text stays. A promise, from a request say, shows `loadingLabel` in the Create row meanwhile (`aria-busy`, disabled, one call), then selects what it resolves to; a rejection shows `errorLabel` there (`data-error`), and a click creates again.
+
+<Preview code={createAsyncCode} title='CreateAsync.tsx'>
+  <CreateAsync client:visible />
+</Preview>
+
+Emails only here, and the pretend server fails for an address at `fail.com`. Paste `ada@example.com, new@example.com, x` to pick, create and leave each part.
+
+In multi select, pasting text with commas, tabs or newlines picks each part: the option whose label text or value it is, in any case, else with `customValue` one it creates, through `canCreate` and `onCreate`. Up to `limit`, in one `onChange`. What doesn't go in goes in the search field at the caret, the text there kept.
+
 ## Option objects
 
-Options can be any shape: `getLabel` and `getValue` read them. `onChange` gets the selected objects back as its second argument. Values created by `customValue` are always `{ label, value }`. The fields `disabled`, `style`, `classes` and `type` keep their meaning in any shape.
+Options can be any shape: `getLabel` and `getValue` read them. `onChange` gets the selected objects back as its second argument. Values created by `customValue` are `{ label, value }`, unless `onCreate` makes them. The fields `disabled`, `style`, `classes` and `type` keep their meaning in any shape.
 
 <Preview code={optionObjectsCode} title='OptionObjects.tsx'>
   <OptionObjects client:visible />
@@ -147,6 +191,16 @@ Pass `value` and update it from `onChange` to own the selection, for example to 
 
 <Preview code={controlledCode} title='Controlled.tsx'>
   <Controlled client:visible />
+</Preview>
+
+## Controlled menu and search
+
+`open` makes the menu yours: it shows exactly while `open` is true, and the dropdown's own opens and closes (a click, a key, Escape, a click outside, a pick with `closeOnSelect`) call `onMenuOpen` and `onMenuClose` for you to set it, or not. Opened from outside, as by a button of yours, focus stays where it is.
+
+`search` makes the search text yours. `onSearchChange(text, reason)` tells each change: `'input'` as typed or pasted, `'pick'` as a pick clears it, `'close'` as the menu closes. Filtering, `onSearch` and `loadOptions` follow the text the field shows, so ignoring `'pick'` keeps the search after a pick:
+
+<Preview code={controlledMenuCode} title='ControlledMenu.tsx'>
+  <ControlledMenu client:visible />
 </Preview>
 
 ## Limit
@@ -165,6 +219,18 @@ Pass `value` and update it from `onChange` to own the selection, for example to 
   <Fixed client:visible />
 </Preview>
 
+## Select all
+
+`selectAll` adds a first row that selects every enabled option the menu lists: a search's results only, those loaded so far, those in closed groups and submenus too, up to `limit`. Once none is left to pick, it has `aria-selected` and deselects them, `fixed` ones aside. The menu stays open, and the row hides while there is nothing to select. Multi select only; style it with `.msl-select-all`.
+
+`toggle` in [`renderGroupTitle`](#group-titles) does it for one group, its nested and loaded options too. Put a checkbox in a plain group's title only: a collapsible group's or a submenu's title is an option, which screen readers read as text, so the example shows a count there. `total` counts disabled options too, so a group with one never shows checked. Each is one `onChange`.
+
+<Preview code={selectAllCode} title='SelectAll.tsx'>
+  <SelectAll client:visible />
+</Preview>
+
+The Vegetables group's `footer` is a group footer: text after its options, which the keyboard passes. See [Groups](#groups).
+
 ## Search in the menu
 
 `searchInMenu` puts the search field at the top of the open menu. The closed control shows only the values, or `placeholder` when there are none, with no search placeholder next to the chips. `searchPlaceholder` labels the field. Single select and `disableChip` can then search with a value selected.
@@ -172,6 +238,16 @@ Pass `value` and update it from `onChange` to own the selection, for example to 
 <Preview code={searchInMenuCode} title='SearchInMenu.tsx'>
   <SearchInMenu client:visible />
 </Preview>
+
+## Menu header and footer
+
+`menuHeader` and `menuFooter` render around the list, outside the listbox, after the search field with `searchInMenu`: buttons, a field, a count. Their clicks don't close the menu or take focus, but a form field's, and their keys are their own. A function gets the enabled options listed, flat, how many of them are selected, and `selectAll()` and `deselectAll()` on them. Search, then Select results:
+
+<Preview code={menuSlotsCode} title='MenuSlots.tsx'>
+  <MenuSlots client:visible />
+</Preview>
+
+They are `.msl-menu-header` and `.msl-menu-footer`, spanning the open box, with no style of their own.
 
 ## Delete chips with their button only
 
@@ -189,12 +265,36 @@ Backspace in an empty search field removes the last chip. `deleteOnBackspace={fa
   <DisableChip client:visible />
 </Preview>
 
+## A few chips, then a count
+
+`maxChips` shows chips for the first values, then one chip for the rest: `+2`, or what `moreChipsLabel` returns. That chip is `.msl-chip[data-more]` (Tailwind's `data-more:` on `classNames.chip`), with no delete button; a click on it opens the menu. The rest stay selected, and Backspace removes the last value that isn't fixed, shown or not. A `customChip` gets `index` and `total` for a cut of its own.
+
+<Preview code={maxChipsCode} title='MaxChips.tsx'>
+  <MaxChips client:visible />
+</Preview>
+
 ## Custom labels
 
 `getLabel(option)` renders each option, chip and single value. Return any JSX. Search matches what `getLabel` returns when it is text, else the option's `label`.
 
 <Preview code={jsxLabelsCode} title='JsxLabels.tsx'>
   <JsxLabels client:visible />
+</Preview>
+
+Its second argument tells where the label shows: `{ context, search, selected }`. `context` is `'menu'` for an option's row and `'value'` for a chip or the single value, `search` is the search text for menu rows (`''` for values), and `selected` whether the option is picked. Below, the match in `<mark>` and a checkmark on the selected rows, plain text in the chips:
+
+<Preview code={labelMetaCode} title='LabelMeta.tsx'>
+  <LabelMeta client:visible />
+</Preview>
+
+Search reads the label's text for no search (`{ context: 'menu', search: '', selected: false }`), so the highlight never changes what matches. The tooltip reads the row's label text, else the option's `label`.
+
+## Hide selected options
+
+`hideSelected` takes picked options out of the menu and its search results. A group, a collapsible group or a submenu with no option left goes too, title and all; nothing left shows `emptyDataLabel`, or `selectAll`'s row, selected, which deselects them. Enter moves the highlight on to the next option, so the keyboard picks one after another. `renderGroupTitle`'s `total` and `selected` still count the hidden options.
+
+<Preview code={hideSelectedCode} title='HideSelected.tsx'>
+  <HideSelected client:visible />
 </Preview>
 
 ## Custom icons

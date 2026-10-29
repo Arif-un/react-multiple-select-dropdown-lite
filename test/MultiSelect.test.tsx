@@ -1,6 +1,14 @@
 // Characterization tests: they pin the current behavior, quirks included.
 // Tests named "current behavior: ..." document known bugs; a fix should update them on purpose.
-import { memo, StrictMode, Suspense, useEffect, useRef, useState } from 'react'
+import {
+  memo,
+  startTransition,
+  StrictMode,
+  Suspense,
+  useEffect,
+  useRef,
+  useState
+} from 'react'
 import type { ComponentProps } from 'react'
 import { createPortal, flushSync } from 'react-dom'
 import { renderToString } from 'react-dom/server'
@@ -9,27 +17,43 @@ import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import type {
   MultiSelectChipProps,
+  MultiSelectGroup,
   MultiSelectGroupTitleProps,
+  MultiSelectLabelMeta,
   MultiSelectListProps,
+  MultiSelectLoaded,
+  MultiSelectLoader,
+  MultiSelectLoadRequest,
+  MultiSelectMenuProps,
   MultiSelectOption,
   MultiSelectProps
 } from '../src/index'
 import MultiSelect from '../src/MultiSelect'
 
-// jsdom has no IntersectionObserver: this one reports what a test passes to `seen`, oldest first
-let seen: (...visible: boolean[]) => void = () => {}
+// jsdom has no IntersectionObserver: this one reports what a test passes, oldest first, to `seen` for the dropdown,
+// and to `inView` for another element it observes, as long as it does
+type Report = (...visible: boolean[]) => void
+let seen: Report = () => {}
+const watched = new Map<Element, Report>()
+const inView = (el: Element, ...visible: boolean[]) =>
+  act(() => watched.get(el)?.(...visible))
 globalThis.IntersectionObserver = class {
-  constructor(cb: IntersectionObserverCallback) {
-    seen = (...visible) =>
-      cb(
+  els: Element[] = []
+  constructor(private cb: IntersectionObserverCallback) {}
+  observe(el: Element) {
+    const report: Report = (...visible) =>
+      this.cb(
         visible.map(
           (v) => ({ isIntersecting: v }) as IntersectionObserverEntry
         ),
         this as unknown as IntersectionObserver
       )
+    this.els.push(el)
+    el.matches('.msl-wrp') ? (seen = report) : watched.set(el, report)
   }
-  observe() {}
-  disconnect() {}
+  disconnect() {
+    this.els.forEach((el) => watched.delete(el))
+  }
 } as unknown as typeof IntersectionObserver
 
 afterEach(() => {
@@ -432,7 +456,8 @@ describe('render', () => {
       total: 2,
       selected: 1,
       open: true,
-      icon: null
+      icon: null,
+      toggle: expect.any(Function)
     })
     expect(last('Inner').group).toBe(options[0].childs[1])
     expect(last('C')).toMatchObject({ open: false, icon: expect.anything() })
@@ -3226,6 +3251,22 @@ describe('value (controlled)', () => {
     expect(chips()).toEqual([])
   })
 
+  it('a null in value or defaultValue (untyped JS, [useState(null)]) is no value', () => {
+    const { chips } = setup({
+      // @ts-expect-error null is not in the types
+      defaultValue: [null, 'apple']
+    })
+    expect(chips()).toEqual(['Apple'])
+    cleanup()
+    const { single } = setup({
+      singleSelect: true,
+      customValue: true,
+      // @ts-expect-error null is not in the types
+      value: [null]
+    })
+    expect(single()).toBeUndefined()
+  })
+
   it('follows the parent state, including resets and created values', () => {
     function Parent() {
       const [value, setValue] = useState<string[]>(['cherry'])
@@ -3336,12 +3377,15 @@ describe('onClear', () => {
 })
 
 describe('aria', () => {
-  it('ids survive SSR hydration', () => {
+  it('ids survive SSR hydration; the server, with no document, runs no layout effect', () => {
     const ui = <MultiSelect options={opts} />
     const container = document.createElement('div')
-    container.innerHTML = renderToString(<MultiSelect options={opts} />)
-    document.body.appendChild(container)
     const error = vi.spyOn(console, 'error')
+    vi.stubGlobal('document', undefined)
+    const html = renderToString(ui)
+    vi.unstubAllGlobals()
+    container.innerHTML = html
+    document.body.appendChild(container)
     render(ui, { container, hydrate: true })
     expect(error).not.toHaveBeenCalled()
   })
@@ -4770,5 +4814,3222 @@ describe('exit animations', () => {
     ).toEqual(['Lemon', 'Lime'])
     await a.end()
     expect(q('[data-closing]')).toBeNull()
+  })
+})
+
+// settles a load, then lets its promise chain run out
+const settle = (f: () => void = () => {}) =>
+  act(async () => {
+    f()
+    await new Promise((r) => setTimeout(r))
+  })
+
+// a loader whose loads wait for the test: each one's request, and ok / fail to settle it
+function loads() {
+  const calls: {
+    req: MultiSelectLoadRequest
+    ok: (v: MultiSelectLoaded) => Promise<void>
+    fail: () => Promise<void>
+  }[] = []
+  const fn = vi.fn(
+    (req: MultiSelectLoadRequest) =>
+      new Promise<MultiSelectLoaded>((res, rej) => {
+        calls.push({
+          req,
+          ok: (v) => settle(() => res(v)),
+          fail: () => settle(() => rej(new Error('down')))
+        })
+      })
+  )
+  return { fn, calls }
+}
+
+const request = (search: string, next?: unknown) => ({
+  search,
+  next,
+  signal: expect.any(AbortSignal)
+})
+
+describe('loadOptions', () => {
+  it('loads the list as the menu first opens, not on mount, and keeps it', async () => {
+    const { fn, calls } = loads()
+    const { root, q, input, optionTexts, isOpen } = setup({
+      options: undefined,
+      loadOptions: fn
+    })
+    expect(fn).not.toHaveBeenCalled()
+    fireEvent.click(root)
+    expect(fn).toHaveBeenCalledTimes(1)
+    expect(calls[0].req).toEqual(request(''))
+    const list = q('.msl-options')
+    expect(list.getAttribute('aria-busy')).toBe('true')
+    expect(optionTexts()).toEqual(['Loading...'])
+    const end = q('.msl-loading')
+    expect(end.className).toBe('msl-option msl-option-disable msl-loading ')
+    expect(end.hasAttribute('role')).toBe(false)
+    expect(end.hasAttribute('data-error')).toBe(false)
+    await calls[0].ok(opts)
+    expect(list.hasAttribute('aria-busy')).toBe(false)
+    expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry'])
+    expect(q('.msl-loading')).toBeNull()
+    press(input(), 'Escape')
+    expect(isOpen()).toBe(false)
+    fireEvent.click(root)
+    expect(fn).toHaveBeenCalledTimes(1)
+    expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry'])
+  })
+
+  it('an empty load shows emptyDataLabel', async () => {
+    const { fn, calls } = loads()
+    const { root, optionTexts } = setup({ options: undefined, loadOptions: fn })
+    fireEvent.click(root)
+    await calls[0].ok([])
+    expect(optionTexts()).toEqual(['No Data Found'])
+  })
+
+  it('loads each search text once, trimmed, commas removed, and filters nothing itself', async () => {
+    const { fn, calls } = loads()
+    const { root, input, optionTexts, onChange } = setup({
+      options: undefined,
+      loadOptions: fn,
+      filterOption: () => false
+    })
+    fireEvent.click(root)
+    await calls[0].ok(opts)
+    fireEvent.change(input(), { target: { value: ' an, ' } })
+    expect(calls[1].req).toEqual(request('an'))
+    // the last search's results are neither shown nor picked
+    expect(optionTexts()).toEqual(['Loading...'])
+    press(input())
+    expect(onChange).not.toHaveBeenCalled()
+    await calls[1].ok([opts[1], opts[0]])
+    expect(optionTexts()).toEqual(['Banana', 'Apple'])
+    // Enter picks the first result
+    press(input())
+    expect(onChange).toHaveBeenLastCalledWith(['banana'], [opts[1]])
+    // the pick cleared the search, whose list loaded once
+    expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry'])
+    fireEvent.change(input(), { target: { value: 'an' } })
+    expect(fn).toHaveBeenCalledTimes(2)
+    expect(optionTexts()).toEqual(['Banana', 'Apple'])
+  })
+
+  it('another search aborts the loads on the way: their late results are dropped, and that search loads again', async () => {
+    const { fn, calls } = loads()
+    const { root, input, optionTexts, unmount } = setup({
+      options: undefined,
+      loadOptions: fn
+    })
+    fireEvent.click(root)
+    fireEvent.change(input(), { target: { value: 'a' } })
+    expect(calls[0].req.signal.aborted).toBe(true)
+    expect(calls[1].req).toEqual(request('a'))
+    fireEvent.change(input(), { target: { value: 'ab' } })
+    expect(calls[1].req.signal.aborted).toBe(true)
+    // a loader that ignores the signal
+    await calls[1].ok(opts)
+    expect(optionTexts()).toEqual(['Loading...'])
+    fireEvent.change(input(), { target: { value: 'a' } })
+    expect(calls[2].req.signal.aborted).toBe(true)
+    expect(calls[3].req).toEqual(request('a'))
+    await calls[3].ok([opts[0]])
+    expect(optionTexts()).toEqual(['Apple'])
+    fireEvent.change(input(), { target: { value: 'b' } })
+    unmount()
+    expect(calls[4].req.signal.aborted).toBe(true)
+  })
+
+  it('loads the next part as the end comes into view, handing back next, until a part comes without one', async () => {
+    const { fn, calls } = loads()
+    const { root, q, optionTexts } = setup({
+      options: undefined,
+      loadOptions: fn
+    })
+    fireEvent.click(root)
+    // not observed while it loads
+    inView(q('.msl-loading'), true)
+    expect(fn).toHaveBeenCalledTimes(1)
+    await calls[0].ok({ options: [opts[0]], next: 2 })
+    expect(optionTexts()).toEqual(['Apple', 'Loading...'])
+    const end = q('.msl-loading')
+    inView(end, false)
+    expect(fn).toHaveBeenCalledTimes(1)
+    // the latest report counts
+    inView(end, false, true)
+    expect(calls[1].req).toEqual(request('', 2))
+    inView(end, true)
+    expect(fn).toHaveBeenCalledTimes(2)
+    await calls[1].ok({ options: [opts[1]], next: 'cursor' })
+    // observed anew: still in view, it goes on
+    inView(q('.msl-loading'), true)
+    expect(calls[2].req).toEqual(request('', 'cursor'))
+    await calls[2].ok({ options: [opts[2]] })
+    expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry'])
+    expect(q('.msl-loading')).toBeNull()
+  })
+
+  it("the keyboard passing a list's end on the way down loads more; it never highlights it", async () => {
+    const { fn, calls } = loads()
+    const { root, q, input } = setup({ options: undefined, loadOptions: fn })
+    const focused = () => q('.msl-option-focused')?.textContent
+    fireEvent.click(root)
+    await calls[0].ok({ options: opts.slice(0, 2), next: 2 })
+    press(input(), 'ArrowDown')
+    press(input(), 'ArrowDown')
+    expect(focused()).toBe('Banana')
+    expect(fn).toHaveBeenCalledTimes(1)
+    press(input(), 'ArrowDown')
+    expect(focused()).toBe('Banana')
+    expect(calls[1].req).toEqual(request('', 2))
+    press(input(), 'ArrowDown')
+    expect(fn).toHaveBeenCalledTimes(2)
+    await calls[1].ok({ options: [opts[2]], next: 3 })
+    // up, and End from below the end: no load
+    press(input(), 'ArrowUp')
+    press(input(), 'End')
+    expect(focused()).toBe('Cherry')
+    expect(fn).toHaveBeenCalledTimes(2)
+    press(input(), 'ArrowDown')
+    expect(calls[2].req).toEqual(request('', 3))
+  })
+
+  it('a failed load shows errorLabel; a click, the keyboard or the list showing again loads again', async () => {
+    const { fn, calls } = loads()
+    const { root, q, input, optionTexts } = setup({
+      options: undefined,
+      loadOptions: fn
+    })
+    fireEvent.click(root)
+    await calls[0].fail()
+    const end = q('.msl-loading')
+    expect(end.textContent).toBe('Failed to load. Retry')
+    expect(end.getAttribute('data-error')).toBe('true')
+    expect(q('.msl-options').hasAttribute('aria-busy')).toBe(false)
+    // not observed: it would load over and over
+    inView(end, true)
+    expect(fn).toHaveBeenCalledTimes(1)
+    fireEvent.click(end)
+    expect(calls[1].req).toEqual(request(''))
+    expect(optionTexts()).toEqual(['Loading...'])
+    expect(end.hasAttribute('data-error')).toBe(false)
+    // a click while it loads does nothing
+    fireEvent.click(end)
+    expect(fn).toHaveBeenCalledTimes(2)
+    await calls[1].fail()
+    press(input(), 'ArrowDown')
+    expect(fn).toHaveBeenCalledTimes(3)
+    await calls[2].fail()
+    press(input(), 'Escape')
+    fireEvent.click(root)
+    expect(fn).toHaveBeenCalledTimes(4)
+    await calls[3].ok(opts)
+    expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry'])
+  })
+
+  it('a failed next part keeps the parts loaded, and loads again from the same next', async () => {
+    const { fn, calls } = loads()
+    const { root, q, optionTexts } = setup({
+      options: undefined,
+      loadOptions: fn
+    })
+    fireEvent.click(root)
+    await calls[0].ok({ options: [opts[0]], next: 2 })
+    inView(q('.msl-loading'), true)
+    await calls[1].fail()
+    expect(optionTexts()).toEqual(['Apple', 'Failed to load. Retry'])
+    fireEvent.click(q('.msl-loading'))
+    expect(calls[2].req).toEqual(request('', 2))
+    await calls[2].ok([opts[1]])
+    expect(optionTexts()).toEqual(['Apple', 'Banana'])
+  })
+
+  it('a search that takes the place of a next part on the way keeps what loaded, to load on from', async () => {
+    const { fn, calls } = loads()
+    const { root, q, input, optionTexts } = setup({
+      options: undefined,
+      loadOptions: fn
+    })
+    fireEvent.click(root)
+    await calls[0].ok({ options: [opts[0]], next: 2 })
+    inView(q('.msl-loading'), true)
+    fireEvent.change(input(), { target: { value: 'x' } })
+    expect(calls[1].req.signal.aborted).toBe(true)
+    fireEvent.change(input(), { target: { value: '' } })
+    expect(optionTexts()).toEqual(['Apple', 'Loading...'])
+    inView(q('.msl-loading'), true)
+    expect(calls[3].req).toEqual(request('', 2))
+  })
+
+  it('a loader that throws, or returns no options, fails', async () => {
+    for (const loadOptions of [
+      () => {
+        throw new Error('down')
+      },
+      () => undefined,
+      () => ({ items: [] }),
+      async () => null
+    ]) {
+      const { root, q, unmount } = setup({
+        options: undefined,
+        loadOptions: loadOptions as unknown as MultiSelectLoader
+      })
+      fireEvent.click(root)
+      await settle()
+      expect(q('.msl-loading').textContent).toBe('Failed to load. Retry')
+      unmount()
+    }
+  })
+
+  it('takes a loader that returns at once, the options or { options }', async () => {
+    for (const loadOptions of [() => opts, () => ({ options: opts })]) {
+      const { root, optionTexts, unmount } = setup({
+        options: undefined,
+        loadOptions
+      })
+      fireEvent.click(root)
+      await settle()
+      expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry'])
+      unmount()
+    }
+  })
+
+  it('lists only what it loads: options name values, the selected ones before their loads; picked loaded options stay named', async () => {
+    const { fn, calls } = loads()
+    const ada = { label: 'Ada', value: '1' }
+    const grace = { label: 'Grace', value: '2' }
+    const { root, input, chips, option, optionTexts, onChange, hidden } = setup(
+      { options: [ada], defaultValue: ['1'], loadOptions: fn }
+    )
+    expect(chips()).toEqual(['Ada'])
+    fireEvent.click(root)
+    expect(optionTexts()).toEqual(['Loading...'])
+    fireEvent.change(input(), { target: { value: 'gr' } })
+    await calls[1].ok([grace])
+    fireEvent.click(option('Grace'))
+    expect(onChange).toHaveBeenLastCalledWith(['1', '2'], [ada, grace])
+    // the search cleared: Grace's list is not shown, her chip stays
+    expect(optionTexts()).toEqual(['Loading...'])
+    expect(chips()).toEqual(['Ada', 'Grace'])
+    expect(hidden().value).toBe('1,2')
+    await calls[2].ok([ada])
+    expect(optionTexts()).toEqual(['Ada'])
+  })
+
+  it('customValue: Create follows what loaded for the search, which a loaded value takes the place of', async () => {
+    const { fn, calls } = loads()
+    const { root, input, optionTexts } = setup({
+      options: undefined,
+      loadOptions: fn,
+      customValue: true
+    })
+    fireEvent.click(root)
+    fireEvent.change(input(), { target: { value: 'ap' } })
+    expect(optionTexts()).toEqual(['Loading...', 'Create "ap"'])
+    await calls[1].ok([opts[0]])
+    expect(optionTexts()).toEqual(['Apple', 'Create "ap"'])
+    fireEvent.change(input(), { target: { value: 'apple' } })
+    expect(optionTexts()).toEqual(['Loading...'])
+  })
+
+  it('loadingLabel, errorLabel and classNames.loading', async () => {
+    const { fn, calls } = loads()
+    const { root, q } = setup({
+      options: undefined,
+      loadOptions: fn,
+      loadingLabel: <i>Wait</i>,
+      errorLabel: <b>Oops</b>,
+      classNames: { loading: 'tw-load' }
+    })
+    fireEvent.click(root)
+    expect(q('.msl-loading').innerHTML).toBe('<i>Wait</i>')
+    expect(q('.msl-loading').className).toBe(
+      'msl-option msl-option-disable msl-loading tw-load'
+    )
+    await calls[0].fail()
+    expect(q('.msl-loading').innerHTML).toBe('<b>Oops</b>')
+  })
+
+  it('with renderList the end is a row, and the options tell an unknown set size while more may load', async () => {
+    const { fn, calls } = loads()
+    const renderList = vi.fn(({ count, row }: MultiSelectListProps) => (
+      <div>
+        {Array.from({ length: count }, (_, i) => (
+          <div key={i} className='my-row'>
+            {row(i)}
+          </div>
+        ))}
+      </div>
+    ))
+    const { root, q, qa } = setup({
+      options: undefined,
+      loadOptions: fn,
+      renderList
+    })
+    const places = () =>
+      qa('[role="option"]').map(
+        (el) =>
+          `${el.getAttribute('aria-posinset')}/${el.getAttribute('aria-setsize')}`
+      )
+    fireEvent.click(root)
+    expect(renderList.mock.lastCall![0].count).toBe(1)
+    await calls[0].ok({ options: opts.slice(0, 2), next: 2 })
+    expect(qa('.my-row').map((el) => el.textContent)).toEqual([
+      'Apple',
+      'Banana',
+      'Loading...'
+    ])
+    expect(places()).toEqual(['1/-1', '2/-1'])
+    inView(q('.msl-loading'), true)
+    await calls[1].ok([opts[2]])
+    expect(places()).toEqual(['1/3', '2/3', '3/3'])
+  })
+
+  it("loads without IntersectionObserver, as in jsdom in a user's tests: the keyboard loads the next part", async () => {
+    const io = globalThis.IntersectionObserver
+    // @ts-expect-error jsdom's
+    delete globalThis.IntersectionObserver
+    try {
+      const { fn, calls } = loads()
+      const { root, input, optionTexts } = setup({
+        options: undefined,
+        loadOptions: fn
+      })
+      fireEvent.click(root)
+      await calls[0].ok({ options: [opts[0]], next: 2 })
+      press(input(), 'ArrowDown')
+      press(input(), 'ArrowDown')
+      await calls[1].ok([opts[1]])
+      expect(optionTexts()).toEqual(['Apple', 'Banana'])
+    } finally {
+      globalThis.IntersectionObserver = io
+    }
+  })
+
+  it('loads once in strict mode', () => {
+    const { fn } = loads()
+    const { container } = render(
+      <StrictMode>
+        <MultiSelect loadOptions={fn} />
+      </StrictMode>
+    )
+    fireEvent.click(container.firstChild as Element)
+    expect(fn).toHaveBeenCalledTimes(1)
+  })
+
+  it('types loaders: T from what they load, next as any, and a group of loaded childs', () => {
+    const ada = { id: '1', name: 'Ada' }
+    const load: MultiSelectLoader<typeof ada> = async ({ next = 1 }) => ({
+      options: [ada],
+      next: next + 1
+    })
+    const people: MultiSelectGroup<typeof ada> = {
+      type: 'submenu',
+      title: 'People',
+      childs: load
+    }
+    const getters = {
+      getLabel: (p: typeof ada) => p.name,
+      getValue: (p: typeof ada) => p.id
+    }
+    const elements = [
+      <MultiSelect key='a' loadOptions={load} {...getters} />,
+      <MultiSelect key='b' options={[people]} {...getters} />,
+      // @ts-expect-error people have no label: getLabel is required
+      <MultiSelect key='c' loadOptions={load} getValue={getters.getValue} />
+    ]
+    expect(elements).toHaveLength(3)
+  })
+})
+
+describe('lazy groups', () => {
+  it('a collapsible group loads its childs the first time it opens, and on while closed', async () => {
+    const { fn, calls } = loads()
+    const group = {
+      type: 'group',
+      title: 'Fruits',
+      collapsible: true,
+      collapsed: true,
+      childs: fn
+    }
+    const renderGroupTitle = vi.fn(
+      ({ title, total }: MultiSelectGroupTitleProps) => `${title} ${total}`
+    )
+    const { root, q, optionTexts } = setupTree({
+      options: [group],
+      renderGroupTitle
+    })
+    fireEvent.click(root)
+    expect(fn).not.toHaveBeenCalled()
+    const title = q('.msl-grp-title')
+    expect(title.textContent).toBe('Fruits 0')
+    fireEvent.click(title)
+    expect(calls[0].req).toEqual(request(''))
+    expect(q('.msl-grp-body .msl-loading').textContent).toBe('Loading...')
+    fireEvent.click(title)
+    fireEvent.click(title)
+    expect(fn).toHaveBeenCalledTimes(1)
+    await calls[0].ok(opts)
+    expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry'])
+    expect(title.textContent).toBe('Fruits 3')
+    // a copy, its childs those loaded
+    expect(renderGroupTitle.mock.lastCall![0].group).toEqual({
+      ...group,
+      childs: opts
+    })
+  })
+
+  it("renderGroupTitle's group holds no list ends: the options so far, the groups in it too", async () => {
+    const { fn, calls } = loads()
+    const inner = { type: 'group', title: 'In', childs: fn }
+    const outer = {
+      type: 'group',
+      title: 'Out',
+      childs: [inner],
+      loading: true
+    }
+    const renderGroupTitle = vi.fn(
+      ({ title }: MultiSelectGroupTitleProps) => title
+    )
+    const { root } = setupTree({ options: [outer], renderGroupTitle })
+    fireEvent.click(root)
+    const last = (title: string) =>
+      renderGroupTitle.mock.calls.filter(([p]) => p.title === title).at(-1)![0]
+        .group
+    expect(last('In')).toEqual({ ...inner, childs: [] })
+    await calls[0].ok({ options: opts, next: 2 })
+    expect(last('In')).toEqual({ ...inner, childs: opts })
+    expect(last('Out')).toEqual({
+      ...outer,
+      childs: [{ ...inner, childs: opts }]
+    })
+  })
+
+  it('a submenu loads its childs as it opens; the keyboard goes in once they are in', async () => {
+    const { fn, calls } = loads()
+    const { input, focused, subs } = setupTree({
+      options: [{ type: 'submenu', title: 'More', childs: fn }, opts[2]]
+    })
+    press(input(), 'ArrowDown')
+    expect(focused()).toBe('More')
+    press(input(), 'ArrowRight')
+    expect(subs()).toEqual(['More'])
+    expect(fn).toHaveBeenCalledTimes(1)
+    expect(focused()).toBe('More')
+    await calls[0].ok(opts.slice(0, 2))
+    press(input(), 'ArrowRight')
+    expect(focused()).toBe('Apple')
+    press(input(), 'ArrowLeft')
+    expect(subs()).toEqual([])
+    press(input(), 'ArrowRight')
+    expect(fn).toHaveBeenCalledTimes(1)
+  })
+
+  it('a plain group loads as the menu opens; an empty one shows its emptyDataLabel', async () => {
+    const { fn, calls } = loads()
+    const { root, optionTexts } = setupTree({
+      options: [
+        { type: 'group', title: 'G', childs: fn, emptyDataLabel: 'None' }
+      ]
+    })
+    fireEvent.click(root)
+    expect(fn).toHaveBeenCalledTimes(1)
+    await calls[0].ok([])
+    expect(optionTexts()).toEqual(['None'])
+  })
+
+  it('search finds the options groups loaded, and they name values', async () => {
+    const { fn, calls } = loads()
+    const { root, input, chips, optionTexts } = setupTree({
+      options: [{ type: 'group', title: 'G', childs: fn }],
+      defaultValue: ['banana']
+    })
+    expect(chips()).toEqual([])
+    fireEvent.click(root)
+    await calls[0].ok(opts)
+    expect(chips()).toEqual(['Banana'])
+    fireEvent.change(input(), { target: { value: 'ch' } })
+    expect(optionTexts()).toEqual(['Cherry'])
+  })
+
+  it("a group's next part loads as its end comes into view, or the keyboard passes it", async () => {
+    const { fn, calls } = loads()
+    const { root, q, input, focused } = setupTree({
+      options: [{ type: 'group', title: 'G', childs: fn }, opts[2]]
+    })
+    fireEvent.click(root)
+    await calls[0].ok({ options: [opts[0]], next: 2 })
+    press(input(), 'ArrowDown')
+    press(input(), 'ArrowDown')
+    expect(focused()).toBe('Cherry')
+    expect(calls[1].req).toEqual(request('', 2))
+    await calls[1].ok({ options: [opts[1]], next: 3 })
+    inView(q('.msl-loading'), true)
+    expect(calls[2].req).toEqual(request('', 3))
+  })
+
+  it('groups in what loadOptions loaded load with its search, and nest', async () => {
+    const top = loads()
+    const veg = loads()
+    const greens = loads()
+    const { root, input, option, subs, chips } = setupTree({
+      options: undefined,
+      loadOptions: top.fn
+    })
+    fireEvent.click(root)
+    fireEvent.change(input(), { target: { value: 'k' } })
+    await top.calls[1].ok([{ type: 'submenu', title: 'Veg', childs: veg.fn }])
+    fireEvent.click(option('Veg'))
+    expect(veg.calls[0].req).toEqual(request('k'))
+    await veg.calls[0].ok([
+      { label: 'Kale', value: 'kale' },
+      { type: 'submenu', title: 'Greens', childs: greens.fn }
+    ])
+    fireEvent.click(option('Greens'))
+    expect(subs()).toEqual(['Veg', 'Greens'])
+    expect(greens.calls[0].req).toEqual(request('k'))
+    await greens.calls[0].ok([{ label: 'Leek', value: 'leek' }])
+    fireEvent.click(option('Leek'))
+    expect(chips()).toEqual(['Leek'])
+  })
+
+  it("a group's list goes by its place and title: another title there loads its own", async () => {
+    const { fn, calls } = loads()
+    const { root, optionTexts, rerender } = setupTree({
+      options: [{ type: 'group', title: 'A', childs: fn }]
+    })
+    fireEvent.click(root)
+    await calls[0].ok([opts[0]])
+    rerender(
+      <MultiSelect options={[{ type: 'group', title: 'A', childs: fn }]} />
+    )
+    expect(fn).toHaveBeenCalledTimes(1)
+    expect(optionTexts()).toEqual(['Apple'])
+    rerender(
+      <MultiSelect options={[{ type: 'group', title: 'B', childs: fn }]} />
+    )
+    expect(fn).toHaveBeenCalledTimes(2)
+  })
+})
+
+// your own data layer's props, as React Query's: set() re-renders with these props and more
+function remote(props: MultiSelectProps = {}) {
+  const onLoadMore = vi.fn()
+  const u = setup({ onLoadMore, ...props })
+  const set = (more: MultiSelectProps) =>
+    u.rerender(
+      <MultiSelect
+        options={opts}
+        onChange={u.onChange}
+        onMenuOpen={u.onMenuOpen}
+        onMenuClose={u.onMenuClose}
+        onLoadMore={onLoadMore}
+        {...props}
+        {...more}
+      />
+    )
+  return { ...u, onLoadMore, set }
+}
+
+describe('your own loading (onSearch, loading, onLoadMore, loadError)', () => {
+  it('onSearch hears each search text, trimmed, commas removed, not the first; the dropdown filters nothing', () => {
+    const onSearch = vi.fn()
+    const { root, input, optionTexts, onChange } = setup({
+      onSearch,
+      filterOption: () => false
+    })
+    fireEvent.click(root)
+    expect(onSearch).not.toHaveBeenCalled()
+    fireEvent.change(input(), { target: { value: ' an, ' } })
+    expect(onSearch).toHaveBeenLastCalledWith('an')
+    // options are the results: none filtered out
+    expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry'])
+    fireEvent.change(input(), { target: { value: 'an ' } })
+    expect(onSearch).toHaveBeenCalledTimes(1)
+    // Enter picks the first result, and the search clears
+    press(input())
+    expect(onChange).toHaveBeenLastCalledWith(['apple'], [opts[0]])
+    expect(onSearch).toHaveBeenLastCalledWith('')
+    expect(onSearch).toHaveBeenCalledTimes(2)
+  })
+
+  it('onSearch is not told of the first text in strict mode', () => {
+    const onSearch = vi.fn()
+    render(
+      <StrictMode>
+        <MultiSelect options={opts} onSearch={onSearch} />
+      </StrictMode>
+    )
+    expect(onSearch).not.toHaveBeenCalled()
+  })
+
+  it("with onSearch, every search's options keep naming values: a controlled pick stays once the results move on", () => {
+    const results = (s: string) =>
+      s ? opts.filter((o) => o.label.toLowerCase().includes(s)) : [opts[0]]
+    const changes = vi.fn()
+    function Parent() {
+      const [value, setValue] = useState<string[]>([])
+      const [search, setSearch] = useState('')
+      return (
+        <MultiSelect
+          options={results(search)}
+          value={value}
+          onSearch={setSearch}
+          onChange={(v, o) => {
+            changes(v, o)
+            setValue(v)
+          }}
+        />
+      )
+    }
+    const { container } = render(<Parent />)
+    const field = () => container.querySelector('input.msl-input')!
+    const chips = () =>
+      [...container.querySelectorAll('.msl-chip')].map((el) => el.textContent)
+    fireEvent.click(container.firstChild as Element)
+    fireEvent.change(field(), { target: { value: 'ch' } })
+    press(field())
+    expect(changes).toHaveBeenLastCalledWith(['cherry'], [opts[2]])
+    // the search cleared: Cherry is in no results now, still named
+    expect(chips()).toEqual(['Cherry'])
+    press(field(), 'ArrowDown')
+    press(field())
+    expect(changes).toHaveBeenLastCalledWith(
+      ['cherry', 'apple'],
+      [opts[2], opts[0]]
+    )
+  })
+
+  it('groups in onSearch results load with its search, and stop as it changes', async () => {
+    const { fn, calls } = loads()
+    const onSearch = vi.fn()
+    const { root, input, rerender } = setupTree({
+      options: [{ type: 'group', title: 'G', childs: fn }],
+      onSearch
+    })
+    fireEvent.click(root)
+    expect(calls[0].req).toEqual(request(''))
+    fireEvent.change(input(), { target: { value: 'k' } })
+    expect(calls[0].req.signal.aborted).toBe(true)
+    expect(calls[1].req).toEqual(request('k'))
+    rerender(
+      <MultiSelect
+        options={[{ type: 'group', title: 'G', childs: fn }]}
+        onSearch={onSearch}
+      />
+    )
+    expect(fn).toHaveBeenCalledTimes(2)
+  })
+
+  it('loading shows the end row and aria-busy, in place of emptyDataLabel', () => {
+    const { root, q, optionTexts, set } = remote({
+      options: [],
+      onLoadMore: undefined,
+      loading: true
+    })
+    fireEvent.click(root)
+    expect(optionTexts()).toEqual(['Loading...'])
+    expect(q('.msl-options').getAttribute('aria-busy')).toBe('true')
+    expect(q('.msl-loading').hasAttribute('data-error')).toBe(false)
+    set({ options: [], onLoadMore: undefined, loading: false })
+    expect(optionTexts()).toEqual(['No Data Found'])
+    expect(q('.msl-options').hasAttribute('aria-busy')).toBe(false)
+    set({ options: opts, onLoadMore: undefined, loading: true })
+    expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry', 'Loading...'])
+  })
+
+  it('onLoadMore: the end row calls it as it comes into view, never while loading, and again as loading ends with it in view', () => {
+    const { root, q, optionTexts, onLoadMore, set } = remote({
+      options: [opts[0]]
+    })
+    fireEvent.click(root)
+    expect(optionTexts()).toEqual(['Apple', 'Loading...'])
+    // the menu opening doesn't call it: your first load is yours
+    expect(onLoadMore).not.toHaveBeenCalled()
+    const end = q('.msl-loading')
+    inView(end, false)
+    expect(onLoadMore).not.toHaveBeenCalled()
+    inView(end, true)
+    expect(onLoadMore).toHaveBeenCalledTimes(1)
+    set({ options: [opts[0]], loading: true })
+    inView(q('.msl-loading'), true)
+    expect(onLoadMore).toHaveBeenCalledTimes(1)
+    expect(q('.msl-options').getAttribute('aria-busy')).toBe('true')
+    // the page is in: still in view, it goes on
+    set({ options: opts.slice(0, 2) })
+    inView(q('.msl-loading'), true)
+    expect(onLoadMore).toHaveBeenCalledTimes(2)
+    // no more
+    set({ onLoadMore: undefined })
+    expect(q('.msl-loading')).toBeNull()
+  })
+
+  it('onLoadMore: the latest one is called, a new closure each render', () => {
+    const { root, q, onLoadMore, set } = remote()
+    fireEvent.click(root)
+    const later = vi.fn()
+    set({ onLoadMore: later })
+    inView(q('.msl-loading'), true)
+    expect(later).toHaveBeenCalledTimes(1)
+    expect(onLoadMore).not.toHaveBeenCalled()
+  })
+
+  it('the keyboard passing the end calls onLoadMore, not while loading; it never highlights it', () => {
+    const { root, q, input, onLoadMore, set } = remote()
+    const focused = () => q('.msl-option-focused')?.textContent
+    fireEvent.click(root)
+    press(input(), 'End')
+    expect(focused()).toBe('Cherry')
+    expect(onLoadMore).not.toHaveBeenCalled()
+    press(input(), 'ArrowDown')
+    expect(focused()).toBe('Cherry')
+    expect(onLoadMore).toHaveBeenCalledTimes(1)
+    set({ loading: true })
+    press(input(), 'ArrowDown')
+    expect(onLoadMore).toHaveBeenCalledTimes(1)
+  })
+
+  it('loadError: errorLabel, not called as it comes into view; a click, the keyboard or the menu opening retries', () => {
+    const { root, q, input, optionTexts, onLoadMore, set } = remote({
+      loadError: true,
+      errorLabel: 'Down. Retry'
+    })
+    fireEvent.click(root)
+    // the menu opening retries
+    expect(onLoadMore).toHaveBeenCalledTimes(1)
+    expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry', 'Down. Retry'])
+    const end = q('.msl-loading')
+    expect(end.getAttribute('data-error')).toBe('true')
+    inView(end, true)
+    expect(onLoadMore).toHaveBeenCalledTimes(1)
+    fireEvent.click(end)
+    expect(onLoadMore).toHaveBeenCalledTimes(2)
+    press(input(), 'End')
+    press(input(), 'ArrowDown')
+    expect(onLoadMore).toHaveBeenCalledTimes(3)
+    // loading again: not failed while it does
+    set({ loadError: true, loading: true, errorLabel: 'Down. Retry' })
+    expect(q('.msl-loading').hasAttribute('data-error')).toBe(false)
+    expect(optionTexts()).toContain('Loading...')
+    // failed again: no retry by itself, as it stayed shown
+    set({ loadError: true, errorLabel: 'Down. Retry' })
+    expect(onLoadMore).toHaveBeenCalledTimes(3)
+    // without onLoadMore, a failure only shows
+    set({ loadError: true, onLoadMore: undefined })
+    fireEvent.click(q('.msl-loading'))
+    expect(onLoadMore).toHaveBeenCalledTimes(3)
+    expect(optionTexts()).toContain('Down. Retry')
+    // a screen reader hears it change
+    expect(q('.msl-loading').getAttribute('aria-live')).toBe('polite')
+  })
+
+  it('loadError: the menu opening retries once an open, not as a search shows the row again', () => {
+    const { root, input, optionTexts, onLoadMore } = remote({
+      loadError: true
+    })
+    fireEvent.click(root)
+    expect(onLoadMore).toHaveBeenCalledTimes(1)
+    fireEvent.change(input(), { target: { value: 'a' } })
+    fireEvent.change(input(), { target: { value: 'ap' } })
+    expect(optionTexts()).toEqual(['Apple', 'Failed to load. Retry'])
+    expect(onLoadMore).toHaveBeenCalledTimes(1)
+    press(input(), 'Escape')
+    fireEvent.click(root)
+    expect(onLoadMore).toHaveBeenCalledTimes(2)
+  })
+
+  it('loadError: with onSearch, a search retries no more; nor strict mode', () => {
+    const onLoadMore = vi.fn()
+    const { container } = render(
+      <StrictMode>
+        <MultiSelect
+          options={opts}
+          onSearch={() => {}}
+          loadError
+          onLoadMore={onLoadMore}
+        />
+      </StrictMode>
+    )
+    fireEvent.click(container.firstChild as Element)
+    expect(onLoadMore).toHaveBeenCalledTimes(1)
+    type(container.querySelector('input.msl-input')!, 'b', 'b')
+    expect(onLoadMore).toHaveBeenCalledTimes(1)
+  })
+
+  it('searched by the dropdown, your list ends in its row: loading in place of emptyDataLabel, failed, more', () => {
+    const { root, input, optionTexts, onLoadMore, set, q } = remote({
+      loading: true
+    })
+    fireEvent.click(root)
+    fireEvent.change(input(), { target: { value: 'ap' } })
+    expect(optionTexts()).toEqual(['Apple', 'Loading...'])
+    fireEvent.change(input(), { target: { value: 'zz' } })
+    expect(optionTexts()).toEqual(['Loading...'])
+    set({ loading: false, loadError: true })
+    expect(optionTexts()).toEqual(['Failed to load. Retry'])
+    // more to load: it loads as it comes into view, searched or not
+    set({ loading: false })
+    expect(optionTexts()).toEqual(['Loading...'])
+    inView(q('.msl-loading'), true)
+    expect(onLoadMore).toHaveBeenCalledTimes(1)
+    set({ loading: false, onLoadMore: undefined })
+    expect(optionTexts()).toEqual(['No Data Found'])
+  })
+
+  it("a list's end never takes the place of the highlighted title: Enter picks nothing", () => {
+    const { root, input, onChange, set } = remote({
+      options: [{ type: 'group', title: 'G', collapsible: true, childs: opts }]
+    })
+    fireEvent.click(root)
+    press(input(), 'ArrowDown')
+    expect(input().getAttribute('aria-activedescendant')).not.toBeNull()
+    set({ options: [], loading: true })
+    expect(input().hasAttribute('aria-activedescendant')).toBe(false)
+    press(input())
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('with loadOptions, loading, loadError and onLoadMore are unused', async () => {
+    const { fn, calls } = loads()
+    const { root, q, optionTexts, onLoadMore } = remote({
+      options: undefined,
+      loadOptions: fn,
+      loading: true,
+      loadError: true
+    })
+    fireEvent.click(root)
+    await calls[0].ok(opts)
+    expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry'])
+    expect(q('.msl-options').hasAttribute('aria-busy')).toBe(false)
+    expect(onLoadMore).not.toHaveBeenCalled()
+  })
+
+  it('values as their options: they name values that options lack, and keep doing so after a pick', () => {
+    const zed = { label: 'Zed', value: 'zed' }
+    const { root, chips, hidden, option, onChange } = setup({
+      defaultValue: [zed, 'apple']
+    })
+    expect(chips()).toEqual(['Zed', 'Apple'])
+    expect(hidden().value).toBe('zed,apple')
+    fireEvent.click(root)
+    fireEvent.click(option('Banana'))
+    expect(onChange).toHaveBeenLastCalledWith(
+      ['zed', 'apple', 'banana'],
+      [zed, opts[0], opts[1]]
+    )
+    expect(chips()).toEqual(['Zed', 'Apple', 'Banana'])
+  })
+
+  it("controlled values as options of the user's shape, read by getValue and getLabel", () => {
+    const ada = { id: '1', name: 'Ada' }
+    const { container, rerender } = render(
+      <MultiSelect
+        options={[] as (typeof ada)[]}
+        value={[ada]}
+        getLabel={(p) => p.name}
+        getValue={(p) => p.id}
+      />
+    )
+    const chips = () =>
+      [...container.querySelectorAll('.msl-chip')].map((el) => el.textContent)
+    expect(chips()).toEqual(['Ada'])
+    // an option with that value names it first
+    rerender(
+      <MultiSelect
+        options={[{ id: '1', name: 'Ada L.' }]}
+        value={[ada]}
+        getLabel={(p) => p.name}
+        getValue={(p) => p.id}
+      />
+    )
+    expect(chips()).toEqual(['Ada L.'])
+  })
+
+  it('customValue: a value that comes as its option is not under Custom Values; created ones are', () => {
+    const zed = { label: 'Zed', value: 'zed' }
+    const { input, groupTitles, optionTexts } = setup({
+      customValue: true,
+      defaultValue: [zed]
+    })
+    type(input(), 'kiwi', 'Enter')
+    expect(groupTitles()).toEqual(['Custom Values'])
+    expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry', 'kiwi'])
+  })
+
+  it('Enter picks the first result shown, not one in a closed submenu or a collapsed group', () => {
+    const apricot = { label: 'Apricot', value: 'apricot' }
+    const { input, onChange } = setup({
+      onSearch: vi.fn(),
+      options: [
+        { type: 'submenu', title: 'Fruits', childs: [opts[0]] },
+        {
+          type: 'group',
+          title: 'More',
+          collapsible: true,
+          collapsed: true,
+          childs: [opts[1]]
+        },
+        apricot
+      ]
+    })
+    type(input(), 'ap', 'Enter')
+    expect(onChange).toHaveBeenLastCalledWith(['apricot'], [apricot])
+  })
+
+  it('types the props: values as T or strings, the callbacks', () => {
+    const ada = { id: '1', name: 'Ada' }
+    const getters = {
+      getLabel: (p: typeof ada) => p.name,
+      getValue: (p: typeof ada) => p.id
+    }
+    const elements = [
+      <MultiSelect
+        key='a'
+        options={[ada]}
+        value={[ada, '2']}
+        onSearch={(s: string) => s}
+        loading
+        loadError={false}
+        onLoadMore={() => {}}
+        {...getters}
+      />,
+      // @ts-expect-error a value is a string or an option, not a number
+      <MultiSelect key='b' options={[ada]} value={[1]} {...getters} />
+    ]
+    expect(elements).toHaveLength(2)
+  })
+})
+
+describe('load more button (loadMoreLabel), groups you load', () => {
+  it('your list with more ends in a button: not called in view, a click or the keyboard calls onLoadMore', () => {
+    const { root, q, input, optionTexts, onLoadMore, set } = remote({
+      loadMoreLabel: 'Load more'
+    })
+    fireEvent.click(root)
+    expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry', 'Load more'])
+    const end = q('.msl-loading')
+    expect(end.className).toBe('msl-option msl-loading ')
+    expect(end.getAttribute('data-more')).toBe('true')
+    expect(end.hasAttribute('role')).toBe(false)
+    inView(end, true)
+    expect(onLoadMore).not.toHaveBeenCalled()
+    fireEvent.click(end)
+    expect(onLoadMore).toHaveBeenCalledTimes(1)
+    press(input(), 'End')
+    press(input(), 'ArrowDown')
+    expect(onLoadMore).toHaveBeenCalledTimes(2)
+    // loading: loadingLabel, no button
+    set({ loadMoreLabel: 'Load more', loading: true })
+    expect(optionTexts()).toContain('Loading...')
+    expect(q('.msl-loading').className).toBe(
+      'msl-option msl-option-disable msl-loading '
+    )
+    expect(q('.msl-loading').hasAttribute('data-more')).toBe(false)
+    fireEvent.click(q('.msl-loading'))
+    expect(onLoadMore).toHaveBeenCalledTimes(2)
+    // failed: errorLabel, a click retries
+    set({ loadMoreLabel: 'Load more', loadError: true })
+    expect(optionTexts()).toContain('Failed to load. Retry')
+    expect(q('.msl-loading').hasAttribute('data-more')).toBe(false)
+    fireEvent.click(q('.msl-loading'))
+    expect(onLoadMore).toHaveBeenCalledTimes(3)
+    // all in
+    set({ loadMoreLabel: 'Load more', onLoadMore: undefined })
+    expect(q('.msl-loading')).toBeNull()
+  })
+
+  it("a loader's first part loads as it shows, each next part on a click", async () => {
+    const { fn, calls } = loads()
+    const { root, q, optionTexts } = setup({
+      options: undefined,
+      loadOptions: fn,
+      loadMoreLabel: <b>More</b>
+    })
+    fireEvent.click(root)
+    expect(optionTexts()).toEqual(['Loading...'])
+    await calls[0].ok({ options: [opts[0]], next: 2 })
+    expect(optionTexts()).toEqual(['Apple', 'More'])
+    inView(q('.msl-loading'), true)
+    expect(fn).toHaveBeenCalledTimes(1)
+    fireEvent.click(q('[data-more]'))
+    expect(calls[1].req).toEqual(request('', 2))
+    expect(optionTexts()).toEqual(['Apple', 'Loading...'])
+    await calls[1].ok({ options: [opts[1]] })
+    expect(optionTexts()).toEqual(['Apple', 'Banana'])
+  })
+
+  it("a group's loadMoreLabel is its own: a submenu's loader, the dropdown's elsewhere", async () => {
+    const sub = loads()
+    const grp = loads()
+    const { root, q, option, optionTexts } = setupTree({
+      options: [
+        {
+          type: 'submenu',
+          title: 'More',
+          loadMoreLabel: 'More fruits',
+          childs: sub.fn
+        },
+        { type: 'group', title: 'G', collapsible: true, childs: grp.fn }
+      ],
+      loadMoreLabel: 'Load more'
+    })
+    fireEvent.click(root)
+    await grp.calls[0].ok({ options: [opts[2]], next: 2 })
+    fireEvent.click(option('More'))
+    await sub.calls[0].ok({ options: [opts[0]], next: 2 })
+    expect(q('.msl-submenu .msl-loading').textContent).toBe('More fruits')
+    expect(q('.msl-grp-body .msl-loading').textContent).toBe('Load more')
+    fireEvent.click(option('More fruits'))
+    expect(sub.calls[1].req).toEqual(request('', 2))
+    await sub.calls[1].ok({ options: [opts[1]] })
+    expect(optionTexts()).toEqual([
+      'More',
+      'Apple',
+      'Banana',
+      'Cherry',
+      'Load more'
+    ])
+    fireEvent.click(option('Load more'))
+    expect(grp.calls[1].req).toEqual(request('', 2))
+  })
+
+  it('a group of childs you load: loading, onLoadMore and loadError as the dropdown has them', () => {
+    const onLoadMore = vi.fn()
+    const group = (more: Partial<MultiSelectGroup>) => [
+      {
+        type: 'group',
+        title: 'G',
+        collapsible: true,
+        collapsed: true,
+        childs: [opts[0]],
+        onLoadMore,
+        ...more
+      },
+      { type: 'group', title: 'H', childs: [opts[2]] }
+    ]
+    const { root, q, optionTexts, rerender } = setupTree({ options: group({}) })
+    const set = (more: Partial<MultiSelectGroup>) =>
+      rerender(<MultiSelect options={group(more)} />)
+    fireEvent.click(root)
+    expect(optionTexts()).toEqual(['Cherry'])
+    fireEvent.click(q('.msl-grp-title'))
+    expect(optionTexts()).toEqual(['Apple', 'Loading...', 'Cherry'])
+    // more in view: called
+    inView(q('.msl-loading'), true)
+    expect(onLoadMore).toHaveBeenCalledTimes(1)
+    set({ loading: true })
+    inView(q('.msl-loading'), true)
+    expect(onLoadMore).toHaveBeenCalledTimes(1)
+    // the listbox is not busy: a group is
+    expect(q('.msl-options').hasAttribute('aria-busy')).toBe(false)
+    set({ loadMoreLabel: 'More' })
+    expect(optionTexts()).toEqual(['Apple', 'More', 'Cherry'])
+    fireEvent.click(q('[data-more]'))
+    expect(onLoadMore).toHaveBeenCalledTimes(2)
+    set({ loadError: true })
+    expect(q('.msl-loading').textContent).toBe('Failed to load. Retry')
+    fireEvent.click(q('.msl-loading'))
+    expect(onLoadMore).toHaveBeenCalledTimes(3)
+    set({ onLoadMore: undefined })
+    expect(optionTexts()).toEqual(['Apple', 'Cherry'])
+  })
+
+  it("a submenu of childs you load: its button loads more; the dropdown's options name values", () => {
+    const onLoadMore = vi.fn()
+    const { root, option, optionTexts, chips } = setupTree({
+      options: [
+        {
+          type: 'submenu',
+          title: 'More',
+          childs: [opts[0]],
+          onLoadMore,
+          loadMoreLabel: 'Show more'
+        }
+      ],
+      defaultValue: ['apple']
+    })
+    expect(chips()).toEqual(['Apple'])
+    fireEvent.click(root)
+    fireEvent.click(option('More'))
+    expect(optionTexts()).toEqual(['More', 'Apple', 'Show more'])
+    fireEvent.click(option('Show more'))
+    expect(onLoadMore).toHaveBeenCalledTimes(1)
+  })
+
+  it('types loadMoreLabel and the fields of a group you load', () => {
+    const elements = [
+      <MultiSelect
+        key='a'
+        loadMoreLabel={<b>More</b>}
+        options={[
+          {
+            type: 'group',
+            title: 'G',
+            childs: opts,
+            loading: false,
+            loadError: false,
+            onLoadMore: () => {},
+            loadMoreLabel: 'More'
+          }
+        ]}
+      />,
+      // @ts-expect-error onLoadMore takes no part to load
+      <MultiSelect
+        key='b'
+        options={[{ type: 'group', title: 'G', childs: opts, onLoadMore: 1 }]}
+      />
+    ]
+    expect(elements).toHaveLength(2)
+  })
+})
+
+describe("groups' classes, style and your own fields", () => {
+  it('classes and style go on the title row of a group, a collapsible one and a submenu, which keeps its anchor', () => {
+    const { root, q, option } = setupTree({
+      options: [
+        {
+          type: 'group',
+          title: 'Plain',
+          classes: 'vip',
+          style: { color: 'red' },
+          childs: [opts[0]]
+        },
+        {
+          type: 'group',
+          title: 'Fold',
+          collapsible: true,
+          classes: 'fold',
+          childs: [opts[1]]
+        },
+        {
+          type: 'submenu',
+          title: 'Sub',
+          classes: 'sub',
+          style: { color: 'blue' },
+          childs: [opts[2]]
+        }
+      ],
+      classNames: { groupTitle: 'gt', option: 'op' }
+    })
+    fireEvent.click(root)
+    const plain = q('.msl-grp-title.vip')
+    expect(plain.textContent).toBe('Plain')
+    expect(plain.className).toBe('msl-grp-title vip gt')
+    expect(plain.style.color).toBe('red')
+    expect(q('.msl-grp-title.fold').getAttribute('aria-expanded')).toBe('true')
+    const sub = option('Sub')
+    expect(sub.className).toBe('msl-option sub op')
+    expect(sub.style.color).toBe('blue')
+    fireEvent.click(sub)
+    expect(sub.style.color).toBe('blue')
+    expect(
+      (sub.style as CSSStyleDeclaration & { anchorName: string }).anchorName
+    ).toBe('--msl-0')
+    // the rest of the submenu from its title
+    expect(q('.sub + .msl-submenu').textContent).toBe('Cherry')
+  })
+
+  it('types your own fields on groups: read back in renderGroupTitle, with options of any shape', () => {
+    const ada = { id: '1', name: 'Ada' }
+    const elements = [
+      <MultiSelect
+        key='a'
+        options={[
+          { type: 'submenu', title: 'Team', icon: <b>T</b>, childs: [ada] }
+        ]}
+        getLabel={(p) => p.name}
+        getValue={(p) => p.id}
+        renderGroupTitle={({ group, title }) => (
+          <>
+            {group.icon}
+            {title}
+          </>
+        )}
+      />
+    ]
+    expect(elements).toHaveLength(1)
+    const { root, option } = setupTree({
+      options: [
+        { type: 'submenu', title: 'Team', icon: '★', childs: [opts[0]] }
+      ],
+      renderGroupTitle: ({ group, title }) => (
+        <>
+          {group.icon}
+          {title}
+        </>
+      )
+    })
+    fireEvent.click(root)
+    expect(option('★Team')).toBeDefined()
+  })
+})
+
+describe('creating: canCreate, onCreate, pasting', () => {
+  // a promise the test settles
+  function later<V>() {
+    let ok!: (v: V) => void
+    let fail!: () => void
+    const promise = new Promise<V>((res, rej) => {
+      ok = res
+      fail = () => rej(new Error('down'))
+    })
+    return {
+      promise,
+      ok: (v: V) => settle(() => ok(v)),
+      fail: () => settle(fail)
+    }
+  }
+  const paste = (el: Element, text: string) =>
+    fireEvent.paste(el, { clipboardData: { getData: () => text } })
+
+  it('canCreate false: no Create row, Enter and comma create nothing; Enter on an option still picks it', () => {
+    const canCreate = vi.fn((text: string) => text.includes('@'))
+    const { input, optionTexts, chips, onChange } = setup({
+      customValue: true,
+      canCreate
+    })
+    type(input(), 'kiwi')
+    expect(canCreate).toHaveBeenLastCalledWith('kiwi')
+    expect(optionTexts()).toEqual(['No Data Found'])
+    type(input(), 'kiwi', 'Enter')
+    type(input(), 'kiwi', ',')
+    expect(onChange).not.toHaveBeenCalled()
+    type(input(), 'an')
+    press(input(), 'ArrowDown')
+    press(input())
+    expect(chips()).toEqual(['Banana'])
+    type(input(), 'a@b', 'Enter')
+    expect(chips()).toEqual(['Banana', 'a@b'])
+  })
+
+  it('onCreate returns an option of your shape: selected, named by your getters, listed with the created values', () => {
+    const onCreate = vi.fn((text: string) => ({
+      id: `n-${text}`,
+      name: text.toUpperCase()
+    }))
+    const { container } = render(
+      <MultiSelect
+        options={[{ id: 'a', name: 'Ada' }]}
+        getLabel={(p) => p.name}
+        getValue={(p) => p.id}
+        customValue
+        onCreate={onCreate}
+        onChange={(v, o) => changes(v, o)}
+      />
+    )
+    const changes = vi.fn()
+    const field = () => container.querySelector('input.msl-input')!
+    const texts = (s: string) =>
+      [...document.querySelectorAll(s)].map((el) => el.textContent)
+    fireEvent.click(container.firstChild as Element)
+    type(field(), 'kim', 'Enter')
+    expect(onCreate).toHaveBeenCalledWith('kim')
+    expect(texts('.msl-chip')).toEqual(['KIM'])
+    expect(changes).toHaveBeenLastCalledWith(
+      ['n-kim'],
+      [{ id: 'n-kim', name: 'KIM' }]
+    )
+    expect((field() as HTMLInputElement).value).toBe('')
+    // deselected, still listed with the created values, and searchable
+    fireEvent.click(document.querySelector('.msl-chip-delete')!)
+    expect(texts('.msl-grp-title')).toEqual(['Custom Values'])
+    expect(texts('.msl-option')).toEqual(['Ada', 'KIM'])
+    type(field(), 'KI')
+    expect(texts('.msl-option')).toEqual(['KIM', 'Create "KI"'])
+  })
+
+  it('onCreate returns a value, or cancels with false or nothing: the text stays', () => {
+    const onCreate = vi.fn((text: string) =>
+      text === 'kiwi' ? 'fruit-kiwi' : text === 'no' ? false : undefined
+    )
+    const { input, chips, onChange } = setup({ customValue: true, onCreate })
+    type(input(), 'no', 'Enter')
+    type(input(), 'nada', 'Enter')
+    expect(onChange).not.toHaveBeenCalled()
+    expect(input().value).toBe('nada')
+    type(input(), 'kiwi', 'Enter')
+    expect(chips()).toEqual(['fruit-kiwi'])
+    expect(onChange).toHaveBeenLastCalledWith(
+      ['fruit-kiwi'],
+      [{ label: 'fruit-kiwi', value: 'fruit-kiwi' }]
+    )
+  })
+
+  it('an already selected value from onCreate stays selected, now or once its promise settles', async () => {
+    const p = later<string>()
+    const onCreate = vi.fn((text: string) =>
+      text === 'now' ? 'apple' : p.promise
+    )
+    const { input, chips } = setup({
+      customValue: true,
+      onCreate,
+      defaultValue: ['apple']
+    })
+    type(input(), 'now', 'Enter')
+    expect(chips()).toEqual(['Apple'])
+    type(input(), 'soon', 'Enter')
+    await p.ok('apple')
+    expect(chips()).toEqual(['Apple'])
+  })
+
+  it('a promise: loadingLabel, aria-busy and disabled meanwhile, one call; then selected, the search cleared', async () => {
+    const p = later<{ label: string; value: string }>()
+    const onCreate = vi.fn(() => p.promise)
+    const { input, q, option, optionTexts, chips, onChange } = setup({
+      customValue: true,
+      onCreate,
+      loadingLabel: 'Saving...'
+    })
+    type(input(), 'kiwi', 'Enter')
+    expect(optionTexts()).toEqual(['Saving...'])
+    const row = option('Saving...')
+    expect(row.getAttribute('aria-busy')).toBe('true')
+    expect(row.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(row)
+    type(input(), 'kiwi', 'Enter')
+    type(input(), 'kiwi', ',')
+    expect(onCreate).toHaveBeenCalledTimes(1)
+    await p.ok({ label: 'Kiwi', value: 'kiwi' })
+    expect(chips()).toEqual(['Kiwi'])
+    expect(onChange).toHaveBeenLastCalledWith(
+      ['kiwi'],
+      [{ label: 'Kiwi', value: 'kiwi' }]
+    )
+    expect(input().value).toBe('')
+    expect(q('[aria-busy]')).toBeNull()
+  })
+
+  it('a rejected promise: errorLabel with data-error on the row, which creates again; nothing pending resolves to nothing', async () => {
+    let p = later<string | null>()
+    const onCreate = vi.fn(() => p.promise)
+    const { input, option, optionTexts, chips, onChange } = setup({
+      customValue: true,
+      onCreate
+    })
+    type(input(), 'kiwi', 'Enter')
+    await p.fail()
+    expect(optionTexts()).toEqual(['Failed to load. Retry'])
+    const row = option('Failed to load. Retry')
+    expect(row.getAttribute('data-error')).toBe('true')
+    expect(row.hasAttribute('aria-busy')).toBe(false)
+    expect(input().value).toBe('kiwi')
+    p = later<string | null>()
+    fireEvent.click(row)
+    expect(onCreate).toHaveBeenCalledTimes(2)
+    await p.ok(null)
+    expect(optionTexts()).toEqual(['Create "kiwi"'])
+    expect(chips()).toEqual([])
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('a rejected promise with an errorLabel function: it gets the error and a retry; a click on its button calls onCreate once', async () => {
+    let p = later<string>()
+    const onCreate = vi.fn(() => p.promise)
+    const { input, q, chips } = setup({
+      customValue: true,
+      onCreate,
+      errorLabel: (error, retry) => (
+        <button onClick={retry}>{(error as Error).message}: again</button>
+      )
+    })
+    type(input(), 'kiwi', 'Enter')
+    await p.fail()
+    const again = q<HTMLButtonElement>('.msl-option[data-error] button')
+    expect(again.textContent).toBe('down: again')
+    p = later<string>()
+    fireEvent.click(again)
+    // the row's own click finds it pending
+    expect(onCreate).toHaveBeenCalledTimes(2)
+    await p.ok('kiwi')
+    expect(chips()).toEqual(['kiwi'])
+  })
+
+  it('a promise rejecting with nothing gives an errorLabel function true, as a load does', async () => {
+    let fail!: () => void
+    const errorLabel = vi.fn(() => 'Failed')
+    const { input, q } = setup({
+      customValue: true,
+      onCreate: () => new Promise<string>((_, rej) => (fail = () => rej())),
+      errorLabel
+    })
+    type(input(), 'kiwi', 'Enter')
+    await settle(fail)
+    expect(q('.msl-option[data-error]').textContent).toBe('Failed')
+    expect(errorLabel).toHaveBeenLastCalledWith(true, expect.any(Function))
+  })
+
+  it('a promise settling after unmount adds nothing', async () => {
+    const p = later<string>()
+    const { input, unmount, onChange } = setup({
+      customValue: true,
+      onCreate: () => p.promise
+    })
+    type(input(), 'kiwi', 'Enter')
+    unmount()
+    await p.ok('kiwi')
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('controlled: the created option comes through onChange', async () => {
+    const p = later<{ label: string; value: string }>()
+    function Parent() {
+      const [value, setValue] = useState<string[]>(['apple'])
+      return (
+        <MultiSelect
+          options={opts}
+          value={value}
+          customValue
+          onCreate={() => p.promise}
+          onChange={setValue}
+        />
+      )
+    }
+    const { container } = render(<Parent />)
+    fireEvent.click(container.firstChild as Element)
+    type(container.querySelector('input.msl-input')!, 'kiwi', 'Enter')
+    await p.ok({ label: 'Kiwi', value: 'kiwi' })
+    expect(
+      [...container.querySelectorAll('.msl-chip')].map((el) => el.textContent)
+    ).toEqual(['Apple', 'Kiwi'])
+  })
+
+  it('pasting a list picks each part: label text or value, any case; the rest stays in the field; one onChange', () => {
+    const { input, chips, onChange } = setup({
+      options: [...opts, { label: 'Date', value: 'date', disabled: true }],
+      defaultValue: ['cherry']
+    })
+    expect(paste(input(), ' APPLE, banana\tkiwi\ncherry\n\nDate')).toBe(false)
+    expect(chips()).toEqual(['Cherry', 'Apple', 'Banana'])
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(input().value).toBe('kiwi, Date')
+  })
+
+  it('pasting creates the rest with customValue, through canCreate and onCreate, up to the limit', async () => {
+    const p = later<string>()
+    const onCreate = vi.fn((text: string) =>
+      text === 'fig' ? p.promise : text === 'no' ? false : text
+    )
+    const { input, chips, onChange } = setup({
+      customValue: true,
+      canCreate: (text) => text !== 'bad',
+      onCreate,
+      limit: 4
+    })
+    paste(input(), 'kiwi, bad, fig, no, apple, KIWI, fig, lime, plum, pear')
+    expect(chips()).toEqual(['kiwi', 'Apple', 'lime'])
+    expect(onChange).toHaveBeenCalledTimes(1)
+    // fig is on its way, holding its room: none left for plum and pear
+    expect(input().value).toBe('bad, no, plum, pear')
+    // each part once, in any case
+    expect(onCreate.mock.calls.map(([t]) => t)).toEqual([
+      'kiwi',
+      'fig',
+      'no',
+      'lime'
+    ])
+    // settled: in the room it held, what the paste left still in the field
+    await p.ok('fig')
+    expect(chips()).toEqual(['kiwi', 'Apple', 'lime', 'fig'])
+    expect(input().value).toBe('bad, no, plum, pear')
+  })
+
+  it('a create that settles after the search changed adds its value, the search and the menu left as they are', async () => {
+    const p = later<string>()
+    const onSearchChange = vi.fn()
+    const { input, chips, isOpen } = setup({
+      customValue: true,
+      closeOnSelect: true,
+      onCreate: () => p.promise,
+      onSearchChange
+    })
+    type(input(), 'kiwi', 'Enter')
+    fireEvent.change(input(), { target: { value: 'lim' } })
+    await p.ok('kiwi')
+    expect(chips()).toEqual(['kiwi'])
+    expect(input().value).toBe('lim')
+    expect(onSearchChange).toHaveBeenLastCalledWith('lim', 'input')
+    expect(isOpen()).toBe(true)
+  })
+
+  it('single select: a create that settles after another pick is listed, not selected; with none it is selected', async () => {
+    let p = later<string>()
+    const { input, option, single, onChange, optionTexts } = setup({
+      singleSelect: true,
+      customValue: true,
+      onCreate: () => p.promise
+    })
+    type(input(), 'kiwi', 'Enter')
+    fireEvent.change(input(), { target: { value: '' } })
+    fireEvent.click(option('Banana'))
+    await p.ok('kiwi')
+    expect(single()).toBe('Banana')
+    expect(values(onChange)).toEqual([['banana']])
+    expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry', 'kiwi'])
+    p = later<string>()
+    fireEvent.click(option('Banana'))
+    type(input(), 'fig', 'Enter')
+    await p.ok('fig')
+    expect(single()).toBe('fig')
+  })
+
+  it('pasting matches the options loadOptions loaded', async () => {
+    const { fn, calls } = loads()
+    const { root, input, chips } = setup({
+      options: undefined,
+      loadOptions: fn
+    })
+    fireEvent.click(root)
+    await calls[0].ok(opts)
+    paste(input(), 'apple,cherry')
+    expect(chips()).toEqual(['Apple', 'Cherry'])
+  })
+
+  it("a paste with one part, or into single select, is the browser's", () => {
+    const { input, onChange } = setup()
+    expect(paste(input(), 'apple')).toBe(true)
+    cleanup()
+    const single = setup({ singleSelect: true })
+    expect(paste(single.input(), 'apple, banana')).toBe(true)
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it("a paste where no part goes in is the browser's, at the caret: the typed text stays", () => {
+    const { input, onChange } = setup()
+    fireEvent.change(input(), { target: { value: 'New ' } })
+    expect(paste(input(), 'York, NY')).toBe(true)
+    expect(onChange).not.toHaveBeenCalled()
+    expect(input().value).toBe('New ')
+  })
+
+  it('a paste that picks keeps the typed text: what it leaves goes in at the caret', () => {
+    const { input, chips } = setup()
+    fireEvent.change(input(), { target: { value: 'New ' } })
+    expect(paste(input(), 'apple, York, banana')).toBe(false)
+    expect(chips()).toEqual(['Apple', 'Banana'])
+    expect(input().value).toBe('New York')
+    input().setSelectionRange(0, 4)
+    paste(input(), 'cherry, Old')
+    expect(input().value).toBe('OldYork')
+  })
+
+  it('promises that settle together are all selected, each from the value the one before set, controlled too', async () => {
+    const onCreate = (text: string) =>
+      Promise.resolve({ label: text, value: text })
+    const { input, chips } = setup({ customValue: true, onCreate })
+    paste(input(), 'kiwi, fig')
+    await settle()
+    expect(chips()).toEqual(['kiwi', 'fig'])
+    cleanup()
+    function Parent() {
+      const [value, setValue] = useState<string[]>(['apple'])
+      return (
+        <MultiSelect
+          options={opts}
+          customValue
+          onCreate={onCreate}
+          value={value}
+          onChange={setValue}
+        />
+      )
+    }
+    const { container } = render(<Parent />)
+    paste(container.querySelector('input.msl-input')!, 'kiwi, fig')
+    await settle()
+    expect(
+      [...container.querySelectorAll('.msl-chip')].map((el) => el.textContent)
+    ).toEqual(['Apple', 'kiwi', 'fig'])
+  })
+
+  it('types canCreate and onCreate', () => {
+    const ada = { id: '1', name: 'Ada' }
+    const getters = {
+      getLabel: (p: typeof ada) => p.name,
+      getValue: (p: typeof ada) => p.id
+    }
+    const elements = [
+      <MultiSelect
+        key='a'
+        options={[ada]}
+        customValue
+        canCreate={(text) => text.length > 1}
+        onCreate={async (text) => ({ id: text, name: text })}
+        {...getters}
+      />,
+      <MultiSelect
+        key='b'
+        options={[ada]}
+        customValue
+        onCreate={() => 'x'}
+        {...getters}
+      />,
+      <MultiSelect
+        key='c'
+        options={[ada]}
+        customValue
+        // @ts-expect-error onCreate makes an option of the options' shape
+        onCreate={() => 1}
+        {...getters}
+      />
+    ]
+    expect(elements).toHaveLength(3)
+  })
+})
+
+describe('maxChips, controlled open and search', () => {
+  const three = ['apple', 'banana', 'cherry']
+
+  it('maxChips: chips for the first values, then one for the rest that opens the menu; all stay selected', () => {
+    const { root, q, qa, chips, hidden, input, isOpen, onChange } = setup({
+      maxChips: 2,
+      defaultValue: three,
+      options: [...opts.slice(0, 2), { ...opts[2], disabled: false }]
+    })
+    expect(chips()).toEqual(['Apple', 'Banana', '+1'])
+    expect(hidden().value).toBe('apple,banana,cherry')
+    const more = q('.msl-chip[data-more]')
+    expect(more.className).toBe('msl-chip ')
+    expect(more.querySelector('.msl-chip-delete')).toBeNull()
+    expect(qa('.msl-chip-delete')).toHaveLength(2)
+    fireEvent.click(more)
+    expect(isOpen()).toBe(true)
+    // Backspace removes the last value, shown or not
+    press(input(), 'Backspace')
+    expect(onChange).toHaveBeenLastCalledWith(
+      ['apple', 'banana'],
+      opts.slice(0, 2)
+    )
+    expect(chips()).toEqual(['Apple', 'Banana'])
+    expect(root.querySelector('[data-more]')).toBeNull()
+  })
+
+  it('maxChips: moreChipsLabel, 0, classNames.chip; customChip gets index and total; not with disableChip or single select', () => {
+    const customChip = vi.fn((p: MultiSelectChipProps) => (
+      <i key={p.value}>{p.label}</i>
+    ))
+    const { container, rerender } = render(
+      <MultiSelect
+        options={opts}
+        defaultValue={three}
+        maxChips={1}
+        customChip={customChip}
+        moreChipsLabel={(n) => <b>{n} more</b>}
+        classNames={{ chip: 'c' }}
+      />
+    )
+    expect(customChip).toHaveBeenCalledTimes(1)
+    expect(customChip.mock.calls[0][0]).toMatchObject({
+      value: 'apple',
+      index: 0,
+      total: 3
+    })
+    const more = container.querySelector('[data-more]')!
+    expect(more.innerHTML).toBe('<b>2 more</b>')
+    expect(more.className).toBe('msl-chip c')
+    rerender(<MultiSelect options={opts} defaultValue={three} maxChips={0} />)
+    expect(container.querySelector('[data-more]')!.textContent).toBe('+3')
+    expect(container.querySelector('.msl-chip:not([data-more])')).toBeNull()
+    rerender(
+      <MultiSelect
+        options={opts}
+        defaultValue={three}
+        maxChips={0}
+        disableChip
+      />
+    )
+    expect(container.querySelector('.msl-chip')).toBeNull()
+    expect(container.querySelector('.msl-single-value')!.textContent).toBe(
+      '3 Item Selected'
+    )
+  })
+
+  it('maxChips: Backspace skips fixed values, hidden ones too', () => {
+    const { chips, input } = setup({
+      maxChips: 1,
+      options: [opts[0], { ...opts[1], fixed: true }],
+      defaultValue: ['apple', 'banana']
+    })
+    expect(chips()).toEqual(['Apple', '+1'])
+    press(input(), 'Backspace')
+    expect(chips()).toEqual(['Banana'])
+    press(input(), 'Backspace')
+    expect(chips()).toEqual(['Banana'])
+  })
+
+  // the parent owns open: its menu calls set it, or not
+  function Owned({
+    take = true,
+    calls,
+    ...props
+  }: MultiSelectProps & { take?: boolean; calls: (e: string) => void }) {
+    const [open, setOpen] = useState(false)
+    return (
+      <>
+        <button onClick={() => setOpen(!open)}>toggle</button>
+        <MultiSelect
+          options={opts}
+          {...props}
+          open={open}
+          onMenuOpen={() => {
+            calls('open')
+            setOpen(true)
+          }}
+          onMenuClose={() => {
+            calls('close')
+            take && setOpen(false)
+          }}
+        />
+      </>
+    )
+  }
+  const own = (props: MultiSelectProps & { take?: boolean } = {}) => {
+    const calls = vi.fn()
+    const u = render(<Owned calls={calls} {...props} />)
+    const c = u.container
+    return {
+      calls,
+      root: c.querySelector<HTMLElement>('.msl-wrp')!,
+      toggle: c.querySelector('button')!,
+      input: () => c.querySelector<HTMLInputElement>('input.msl-input')!,
+      option: (t: string) =>
+        [...c.querySelectorAll('.msl-option')].find(
+          (el) => el.textContent === t
+        )!
+    }
+  }
+
+  it("open: the dropdown's opens and closes ask; yours open and close it, once", () => {
+    const { calls, root, input } = own()
+    fireEvent.click(root)
+    expect(calls.mock.calls).toEqual([['open']])
+    expect(box()).not.toBeNull()
+    // opened from the dropdown, focus goes to the search field
+    expect(document.activeElement).toBe(input())
+    press(input(), 'Escape')
+    expect(calls.mock.calls).toEqual([['open'], ['close']])
+    expect(box()).toBeNull()
+  })
+
+  it('open: a close it ignores keeps the menu open, a pick with closeOnSelect clears the search all the same', () => {
+    const onSearchChange = vi.fn()
+    const { calls, root, input, option } = own({
+      take: false,
+      closeOnSelect: true,
+      onSearchChange
+    })
+    fireEvent.click(root)
+    press(input(), 'Escape')
+    fireEvent.click(document.body)
+    expect(calls.mock.calls).toEqual([['open'], ['close'], ['close']])
+    expect(box()).not.toBeNull()
+    type(input(), 'a', 'a')
+    fireEvent.click(option('Apple'))
+    expect(calls).toHaveBeenLastCalledWith('close')
+    expect(onSearchChange).toHaveBeenLastCalledWith('', 'pick')
+    expect(input().value).toBe('')
+    expect(box()).not.toBeNull()
+  })
+
+  it('open: a single select pick closes it, focus on the wrapper once the field goes', () => {
+    const { root, input, option } = own({ singleSelect: true })
+    fireEvent.click(root)
+    expect(document.activeElement).toBe(input())
+    fireEvent.click(option('Banana'))
+    expect(box()).toBeNull()
+    expect(root.querySelector('.msl-single-value')!.textContent).toBe('Banana')
+    expect(document.activeElement).toBe(root)
+  })
+
+  it('open: opened from outside, focus stays there; then a click outside asks to close', () => {
+    const { calls, toggle } = own()
+    toggle.focus()
+    fireEvent.click(toggle)
+    expect(box()).not.toBeNull()
+    expect(document.activeElement).toBe(toggle)
+    expect(calls).not.toHaveBeenCalled()
+    fireEvent.click(document.body)
+    expect(calls.mock.calls).toEqual([['close']])
+    expect(box()).toBeNull()
+  })
+
+  it('open: an open it asked for and yours ignored ends as focus leaves, so a later open of yours keeps focus there', () => {
+    const onBlur = vi.fn()
+    function Ignored() {
+      const [open, setOpen] = useState(false)
+      return (
+        <>
+          <button onClick={() => setOpen(true)}>open</button>
+          <MultiSelect options={opts} open={open} attr={{ onBlur }} />
+        </>
+      )
+    }
+    const { container } = render(<Ignored />)
+    const root = container.querySelector<HTMLElement>('.msl-wrp')!
+    const button = container.querySelector('button')!
+    root.focus()
+    fireEvent.click(root)
+    expect(box()).toBeNull()
+    // within it, still asked
+    container.querySelector<HTMLElement>('input.msl-input')!.focus()
+    button.focus()
+    expect(onBlur).toHaveBeenCalledTimes(2)
+    fireEvent.click(button)
+    expect(box()).not.toBeNull()
+    expect(document.activeElement).toBe(button)
+  })
+
+  it('open: disabled, a menu yours keeps open picks nothing, unstyled too', () => {
+    const onChange = vi.fn()
+    const onMenuClose = vi.fn()
+    const { container } = render(
+      <MultiSelect
+        options={opts}
+        open
+        disabled
+        onChange={onChange}
+        onMenuClose={onMenuClose}
+        selectAll
+      />
+    )
+    expect(onMenuClose).toHaveBeenCalledTimes(1)
+    const apple = [...container.querySelectorAll('.msl-option')].find(
+      (el) => el.textContent === 'Apple'
+    )!
+    fireEvent.click(apple)
+    press(apple)
+    fireEvent.click(container.querySelector('.msl-select-all')!)
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('open: disabled while open, yours closes it and focus moves to the wrapper, as without open', () => {
+    function Form({ disabled }: { disabled: boolean }) {
+      const [open, setOpen] = useState(false)
+      return (
+        <MultiSelect
+          options={opts}
+          open={open}
+          disabled={disabled}
+          onMenuOpen={() => setOpen(true)}
+          onMenuClose={() => setOpen(false)}
+        />
+      )
+    }
+    const { container, rerender } = render(<Form disabled={false} />)
+    const root = container.querySelector<HTMLElement>('.msl-wrp')!
+    fireEvent.click(root)
+    expect(document.activeElement).toBe(
+      container.querySelector('input.msl-input')
+    )
+    rerender(<Form disabled />)
+    expect(box()).toBeNull()
+    expect(document.activeElement).toBe(root)
+  })
+
+  it('open: open from the start, false stays closed', () => {
+    const onMenuOpen = vi.fn()
+    const { rerender } = render(
+      <MultiSelect options={opts} open onMenuOpen={onMenuOpen} />
+    )
+    expect(box()).not.toBeNull()
+    expect(onMenuOpen).not.toHaveBeenCalled()
+    rerender(
+      <MultiSelect options={opts} open={false} onMenuOpen={onMenuOpen} />
+    )
+    expect(box()).toBeNull()
+  })
+
+  it("onSearchChange hears the field's text, raw, as typed, picked and closed, each change once", () => {
+    const onSearchChange = vi.fn()
+    const onSearch = vi.fn()
+    const { root, input } = setup({ onSearchChange, onSearch })
+    fireEvent.click(root)
+    press(input(), 'Escape')
+    expect(onSearchChange).not.toHaveBeenCalled()
+    fireEvent.click(root)
+    fireEvent.change(input(), { target: { value: ' ap, ' } })
+    expect(onSearchChange).toHaveBeenLastCalledWith(' ap, ', 'input')
+    expect(onSearch).toHaveBeenLastCalledWith('ap')
+    press(input())
+    expect(onSearchChange).toHaveBeenLastCalledWith('', 'pick')
+    type(input(), 'b', 'b')
+    press(input(), 'Escape')
+    expect(onSearchChange.mock.calls).toEqual([
+      [' ap, ', 'input'],
+      ['', 'pick'],
+      ['b', 'input'],
+      ['', 'close']
+    ])
+  })
+
+  it('a close from outside reports to the latest onSearchChange and onMenuClose, a new closure each render', () => {
+    const first = vi.fn()
+    const latest = vi.fn()
+    const onMenuClose = vi.fn()
+    const { root, input, rerender } = setup({ onSearchChange: first })
+    fireEvent.click(root)
+    fireEvent.change(input(), { target: { value: 'ap' } })
+    rerender(
+      <MultiSelect
+        options={opts}
+        onSearchChange={latest}
+        onMenuClose={onMenuClose}
+      />
+    )
+    fireEvent.click(document.body)
+    expect(first.mock.calls).toEqual([['ap', 'input']])
+    expect(latest.mock.calls).toEqual([['', 'close']])
+    expect(onMenuClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('search: yours shows, filters and loads; ignoring a pick keeps it after the pick', () => {
+    const changes = vi.fn()
+    function Kept(props: MultiSelectProps) {
+      const [search, setSearch] = useState('')
+      return (
+        <MultiSelect
+          options={opts}
+          onChange={changes}
+          search={search}
+          onSearchChange={(text, reason) =>
+            reason !== 'pick' && setSearch(text)
+          }
+          {...props}
+        />
+      )
+    }
+    const { container, rerender } = render(<Kept />)
+    const field = () =>
+      container.querySelector<HTMLInputElement>('input.msl-input')!
+    const texts = () =>
+      [...document.querySelectorAll('.msl-options .msl-option')].map(
+        (el) => el.textContent
+      )
+    fireEvent.click(container.firstChild as Element)
+    type(field(), 'an', 'n')
+    expect(texts()).toEqual(['Banana'])
+    press(field(), 'ArrowDown')
+    press(field())
+    expect(changes).toHaveBeenLastCalledWith(['banana'], [opts[1]])
+    expect(field().value).toBe('an')
+    expect(texts()).toEqual(['Banana'])
+    press(field(), 'Escape')
+    expect(field().value).toBe('')
+    // set from outside: the field shows it, closed too
+    rerender(<Kept search='ch' />)
+    expect(field().value).toBe('ch')
+  })
+
+  it('types open, search, onSearchChange, maxChips, moreChipsLabel and the chip index and total', () => {
+    const chip = (p: MultiSelectChipProps) => `${p.index}/${p.total}`
+    const elements = [
+      <MultiSelect
+        key='a'
+        open={false}
+        search=''
+        onSearchChange={(text: string, reason: 'input' | 'pick' | 'close') =>
+          text + reason
+        }
+        maxChips={2}
+        moreChipsLabel={(n: number) => n}
+        customChip={chip}
+      />,
+      // @ts-expect-error a reason is one of three
+      <MultiSelect key='b' onSearchChange={(_, r: 'typed') => r} />
+    ]
+    expect(elements).toHaveLength(2)
+  })
+})
+
+describe("getLabel's meta (context, search, selected) and hideSelected", () => {
+  // the label with where it shows: `menu: ''` for a menu row with no search, `value` for a value
+  const where = vi.fn(
+    (
+      opt: MultiSelectOption,
+      { context, search, selected }: MultiSelectLabelMeta
+    ) =>
+      `${opt.label} ${context}${context === 'menu' ? `:${search}` : ''}${selected ? ' ✓' : ''}`
+  )
+
+  it('menu rows get the search and their selected state, chips and the single value get the value context', () => {
+    const { root, input, chips, optionTexts, rerender, q } = setup({
+      getLabel: where,
+      defaultValue: ['banana']
+    })
+    expect(chips()).toEqual(['Banana value ✓'])
+    fireEvent.click(root)
+    expect(optionTexts()).toEqual([
+      'Apple menu:',
+      'Banana menu: ✓',
+      'Cherry menu:'
+    ])
+    fireEvent.change(input(), { target: { value: ' an, ' } })
+    expect(optionTexts()).toEqual(['Banana menu:an ✓'])
+    rerender(<MultiSelect options={opts} getLabel={where} singleSelect />)
+    expect(q('.msl-single-value').textContent).toBe('Banana value ✓')
+  })
+
+  it('search and the tooltip read the text of the label for no search: a highlight of the match leaves them be', () => {
+    const name = (p: { id: string; name: string }) => p.name
+    const people = [
+      { id: '1', name: 'Ada' },
+      { id: '2', name: 'Alan' }
+    ]
+    const { container } = render(
+      <MultiSelect
+        options={people}
+        getValue={(p) => p.id}
+        // the match in <mark>
+        getLabel={(p, { search }) => {
+          const i = search ? name(p).toLowerCase().indexOf(search) : -1
+          return i < 0 ? (
+            name(p)
+          ) : (
+            <>
+              {name(p).slice(0, i)}
+              <mark>{name(p).slice(i, i + search.length)}</mark>
+              {name(p).slice(i + search.length)}
+            </>
+          )
+        }}
+      />
+    )
+    fireEvent.click(container.firstChild!)
+    const rows = () => [...container.querySelectorAll('.msl-option')]
+    expect(rows().map((el) => el.getAttribute('title'))).toEqual([
+      'Ada',
+      'Alan'
+    ])
+    fireEvent.change(container.querySelector('input.msl-input')!, {
+      target: { value: 'la' }
+    })
+    expect(rows().map((el) => el.innerHTML)).toEqual(['A<mark>la</mark>n'])
+    // a JSX label: the tooltip falls back to the option's label field, which people lack
+    expect(rows()[0].getAttribute('title')).toBe('')
+  })
+
+  it("created values skip getLabel; a value's chip is named by its value label", () => {
+    const getLabel = vi.fn(where)
+    const { input, chips } = setup({ getLabel, customValue: true })
+    type(input(), 'kiwi', 'Enter')
+    expect(chips()).toEqual(['kiwi'])
+    expect(getLabel.mock.calls.some(([o]) => o.value === 'kiwi')).toBe(false)
+  })
+
+  it('types the meta, one-argument getLabels too', () => {
+    const ada = { id: '1', name: 'Ada' }
+    const elements = [
+      <MultiSelect
+        key='a'
+        options={[ada]}
+        getLabel={(p, meta) =>
+          meta.context === 'value' ? p.name : `${p.name}${meta.search}`
+        }
+        getValue={(p) => p.id}
+      />,
+      <MultiSelect
+        key='b'
+        options={[ada]}
+        getLabel={(p) => p.name}
+        getValue={(p) => p.id}
+      />,
+      <MultiSelect
+        key='c'
+        // @ts-expect-error meta comes second
+        getLabel={(m: MultiSelectLabelMeta, p: MultiSelectOption) => p.label}
+      />
+    ]
+    expect(elements).toHaveLength(3)
+  })
+
+  it('hideSelected: picked options leave the menu and search results; a deleted chip brings one back', () => {
+    const { root, input, optionTexts, option, qa } = setup({
+      hideSelected: true,
+      defaultValue: ['banana']
+    })
+    fireEvent.click(root)
+    expect(optionTexts()).toEqual(['Apple', 'Cherry'])
+    fireEvent.click(option('Apple'))
+    expect(optionTexts()).toEqual(['Cherry'])
+    fireEvent.change(input(), { target: { value: 'a' } })
+    expect(optionTexts()).toEqual(['No Data Found'])
+    fireEvent.change(input(), { target: { value: '' } })
+    fireEvent.click(qa('.msl-chip-delete')[0])
+    expect(optionTexts()).toEqual(['Banana', 'Cherry'])
+  })
+
+  it('hideSelected: Enter or a comma picks the first result shown, never a hidden one', () => {
+    const { input, chips } = setup({
+      hideSelected: true,
+      options: [...opts, { label: 'Apricot', value: 'apricot' }],
+      defaultValue: ['apple']
+    })
+    type(input(), 'ap', 'Enter')
+    expect(chips()).toEqual(['Apple', 'Apricot'])
+    type(input(), 'ap', ',')
+    expect(chips()).toEqual(['Apple', 'Apricot'])
+  })
+
+  it('single select hides its value', () => {
+    const { root, optionTexts } = setup({
+      hideSelected: true,
+      singleSelect: true,
+      defaultValue: ['cherry']
+    })
+    fireEvent.click(root)
+    expect(optionTexts()).toEqual(['Apple', 'Banana'])
+  })
+
+  it('groups, collapsible groups and submenus with nothing left go, title and all; an empty group stays; renderGroupTitle counts the hidden', () => {
+    const renderGroupTitle = vi.fn(
+      ({ title, total, selected }: MultiSelectGroupTitleProps) =>
+        `${title} ${selected}/${total}`
+    )
+    const { root, groupTitles, optionTexts, option } = setupTree({
+      options: [
+        { type: 'group', title: 'Plain', childs: [opts[0]] },
+        {
+          type: 'group',
+          title: 'Fold',
+          collapsible: true,
+          childs: [opts[1], { label: 'Kiwi', value: 'kiwi' }]
+        },
+        { type: 'submenu', title: 'Sub', childs: [opts[2]] },
+        { type: 'group', title: 'Empty', childs: [], emptyDataLabel: 'None' }
+      ],
+      hideSelected: true,
+      defaultValue: ['apple', 'banana', 'cherry'],
+      renderGroupTitle
+    })
+    fireEvent.click(root)
+    expect(groupTitles()).toEqual(['Fold 1/2', 'Empty 0/0'])
+    expect(optionTexts()).toEqual(['Kiwi', 'None'])
+    fireEvent.click(option('Kiwi'))
+    expect(groupTitles()).toEqual(['Empty 0/0'])
+  })
+
+  it('the Custom Values group goes once its values are all picked', () => {
+    const { input, groupTitles, optionTexts } = setup({
+      hideSelected: true,
+      customValue: true
+    })
+    type(input(), 'kiwi', 'Enter')
+    expect(groupTitles()).toEqual([])
+    expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry'])
+  })
+
+  it("hidden options leave gaps: the others keep their places, a group's open state too", () => {
+    const { root, q, optionTexts, option, titles } = setupTree({
+      options: [opts[0], { ...fruits[1] }],
+      hideSelected: true
+    })
+    fireEvent.click(root)
+    // Berries opens
+    fireEvent.click(q('.msl-grp-title'))
+    expect(titles()).toEqual(['true'])
+    fireEvent.click(option('Apple'))
+    expect(titles()).toEqual(['true'])
+    expect(optionTexts()).toEqual(['Blueberry'])
+  })
+
+  it('the keyboard: Enter picks, the highlight goes on to the next row, at the end back to the one before', () => {
+    const { input, focused, onChange, q } = setupTree({
+      hideSelected: true,
+      options: [opts[0], { type: 'group', title: 'G', childs: opts.slice(1) }]
+    })
+    press(input(), 'ArrowDown')
+    press(input(), 'ArrowDown')
+    expect(focused()).toBe('Banana')
+    press(input())
+    expect(onChange).toHaveBeenLastCalledWith(['banana'], [opts[1]])
+    expect(focused()).toBe('Cherry')
+    expect(input().getAttribute('aria-activedescendant')).toBe(
+      q('.msl-option-focused').id
+    )
+    press(input())
+    expect(focused()).toBe('Apple')
+    press(input())
+    expect(focused()).toBeUndefined()
+    expect(q('.msl-options > .msl-option').textContent).toBe('No Data Found')
+  })
+
+  it('the keyboard: Enter skips the rows the pick hides or disables, a group left empty, options past the limit', () => {
+    const { input, focused } = setupTree({
+      hideSelected: true,
+      defaultValue: ['banana'],
+      options: [
+        opts[0],
+        { type: 'group', title: 'G', collapsible: true, childs: opts.slice(1) }
+      ]
+    })
+    // Apple, G, Cherry in it: G goes with Cherry
+    press(input(), 'ArrowUp')
+    expect(focused()).toBe('Cherry')
+    press(input())
+    expect(focused()).toBe('Apple')
+    cleanup()
+    const limited = setupTree({
+      hideSelected: true,
+      limit: 2,
+      defaultValue: ['apple']
+    })
+    press(limited.input(), 'ArrowDown')
+    press(limited.input())
+    expect(limited.chips()).toEqual(['Apple', 'Banana'])
+    expect(limited.focused()).toBeUndefined()
+  })
+
+  it("a loader's list with its options all picked keeps its end row while it may load more; getValue never reads that row", async () => {
+    const { fn, calls } = loads()
+    const getValue = (o: MultiSelectOption) => o.value.trim()
+    const { root, optionTexts, option } = setup({
+      options: undefined,
+      loadOptions: fn,
+      getValue,
+      hideSelected: true
+    })
+    fireEvent.click(root)
+    await calls[0].ok({ options: [opts[0]], next: 2 })
+    fireEvent.click(option('Apple'))
+    expect(optionTexts()).toEqual(['Loading...'])
+  })
+
+  it('with renderList, the rows a virtual list gets leave out the hidden', () => {
+    const renderList = vi.fn(({ count, row }: MultiSelectListProps) => (
+      <div>{Array.from({ length: count }, (_, i) => row(i))}</div>
+    ))
+    const { root, optionTexts } = setup({
+      options: grouped,
+      renderList,
+      hideSelected: true,
+      defaultValue: ['banana']
+    })
+    fireEvent.click(root)
+    expect(renderList.mock.lastCall![0].count).toBe(4)
+    expect(optionTexts()).toEqual(['Apple', 'Cherry'])
+  })
+})
+
+describe('loadKey, errorLabel(error, retry), data-loading, preload, loadAhead, emptyDataLabel(search)', () => {
+  it('a new loadKey drops the lists and stops their loads, the list showing loads again; the selection, the open menu and the names stay', async () => {
+    const { fn, calls } = loads()
+    const props = {
+      options: undefined,
+      loadOptions: fn,
+      defaultValue: ['banana']
+    }
+    const { root, rerender, chips, optionTexts, isOpen } = setup({
+      ...props,
+      loadKey: 'a'
+    })
+    const key = (loadKey: unknown) =>
+      rerender(<MultiSelect {...props} loadKey={loadKey} />)
+    fireEvent.click(root)
+    await calls[0].ok({ options: opts, next: 2 })
+    expect(chips()).toEqual(['Banana'])
+    key('a')
+    expect(fn).toHaveBeenCalledTimes(1)
+    key('b')
+    expect(calls[1].req).toEqual(request(''))
+    expect(isOpen()).toBe(true)
+    expect(optionTexts()).toEqual(['Loading...'])
+    // the dropped options name the value still
+    expect(chips()).toEqual(['Banana'])
+    key('c')
+    expect(calls[1].req.signal.aborted).toBe(true)
+    expect(calls[2].req).toEqual(request(''))
+    // late: dropped
+    await calls[1].ok([{ label: 'Zed', value: 'zed' }])
+    expect(optionTexts()).toEqual(['Loading...'])
+    await calls[2].ok([opts[0]])
+    expect(optionTexts()).toEqual(['Apple'])
+    // by Object.is: NaN is NaN
+    key(NaN)
+    key(NaN)
+    expect(fn).toHaveBeenCalledTimes(4)
+  })
+
+  it('a new loadKey keeps naming only the values picked from the dropped lists', async () => {
+    const { fn, calls } = loads()
+    const props = { options: undefined, loadOptions: fn }
+    const { root, rerender, chips } = setup({
+      ...props,
+      value: ['banana'],
+      loadKey: 'a'
+    })
+    fireEvent.click(root)
+    await calls[0].ok(opts)
+    rerender(<MultiSelect {...props} value={['banana']} loadKey='b' />)
+    rerender(
+      <MultiSelect {...props} value={['banana', 'cherry']} loadKey='b' />
+    )
+    expect(chips()).toEqual(['Banana'])
+  })
+
+  it("a new loadKey stops the loads once it commits: an abort's listeners may set state", () => {
+    const error = vi.spyOn(console, 'error')
+    function Parent({ k }: { k: number }) {
+      const [aborts, setAborts] = useState(0)
+      return (
+        <>
+          <p>{aborts}</p>
+          <MultiSelect
+            loadKey={k}
+            loadOptions={({ signal }) => {
+              signal.addEventListener('abort', () => setAborts((n) => n + 1))
+              return new Promise<MultiSelectLoaded>(() => {})
+            }}
+          />
+        </>
+      )
+    }
+    const { container, rerender } = render(<Parent k={1} />)
+    fireEvent.click(container.querySelector('.msl-wrp')!)
+    rerender(<Parent k={2} />)
+    expect(container.querySelector('p')!.textContent).toBe('1')
+    expect(error).not.toHaveBeenCalled()
+  })
+
+  it('a new loadKey in a render React drops leaves the lists be: a render with the old one keeps them', async () => {
+    const { fn, calls } = loads()
+    const never = new Promise(() => {})
+    function Hold({ on }: { on: boolean }) {
+      if (on) throw never
+      return null
+    }
+    let setKey!: (k: string) => void
+    function Parent() {
+      const [k, set] = useState('a')
+      setKey = set
+      return (
+        <Suspense fallback={null}>
+          <MultiSelect loadOptions={fn} loadKey={k} />
+          <Hold on={k === 'b'} />
+        </Suspense>
+      )
+    }
+    const { container } = render(<Parent />)
+    fireEvent.click(container.querySelector('.msl-wrp')!)
+    await calls[0].ok(opts)
+    // renders with b, then suspends: React keeps showing a
+    act(() => startTransition(() => setKey('b')))
+    const field = container.querySelector('input.msl-input')!
+    // a render with a: the highlight moves
+    press(field, 'ArrowDown')
+    expect(fn).toHaveBeenCalledTimes(1)
+    expect(
+      [...document.querySelectorAll('.msl-options .msl-option')].map(
+        (el) => el.textContent
+      )
+    ).toEqual(['Apple', 'Banana', 'Cherry'])
+  })
+
+  it("a new loadKey drops groups' lists: the open ones load again, search no longer finds the dropped options", async () => {
+    const { fn, calls } = loads()
+    const options = [
+      { type: 'group', title: 'G', childs: fn },
+      {
+        type: 'group',
+        title: 'H',
+        collapsible: true,
+        collapsed: true,
+        childs: fn
+      }
+    ]
+    const { root, rerender, chips, optionTexts, input, option } = setupTree({
+      options,
+      loadKey: 1
+    })
+    fireEvent.click(root)
+    await calls[0].ok(opts)
+    fireEvent.click(option('Cherry'))
+    rerender(<MultiSelect options={options} loadKey={2} />)
+    expect(fn).toHaveBeenCalledTimes(2)
+    expect(calls[1].req).toEqual(request(''))
+    expect(chips()).toEqual(['Cherry'])
+    fireEvent.change(input(), { target: { value: 'an' } })
+    expect(optionTexts()).toEqual(['No Data Found'])
+  })
+
+  it('errorLabel as a function gets what the load threw and a retry: a click on the row does not retry, the keyboard does', async () => {
+    const { fn, calls } = loads()
+    const errorLabel = vi.fn((error: unknown, retry: () => void) => (
+      <button onClick={retry}>{(error as Error).message}</button>
+    ))
+    const { root, q, input, optionTexts } = setup({
+      options: undefined,
+      loadOptions: fn,
+      errorLabel
+    })
+    fireEvent.click(root)
+    await calls[0].fail()
+    expect(errorLabel).toHaveBeenLastCalledWith(
+      new Error('down'),
+      expect.any(Function)
+    )
+    expect(optionTexts()).toEqual(['down'])
+    const end = q('.msl-loading')
+    expect(end.getAttribute('data-error')).toBe('true')
+    fireEvent.click(end)
+    expect(fn).toHaveBeenCalledTimes(1)
+    fireEvent.click(q('.msl-loading button'))
+    expect(fn).toHaveBeenCalledTimes(2)
+    await calls[1].fail()
+    press(input(), 'ArrowDown')
+    expect(fn).toHaveBeenCalledTimes(3)
+  })
+
+  it('a load that rejects with nothing fails with true, one that returns nothing with a TypeError', async () => {
+    const errorLabel = vi.fn((error: unknown) => (error ? 'failed' : ''))
+    const { root, optionTexts } = setup({
+      options: undefined,
+      loadOptions: () => Promise.reject(),
+      errorLabel
+    })
+    fireEvent.click(root)
+    await settle()
+    expect(optionTexts()).toEqual(['failed'])
+    expect(errorLabel).toHaveBeenLastCalledWith(true, expect.any(Function))
+    cleanup()
+    const { root: other } = setup({
+      options: undefined,
+      loadOptions: (() => undefined) as unknown as MultiSelectLoader,
+      errorLabel
+    })
+    fireEvent.click(other)
+    await settle()
+    expect(errorLabel.mock.lastCall![0]).toBeInstanceOf(TypeError)
+  })
+
+  it('loadError takes the error itself, as errorLabel gets it; retry calls onLoadMore', () => {
+    const errorLabel = vi.fn((error: unknown, retry: () => void) => (
+      <button onClick={retry}>{String(error)}</button>
+    ))
+    const { root, q, onLoadMore } = remote({
+      loadError: new Error('down'),
+      errorLabel
+    })
+    fireEvent.click(root)
+    // the menu opening retries, as before
+    expect(onLoadMore).toHaveBeenCalledTimes(1)
+    expect(q('.msl-loading').getAttribute('data-error')).toBe('true')
+    expect(q('.msl-loading').textContent).toBe('Error: down')
+    fireEvent.click(q('.msl-loading'))
+    expect(onLoadMore).toHaveBeenCalledTimes(1)
+    fireEvent.click(q('.msl-loading button'))
+    expect(onLoadMore).toHaveBeenCalledTimes(2)
+  })
+
+  it("errorLabel's retry from a focused button: loadingLabel takes its place, focus goes to the listbox", async () => {
+    const { fn, calls } = loads()
+    const { root, q } = setup({
+      options: undefined,
+      loadOptions: fn,
+      disableSearch: true,
+      errorLabel: (_, retry) => <button onClick={retry}>Retry</button>
+    })
+    fireEvent.click(root)
+    await calls[0].fail()
+    const retry = q('.msl-loading button')
+    retry.focus()
+    fireEvent.click(retry)
+    expect(fn).toHaveBeenCalledTimes(2)
+    expect(q('.msl-loading').textContent).toBe('Loading...')
+    expect(document.activeElement).toBe(q('.msl-options'))
+  })
+
+  it('data-loading on the wrapper while any list loads, open or closed: a loader, loading, a group of yours', async () => {
+    const { fn, calls } = loads()
+    const { root, input, isOpen } = setup({
+      options: undefined,
+      loadOptions: fn
+    })
+    expect(root.hasAttribute('data-loading')).toBe(false)
+    fireEvent.click(root)
+    expect(root.getAttribute('data-loading')).toBe('true')
+    press(input(), 'Escape')
+    expect(isOpen()).toBe(false)
+    // closing doesn't stop it
+    expect(root.getAttribute('data-loading')).toBe('true')
+    await calls[0].ok(opts)
+    expect(root.hasAttribute('data-loading')).toBe(false)
+    cleanup()
+    const yours = remote({ loading: true })
+    expect(yours.root.getAttribute('data-loading')).toBe('true')
+    cleanup()
+    const group = setupTree({
+      options: [
+        {
+          type: 'group',
+          title: 'G',
+          collapsible: true,
+          collapsed: true,
+          childs: [],
+          loading: true
+        }
+      ]
+    })
+    expect(group.root.getAttribute('data-loading')).toBe('true')
+  })
+
+  it('preload loads the first list on mount, and as loadKey changes; the menu opens on it', async () => {
+    const { fn, calls } = loads()
+    const { root, rerender, input, optionTexts } = setup({
+      options: undefined,
+      loadOptions: fn,
+      preload: true
+    })
+    expect(calls[0].req).toEqual(request(''))
+    await calls[0].ok(opts)
+    // loaded: not again
+    fireEvent.focus(root)
+    fireEvent.click(root)
+    expect(fn).toHaveBeenCalledTimes(1)
+    expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry'])
+    press(input(), 'Escape')
+    rerender(<MultiSelect loadOptions={fn} preload loadKey={2} />)
+    expect(fn).toHaveBeenCalledTimes(2)
+    expect(calls[1].req).toEqual(request(''))
+  })
+
+  it("preload 'intent' loads as the pointer enters or focus arrives, once, calling your handlers first", () => {
+    const { fn } = loads()
+    const onFocus = vi.fn()
+    const onPointerEnter = vi.fn()
+    const { root } = setup({
+      options: undefined,
+      loadOptions: fn,
+      preload: 'intent',
+      attr: { onFocus, onPointerEnter }
+    })
+    expect(fn).not.toHaveBeenCalled()
+    fireEvent.pointerEnter(root)
+    expect(onPointerEnter).toHaveBeenCalledTimes(1)
+    expect(fn).toHaveBeenCalledTimes(1)
+    fireEvent.focus(root)
+    expect(onFocus).toHaveBeenCalledTimes(1)
+    expect(fn).toHaveBeenCalledTimes(1)
+    cleanup()
+    const other = setup({
+      options: undefined,
+      loadOptions: fn,
+      preload: 'intent'
+    })
+    fireEvent.focus(other.root)
+    expect(fn).toHaveBeenCalledTimes(2)
+  })
+
+  it('a search stopping a list that shows once it clears: that list loads again, not stuck on its stopped load', async () => {
+    const { fn, calls } = loads()
+    const { root, input, optionTexts } = setup({
+      options: undefined,
+      loadOptions: fn,
+      preload: 'intent'
+    })
+    fireEvent.click(root)
+    fireEvent.change(input(), { target: { value: 'a' } })
+    // the first list loads again, under the search
+    fireEvent.pointerEnter(root)
+    expect(calls[2].req).toEqual(request(''))
+    fireEvent.change(input(), { target: { value: '' } })
+    expect(calls[2].req.signal.aborted).toBe(true)
+    expect(calls[3].req).toEqual(request(''))
+    await calls[3].ok(opts)
+    expect(optionTexts()).toEqual(['Apple', 'Banana', 'Cherry'])
+  })
+
+  it('without preload, or without loadOptions, the pointer and focus load nothing', () => {
+    const { fn } = loads()
+    const { root } = setup({ options: undefined, loadOptions: fn })
+    fireEvent.pointerEnter(root)
+    fireEvent.focus(root)
+    expect(fn).not.toHaveBeenCalled()
+    cleanup()
+    const group = setupTree({
+      options: [{ type: 'submenu', title: 'S', childs: fn }],
+      preload: true
+    })
+    fireEvent.focus(group.root)
+    expect(fn).not.toHaveBeenCalled()
+  })
+
+  it('loadAhead: a box that much taller upward over the end row is observed, the row not', () => {
+    const { root, q, onLoadMore } = remote({ loadAhead: 120 })
+    fireEvent.click(root)
+    const end = q('.msl-loading')
+    const box = end.firstElementChild as HTMLElement
+    expect(end.style.position).toBe('relative')
+    expect(box.style.position).toBe('absolute')
+    expect(box.style.pointerEvents).toBe('none')
+    expect(end.textContent).toBe('Loading...')
+    inView(end, true)
+    expect(onLoadMore).not.toHaveBeenCalled()
+    inView(box, true)
+    expect(onLoadMore).toHaveBeenCalledTimes(1)
+  })
+
+  it('emptyDataLabel as a function of the search text', () => {
+    const emptyDataLabel = (search: string) =>
+      search.length < 2 ? 'Type 2 letters' : `Nothing for "${search}"`
+    const { input, optionTexts } = setup({ options: [], emptyDataLabel })
+    expect(optionTexts()).toEqual(['Type 2 letters'])
+    fireEvent.change(input(), { target: { value: ' xyz, ' } })
+    expect(optionTexts()).toEqual(['Nothing for "xyz"'])
+  })
+
+  it('types loadKey, preload, loadAhead, errorLabel and emptyDataLabel as functions, loadError as the error', () => {
+    const elements = [
+      <MultiSelect
+        key='a'
+        loadKey={{ country: 'NO' }}
+        preload='intent'
+        loadAhead={200}
+        loadError={new Error('down')}
+        errorLabel={(error, retry) => (
+          <button onClick={retry}>{String(error)}</button>
+        )}
+        emptyDataLabel={(search) => search.toUpperCase()}
+        options={[
+          { type: 'group', title: 'G', childs: opts, loadError: 'down' }
+        ]}
+      />,
+      // @ts-expect-error preload is true, false or 'intent'
+      <MultiSelect key='b' preload='hover' />
+    ]
+    expect(elements).toHaveLength(2)
+  })
+})
+
+describe('menuHeader, menuFooter, selectAll, group header and footer, renderGroupTitle toggle', () => {
+  // every row in a box of its own, as a virtual list positions them
+  const rows = ({ count, row }: MultiSelectListProps) => (
+    <div className='my-list'>
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className='my-row'>
+          {row(i)}
+        </div>
+      ))}
+    </div>
+  )
+  const tree = [
+    opts[0],
+    {
+      type: 'group',
+      title: 'G',
+      collapsible: true,
+      collapsed: true,
+      childs: [opts[1], { label: 'Off', value: 'off', disabled: true }]
+    },
+    { type: 'submenu', title: 'S', childs: [opts[2]] }
+  ]
+
+  it('menuHeader and menuFooter go around the listbox, outside it, with searchInMenu after the field', () => {
+    const { root, q, qa } = setup({
+      menuHeader: <b>Head</b>,
+      menuFooter: 'Foot',
+      searchInMenu: true,
+      classNames: { menuHeader: 'mh', menuFooter: 'mf' }
+    })
+    expect(qa('.msl-menu-header')).toEqual([])
+    fireEvent.click(root)
+    const head = q('.msl-menu-header')
+    expect(head.className).toBe('msl-menu-header mh')
+    expect(head.innerHTML).toBe('<b>Head</b>')
+    expect(head.previousElementSibling!.className).toBe('msl-search ')
+    expect(head.nextElementSibling).toBe(q('.msl-options'))
+    const foot = q('.msl-menu-footer')
+    expect(foot.className).toBe('msl-menu-footer mf')
+    expect(foot.previousElementSibling).toBe(q('.msl-options'))
+    expect(q('.msl-options').querySelector('.msl-menu-header')).toBeNull()
+  })
+
+  it('a menuHeader of false or null renders no box', () => {
+    const { root, qa } = setup({ menuHeader: false, menuFooter: null })
+    fireEvent.click(root)
+    expect(qa('.msl-menu-header, .msl-menu-footer')).toEqual([])
+  })
+
+  it('a click in it keeps the menu open and focus where it is, but on a form field; its keys are its own', () => {
+    const click = vi.fn()
+    const { root, q, input, isOpen, onChange } = setup({
+      menuHeader: (
+        <>
+          <button onClick={click}>All</button>
+          <input className='filter' />
+        </>
+      )
+    })
+    fireEvent.click(root)
+    const button = q('.msl-menu-header button')
+    expect(fireEvent.mouseDown(button)).toBe(false)
+    expect(fireEvent.mouseDown(q('.filter'))).toBe(true)
+    fireEvent.click(button)
+    expect(click).toHaveBeenCalled()
+    expect(isOpen()).toBe(true)
+    // Enter on the button presses it: no pick of the highlighted option
+    press(input(), 'ArrowDown')
+    expect(press(button)).toBe(true)
+    expect(onChange).not.toHaveBeenCalled()
+    // typing in its field stays there
+    q<HTMLInputElement>('.filter').focus()
+    press(q('.filter'), 'a')
+    expect(document.activeElement).toBe(q('.filter'))
+    expect(isOpen()).toBe(true)
+  })
+
+  it('Tab steps into what is tabbable in it, the menu open; Escape there closes it, focus back in the field', () => {
+    const { root, q, input, isOpen } = setup({
+      menuFooter: <button>Done</button>
+    })
+    fireEvent.click(root)
+    expect(press(input(), 'Tab')).toBe(true)
+    expect(isOpen()).toBe(true)
+    q('.msl-menu-footer button').focus()
+    press(q('.msl-menu-footer button'), 'Escape')
+    expect(isOpen()).toBe(false)
+    expect(document.activeElement).toBe(input())
+  })
+
+  it('as a function: the enabled options listed, in closed groups too, a search narrows them; selectAll and deselectAll', () => {
+    const fixed = { label: 'Fixed', value: 'fixed', fixed: true }
+    const menuHeader = vi.fn(
+      ({
+        options,
+        selected,
+        search,
+        selectAll,
+        deselectAll
+      }: MultiSelectMenuProps) => (
+        <>
+          <span className='count'>
+            {search}:{selected}/{options.length}
+          </span>
+          <button className='all' onClick={selectAll} />
+          <button className='none' onClick={deselectAll} />
+        </>
+      )
+    )
+    const { root, q, input, onChange, chips } = setupTree({
+      options: [...tree, fixed],
+      defaultValue: ['fixed'],
+      menuHeader,
+      customValue: true
+    })
+    fireEvent.click(root)
+    expect(q('.count').textContent).toBe(':1/4')
+    expect(menuHeader.mock.lastCall![0].options).toEqual([
+      opts[0],
+      opts[1],
+      opts[2],
+      fixed
+    ])
+    fireEvent.click(q('.all'))
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(chips()).toEqual(['Fixed', 'Apple', 'Banana', 'Cherry'])
+    fireEvent.click(q('.none'))
+    expect(onChange).toHaveBeenCalledTimes(2)
+    expect(chips()).toEqual(['Fixed'])
+    // a search's results, not its Create row
+    fireEvent.change(input(), { target: { value: 'an' } })
+    expect(q('.count').textContent).toBe('an:0/1')
+    fireEvent.click(q('.all'))
+    expect(chips()).toEqual(['Fixed', 'Banana'])
+  })
+
+  it('selectAll from a header stays under the limit, and picks one in single select', () => {
+    const header = ({ selectAll }: MultiSelectMenuProps) => (
+      <button className='all' onClick={selectAll} />
+    )
+    const { root, q, chips, onChange } = setup({
+      menuHeader: header,
+      limit: 2
+    })
+    fireEvent.click(root)
+    fireEvent.click(q('.all'))
+    expect(chips()).toEqual(['Apple', 'Banana'])
+    // full: nothing more, still one onChange
+    fireEvent.click(q('.all'))
+    expect(onChange).toHaveBeenLastCalledWith(
+      ['apple', 'banana'],
+      opts.slice(0, 2)
+    )
+    cleanup()
+    const one = setup({ menuHeader: header, singleSelect: true })
+    fireEvent.click(one.root)
+    fireEvent.click(one.q('.all'))
+    expect(one.single()).toBe('Apple')
+    fireEvent.click(one.root)
+    fireEvent.click(one.q('.all'))
+    expect(one.single()).toBe('Apple')
+  })
+
+  it("the function's options are those loaded so far with loadOptions", async () => {
+    const { fn, calls } = loads()
+    const menuFooter = vi.fn(
+      ({ options }: MultiSelectMenuProps) => options.length
+    )
+    const { root, q } = setup({
+      options: undefined,
+      loadOptions: fn,
+      menuFooter
+    })
+    fireEvent.click(root)
+    expect(q('.msl-menu-footer').textContent).toBe('0')
+    await calls[0].ok({ options: opts.slice(0, 2), next: 2 })
+    expect(q('.msl-menu-footer').textContent).toBe('2')
+  })
+
+  it('selectAll: a row atop the options the keyboard reaches first; it selects every enabled one listed, then deselects', () => {
+    const { root, q, input, focused, optionTexts, onChange, chips } = setupTree(
+      {
+        options: [...tree, { label: 'Kept', value: 'kept', fixed: true }],
+        defaultValue: ['kept'],
+        selectAll: true,
+        classNames: { selectAll: 'sa' }
+      }
+    )
+    fireEvent.click(root)
+    expect(optionTexts()[0]).toBe('Select all')
+    const row = q('.msl-select-all')
+    expect(row.getAttribute('role')).toBe('option')
+    expect(row.className).toContain('msl-option')
+    expect(row.className).toContain('sa')
+    expect(row.getAttribute('aria-selected')).toBe('false')
+    press(input(), 'ArrowDown')
+    expect(focused()).toBe('Select all')
+    press(input())
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(chips()).toEqual(['Kept', 'Apple', 'Banana', 'Cherry'])
+    expect(q('.msl-select-all').getAttribute('aria-selected')).toBe('true')
+    expect(q('.msl-select-all').className).toContain('msl-option-active')
+    // the menu stays, the highlight on it
+    expect(focused()).toBe('Select all')
+    fireEvent.click(q('.msl-select-all'))
+    expect(chips()).toEqual(['Kept'])
+    expect(onChange).toHaveBeenCalledTimes(2)
+  })
+
+  it("selectAll: a search's results only; hidden with none, in single select, and stays open with closeOnSelect", () => {
+    const { q, input, optionTexts, chips, isOpen } = setup({
+      selectAll: 'Every fruit',
+      closeOnSelect: true
+    })
+    fireEvent.change(input(), { target: { value: 'an' } })
+    expect(optionTexts()).toEqual(['Every fruit', 'Banana'])
+    fireEvent.click(q('.msl-select-all'))
+    expect(chips()).toEqual(['Banana'])
+    expect(isOpen()).toBe(true)
+    fireEvent.change(input(), { target: { value: 'zz' } })
+    expect(optionTexts()).toEqual(['No Data Found'])
+    cleanup()
+    const one = setup({ selectAll: true, singleSelect: true })
+    expect(one.optionTexts()).toEqual(['Apple', 'Banana', 'Cherry'])
+    cleanup()
+    const off = setup({
+      selectAll: true,
+      options: [{ label: 'Off', value: 'off', disabled: true }]
+    })
+    expect(off.optionTexts()).toEqual(['Off'])
+  })
+
+  it('selectAll under a limit: it fills it, then shows selected and deselects', () => {
+    const { root, q, chips } = setup({ selectAll: true, limit: 2 })
+    fireEvent.click(root)
+    fireEvent.click(q('.msl-select-all'))
+    expect(chips()).toEqual(['Apple', 'Banana'])
+    const row = q('.msl-select-all')
+    expect(row.getAttribute('aria-selected')).toBe('true')
+    expect(row.getAttribute('aria-disabled')).toBe('false')
+    fireEvent.click(row)
+    expect(chips()).toEqual([])
+  })
+
+  it('selectAll: Enter picks the first result shown, not one in a group collapsed', () => {
+    const results = [
+      {
+        type: 'group',
+        title: 'Fruits',
+        collapsible: true,
+        childs: [{ label: 'Apple', value: 'apple' }]
+      },
+      { label: 'Apricot', value: 'apricot' }
+    ]
+    const { root, input, chips, q } = setup({
+      options: results,
+      onSearch: () => {},
+      selectAll: true
+    })
+    fireEvent.click(root)
+    type(input(), 'ap', 'p')
+    fireEvent.click(q('.msl-grp-title'))
+    press(input())
+    expect(chips()).toEqual(['Apricot'])
+  })
+
+  it('selectAll with renderList: a row', () => {
+    const { root, qa } = setup({ selectAll: true, renderList: rows })
+    fireEvent.click(root)
+    expect(qa('.my-row').map((el) => el.textContent)).toEqual([
+      'Select all',
+      'Apple',
+      'Banana',
+      'Cherry'
+    ])
+  })
+
+  it('selectAll showing as a lazy submenu loads leaves it open, the highlight on its title', async () => {
+    const { fn, calls } = loads()
+    const { root, input, focused, subs, optionTexts } = setupTree({
+      options: [{ type: 'submenu', title: 'Users', childs: fn }],
+      selectAll: true
+    })
+    fireEvent.click(root)
+    press(input(), 'ArrowDown')
+    press(input(), 'ArrowRight')
+    expect(subs()).toEqual(['Users'])
+    expect(focused()).toBe('Users')
+    await calls[0].ok(opts)
+    expect(subs()).toEqual(['Users'])
+    expect(focused()).toBe('Users')
+    expect(optionTexts()).toEqual([
+      'Select all',
+      'Users',
+      'Apple',
+      'Banana',
+      'Cherry'
+    ])
+  })
+
+  it("a group's header and footer: rows around its own, no options, the highlight passes them", () => {
+    const { root, q, qa, input, focused, option, subs } = setupTree({
+      options: [
+        {
+          type: 'group',
+          title: 'Plain',
+          header: 'P head',
+          footer: false,
+          childs: [opts[0]]
+        },
+        {
+          type: 'group',
+          title: 'Fold',
+          collapsible: true,
+          header: 'F head',
+          footer: <i>F foot</i>,
+          childs: [opts[1]]
+        },
+        {
+          type: 'submenu',
+          title: 'Sub',
+          header: 'S head',
+          footer: 'S foot',
+          childs: [opts[2]]
+        }
+      ],
+      classNames: { groupHeader: 'gh', groupFooter: 'gf' }
+    })
+    fireEvent.click(root)
+    const head = q('.msl-grp-header')
+    expect(head.className).toBe(
+      'msl-option msl-option-disable msl-grp-header gh'
+    )
+    expect(head.hasAttribute('role')).toBe(false)
+    expect(head.previousElementSibling!.textContent).toBe('Plain')
+    expect(qa('.msl-grp-footer').map((el) => el.textContent)).toEqual([
+      'F foot'
+    ])
+    expect(q('.msl-grp-body .msl-grp-footer').className).toBe(
+      'msl-option msl-option-disable msl-grp-footer gf'
+    )
+    expect(
+      q('.msl-grp-body').firstElementChild!.firstElementChild!.textContent
+    ).toBe('F head')
+    press(input(), 'ArrowDown')
+    expect(focused()).toBe('Apple')
+    press(input(), 'ArrowDown')
+    expect(focused()).toBe('Fold')
+    press(input(), 'ArrowDown')
+    expect(focused()).toBe('Banana')
+    press(input(), 'ArrowDown')
+    expect(focused()).toBe('Sub')
+    fireEvent.click(option('Sub'))
+    expect(subs()).toEqual(['Sub'])
+    const menu = q('.msl-submenu')
+    expect([...menu.children].map((el) => el.textContent)).toEqual([
+      'S head',
+      'Cherry',
+      'S foot'
+    ])
+    press(input(), 'ArrowRight')
+    expect(focused()).toBe('Cherry')
+    press(input(), 'ArrowDown')
+    expect(focused()).toBe('Cherry')
+  })
+
+  it("a group's header and footer with renderList: rows, a submenu's in its list", () => {
+    const { root, qa, option } = setup({
+      options: [
+        { type: 'group', title: 'G', header: 'Head', childs: [opts[0]] },
+        {
+          type: 'submenu',
+          title: 'S',
+          footer: 'Foot',
+          childs: [opts[1]]
+        }
+      ],
+      renderList: rows
+    })
+    fireEvent.click(root)
+    expect(
+      qa('.msl-options > .my-list > .my-row').map((el) => el.textContent)
+    ).toEqual(['G', 'Head', 'Apple', 'S'])
+    fireEvent.click(option('S'))
+    expect(qa('.msl-submenu .my-row').map((el) => el.textContent)).toEqual([
+      'Banana',
+      'Foot'
+    ])
+  })
+
+  it("renderGroupTitle's toggle selects a group's enabled options, nested too, in one onChange, then deselects them", () => {
+    const renderGroupTitle = ({
+      title,
+      total,
+      selected,
+      toggle
+    }: MultiSelectGroupTitleProps) => (
+      <>
+        <input
+          type='checkbox'
+          aria-label={`All of ${title}`}
+          checked={selected === total}
+          onChange={() => {}}
+          onClick={(e) => {
+            e.stopPropagation()
+            toggle()
+          }}
+        />
+        {title}
+      </>
+    )
+    const { root, q, titles, chips, onChange } = setupTree({
+      options: [
+        {
+          type: 'group',
+          title: 'G',
+          collapsible: true,
+          childs: [
+            opts[0],
+            { type: 'group', title: 'In', childs: [opts[1]] },
+            { label: 'Off', value: 'off', disabled: true },
+            { label: 'Kept', value: 'kept', fixed: true }
+          ]
+        },
+        opts[2]
+      ],
+      defaultValue: ['kept', 'off'],
+      renderGroupTitle
+    })
+    fireEvent.click(root)
+    const box = q<HTMLInputElement>('[aria-label="All of G"]')
+    fireEvent.click(box)
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(chips()).toEqual(['Kept', 'Off', 'Apple', 'Banana'])
+    // the title didn't collapse
+    expect(titles()[0]).toBe('true')
+    // a selected disabled option stays, as a fixed one does: it couldn't be picked again
+    fireEvent.click(box)
+    expect(chips()).toEqual(['Kept', 'Off'])
+    fireEvent.click(q('[aria-label="All of In"]'))
+    expect(chips()).toEqual(['Kept', 'Off', 'Banana'])
+  })
+
+  it("keys on a control in a title row are the control's: Space keeps focus there, Enter doesn't toggle the group", () => {
+    const { root, q, titles } = setupTree({
+      options: [{ type: 'group', title: 'G', collapsible: true, childs: opts }],
+      renderGroupTitle: ({ title }) => (
+        <>
+          <input type='checkbox' aria-label='All' />
+          {title}
+        </>
+      )
+    })
+    fireEvent.click(root)
+    const box = q<HTMLInputElement>('[aria-label="All"]')
+    box.focus()
+    expect(press(box, ' ')).toBe(true)
+    expect(document.activeElement).toBe(box)
+    press(box, 'Enter')
+    expect(titles()[0]).toBe('true')
+    expect(document.activeElement).toBe(box)
+  })
+
+  it('keys on a control in an option row still move the highlight, and Enter picks that row', () => {
+    const { root, q, focused, onChange } = setupTree({
+      disableSearch: true,
+      getLabel: (o: MultiSelectOption) => (
+        <>
+          <input type='checkbox' aria-label={o.label as string} readOnly />
+          {o.label}
+        </>
+      )
+    })
+    fireEvent.click(root)
+    const box = q<HTMLInputElement>('[aria-label="Banana"]')
+    box.focus()
+    press(box, 'ArrowDown')
+    expect(focused()).toBe('Apple')
+    press(box, 'Enter')
+    expect(onChange).toHaveBeenLastCalledWith(['banana'], [opts[1]])
+  })
+
+  it('types the props: menuHeader and menuFooter of T, selectAll, group header and footer, toggle', () => {
+    const ada = { id: '1', name: 'Ada' }
+    const getters = {
+      getLabel: (p: typeof ada) => p.name,
+      getValue: (p: typeof ada) => p.id
+    }
+    const elements = [
+      <MultiSelect
+        key='a'
+        options={[
+          {
+            type: 'group',
+            title: 'G',
+            header: <b />,
+            footer: 'f',
+            childs: [ada]
+          }
+        ]}
+        menuHeader={({ options }) => options.map((p) => p.name)}
+        menuFooter={<b />}
+        selectAll={<i>All</i>}
+        renderGroupTitle={({ toggle }) => <button onClick={toggle} />}
+        {...getters}
+      />,
+      <MultiSelect
+        key='b'
+        options={[ada]}
+        customValue
+        // @ts-expect-error with customValue, created { label, value } options are listed too
+        menuHeader={({ options }) => options.map((p) => p.name)}
+        {...getters}
+      />
+    ]
+    expect(elements).toHaveLength(2)
+  })
+})
+
+describe('features together', () => {
+  it('hideSelected with selectAll: all picked, only the row is left, selected, and deselects them', () => {
+    const { root, q, optionTexts, chips } = setup({
+      hideSelected: true,
+      selectAll: true
+    })
+    fireEvent.click(root)
+    expect(optionTexts()).toEqual(['Select all', 'Apple', 'Banana', 'Cherry'])
+    fireEvent.click(q('.msl-select-all'))
+    expect(chips()).toEqual(['Apple', 'Banana', 'Cherry'])
+    expect(optionTexts()).toEqual(['Select all'])
+    expect(q('.msl-select-all').getAttribute('aria-selected')).toBe('true')
+    fireEvent.click(q('.msl-select-all'))
+    expect(chips()).toEqual([])
+    expect(optionTexts()).toEqual(['Select all', 'Apple', 'Banana', 'Cherry'])
   })
 })

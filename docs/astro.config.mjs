@@ -21,6 +21,7 @@ export default defineConfig({
         { label: 'Getting started', slug: 'getting-started' },
         { label: 'Examples', slug: 'examples' },
         { label: 'Virtual lists', slug: 'virtual-lists' },
+        { label: 'Async options', slug: 'async' },
         { label: 'API', slug: 'api' },
         { label: 'Styling', slug: 'styling' },
         { label: 'Tailwind', slug: 'tailwind' },

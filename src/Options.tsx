@@ -1,10 +1,11 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import type { HTMLAttributes, KeyboardEvent, ReactNode } from 'react'
 import { DownIcon } from './icons'
 import type {
   MultiSelectClassNames,
   MultiSelectGroup,
   MultiSelectGroupTitleProps,
+  MultiSelectLabelMeta,
   MultiSelectListProps,
   MultiSelectOption
 } from './index'
@@ -16,14 +17,22 @@ export type Row = { opt: Item; key: string; level: string }
 
 export const isGroup = (opt: MultiSelectOption | MultiSelectGroup) =>
   opt.type === 'group' || opt.type === 'submenu'
-// every option, groups and submenus unwrapped, open or not
+// the end of a loader's list while it loads, has more to load or failed: { k: its key, l: what loaded, load }
+export const ends = new WeakSet<object>()
+// attributes of an option of ours: the create row's busy or failed state
+export const attrs = new WeakMap<object, object>()
+// hideSelected: what holds a hidden option's or group's place, skipped. Its copies of groups, by the group as given
+export const gap = {} as Item
+export const whole = new WeakMap<object, MultiSelectGroup>()
+// every option, groups and submenus unwrapped, open or not. Not a loader's: its loaded lists are flattened apart
 export function flatten(
   items: ReadonlyArray<MultiSelectOption | MultiSelectGroup>,
   out: MultiSelectOption[] = []
 ) {
   for (const opt of items as Item[]) {
-    if (isGroup(opt)) flatten(opt.childs, out)
-    else out.push(opt)
+    if (isGroup(opt))
+      typeof opt.childs == 'function' || flatten(opt.childs, out)
+    else ends.has(opt) || opt === gap || out.push(opt)
   }
   return out
 }
@@ -168,6 +177,72 @@ function Kept({ children }: { children: ReactNode }) {
   )
 }
 
+// a list's end: a loader's, or of options you load. Shown, a list never loaded (or dropped by a loadKey), or that
+// failed, loads. In view with more to load, it loads the next part, without a loadMoreLabel: observed anew once that
+// is in, so it goes on while in view. With loadAhead, a box over it that much taller upward is observed instead.
+// Missing in jsdom. Polite live region: a screen reader hears it fail, where it took loadingLabel's place
+function End({
+  end,
+  ahead,
+  children,
+  ...p
+}: Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
+  end: Item
+  ahead: number
+  children: (retry: () => void) => ReactNode
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  // the latest: your onLoadMore may be a new closure each render
+  const now = useRef(end)
+  now.current = end
+  const { busy, next, error } = end.l || {}
+  useEffect(() => {
+    ;(!end.l || error) && (end.once || end.load)()
+  }, [!end.l])
+  // errorLabel's, for your button in it: loadingLabel takes its place, so focus in it goes to the listbox first
+  const retry = () => {
+    ref.current && keep(ref.current.closest<HTMLElement>('.msl-options')!)
+    now.current.load()
+  }
+  useEffect(() => {
+    // with a loadMoreLabel, it waits for a click
+    if (
+      !next ||
+      busy ||
+      error ||
+      end.label != null ||
+      typeof IntersectionObserver == 'undefined'
+    )
+      return
+    const io = new IntersectionObserver(
+      (es) => es[es.length - 1].isIntersecting && now.current.load()
+    )
+    io.observe(ref.current!)
+    return () => io.disconnect()
+  }, [busy, next, error, ahead])
+  return (
+    <div
+      ref={ahead ? undefined : ref}
+      style={ahead ? { position: 'relative' } : undefined}
+      aria-live='polite'
+      {...p}
+    >
+      {!!ahead && (
+        // no clicks: it lies over the rows above
+        <div
+          ref={ref}
+          style={{
+            position: 'absolute',
+            inset: `${-ahead}px 0 0`,
+            pointerEvents: 'none'
+          }}
+        />
+      )}
+      {children(retry)}
+    </div>
+  )
+}
+
 // rows in render order, as Options walks them: a collapsed group's or a closed submenu's childs are not rendered
 export function walk(
   items: ReadonlyArray<MultiSelectOption | MultiSelectGroup>,
@@ -178,11 +253,12 @@ export function walk(
 ) {
   ;(items as Item[]).forEach((opt, i) => {
     const key = pre + i
+    if (opt === gap) return
     if (!isGroup(opt) || titled(opt)) out.push({ opt, key, level })
     isGroup(opt) &&
       isOpen(opt, key) &&
       walk(
-        opt.childs,
+        opt.childs as Item[],
         isOpen,
         out,
         key + '.',
@@ -210,7 +286,11 @@ function Options({
   term,
   groupIcon,
   submenuIcon,
-  renderGroupTitle
+  renderGroupTitle,
+  toggle,
+  loadingLabel,
+  errorLabel,
+  loadAhead
 }: {
   opts: ReadonlyArray<MultiSelectOption | MultiSelectGroup>
   isOpen: (g: MultiSelectGroup, key: string) => boolean
@@ -222,7 +302,7 @@ function Options({
   listId: string
   activeIdx: number
   valueOf: (opt: MultiSelectOption) => string
-  labelOf: (opt: MultiSelectOption) => ReactNode
+  labelOf: (opt: MultiSelectOption, meta: MultiSelectLabelMeta) => ReactNode
   textOf: (opt: MultiSelectOption, label?: ReactNode) => string
   cn: MultiSelectClassNames
   renderList?: (list: MultiSelectListProps) => ReactNode
@@ -230,20 +310,30 @@ function Options({
   groupIcon?: ReactNode
   submenuIcon?: ReactNode
   renderGroupTitle?: (props: MultiSelectGroupTitleProps) => ReactNode
+  toggle: (opts: MultiSelectOption[]) => void
+  loadingLabel: ReactNode
+  errorLabel: ReactNode | ((error: unknown, retry: () => void) => ReactNode)
+  loadAhead: number
 }) {
   // counts rows, like walk
   let n = 0
   let g = 0
   // with renderList, an option row's place in its list, and the list: only the rows it shows are there to count
   const place: [number, List][] = []
-  // what options and titles share: Enter on a focused row (no search field) acts on it, not on the highlighted one
+  const of = (idx: number) => place[idx]?.[1]
+  // what options and titles share: Enter on a focused row (no search field), or a control in an option's label, acts
+  // on it, not on the highlighted one. Not on a control in a title, a checkbox: that has its own
   const row = (idx: number, act: () => void) => ({
     id: `${listId}-${idx}`,
     role: 'option',
     tabIndex: -1,
     onClick: act,
     onKeyDown: (e: KeyboardEvent) => {
-      if (e.key === 'Enter') {
+      if (
+        e.key === 'Enter' &&
+        (e.target === e.currentTarget ||
+          !e.currentTarget.hasAttribute('aria-expanded'))
+      ) {
         e.stopPropagation()
         act()
       }
@@ -251,15 +341,22 @@ function Options({
     onMouseEnter: () => hover(idx),
     'data-focused': idx === activeIdx || undefined,
     'aria-posinset': place[idx]?.[0],
-    'aria-setsize': place[idx]?.[1].size
+    // -1: unknown, while more may load
+    'aria-setsize': of(idx) && (of(idx).more ? -1 : of(idx).size)
   })
   // static group titles are -1, as is activeIdx with no highlight
   const hit = (idx: number) => idx >= 0 && idx === activeIdx
   const focused = (idx: number) => (hit(idx) ? ' msl-option-focused' : '')
   const grp = `msl-grp ${cn.group ?? ''}`
   // for renderList: the rows of the menu or of an open submenu, groups flattened, a function per row, so only
-  // the rows it shows render. active: the highlight's row. size: its option rows
-  type List = { rows: (() => ReactNode)[]; active: number; size: number }
+  // the rows it shows render. active: the highlight's row. size: its option rows. more: a loader's list in it is
+  // not all in
+  type List = {
+    rows: (() => ReactNode)[]
+    active: number
+    size: number
+    more?: boolean
+  }
   // a row past the end is nothing: a virtual list may ask for one as the rows shrink
   const list = ({ rows, active }: List) =>
     renderList!({
@@ -296,6 +393,7 @@ function Options({
   ) {
     for (const [i, opt] of opts.entries()) {
       const key = pre + i
+      if (opt === gap) continue
       if (isGroup(opt)) {
         const sub = opt.type === 'submenu'
         const shown = isOpen(opt, key)
@@ -332,14 +430,18 @@ function Options({
                 {icon}
               </>
             )
-          const all = flatten(opt.childs)
+          // with its hidden options: they count
+          const g = whole.get(opt) ?? opt
+          const all = flatten(g.childs as Item[])
           return renderGroupTitle({
-            group: opt,
+            // a loader's comes resolved
+            group: g as MultiSelectGroupTitleProps['group'],
             title: opt.title,
             total: all.length,
             selected: all.filter(checkValueExist).length,
             open: shown,
-            icon
+            icon,
+            toggle: () => toggle(all)
           })
         }
         // built as it renders: with renderList, once its list's size is known
@@ -349,9 +451,9 @@ function Options({
               key={key}
               {...row(idx, () => expand(idx))}
               aria-expanded={shown}
-              // only while open: one per depth, so each open submenu finds its title
-              style={shown ? { anchorName: anchor } : undefined}
-              className={`msl-option${focused(idx)} ${cn.option ?? ''}`}
+              // the anchor only while open: one per depth, so each open submenu finds its title
+              style={{ ...opt.style, anchorName: shown ? anchor : undefined }}
+              className={`msl-option ${opt.classes ?? ''}${focused(idx)} ${cn.option ?? ''}`}
             >
               {head()}
             </div>
@@ -363,7 +465,8 @@ function Options({
                     ...row(idx, () => expand(idx)),
                     'aria-expanded': shown
                   })}
-              className={`msl-grp-title${focused(idx)} ${cn.groupTitle ?? ''}`}
+              style={opt.style}
+              className={`msl-grp-title ${opt.classes ?? ''}${focused(idx)} ${cn.groupTitle ?? ''}`}
             >
               {head()}
             </div>
@@ -377,6 +480,20 @@ function Options({
               {menu}
             </>
           ))
+        // its header and footer: rows walk doesn't count, as the empty label, so the highlight passes them
+        const deco = (part: 'header' | 'footer', c?: string) =>
+          shown &&
+          opt[part] != null &&
+          opt[part] !== false &&
+          add(childs, inner, ins, -1, () => (
+            <div
+              key={part}
+              className={`msl-option msl-option-disable msl-grp-${part} ${c ?? ''}`}
+            >
+              {opt[part]}
+            </div>
+          ))
+        deco('header', cn.groupHeader)
         if (shown && opt.childs.length > 0) {
           addInArr(
             opt.childs as Item[],
@@ -396,6 +513,7 @@ function Options({
             </div>
           ))
         }
+        deco('footer', cn.groupFooter)
         // beside its title in the top layer, placed by the stylesheet. In the listbox all the same
         const menu = sub && shown && (
           <Leave
@@ -438,11 +556,46 @@ function Options({
             ),
             menu
           )
+      } else if (ends.has(opt)) {
+        // a row walk counts, which the keyboard passes (loading more on the way down), never highlights
+        n++
+        to.more = true
+        const failed = opt.l?.error
+        // a loadMoreLabel's, with more to load: a button
+        const idle = opt.label != null && opt.l && !opt.l.busy && !failed
+        // yours gets the error and retries itself: a click on the row would load twice
+        const own = typeof errorLabel == 'function'
+        add(out, to, groups, -1, () => (
+          <End
+            key={opt.k}
+            end={opt}
+            ahead={loadAhead}
+            data-error={!!failed || undefined}
+            data-more={idle || undefined}
+            // a failed load loads again on a click, as does more
+            onClick={(failed && !own) || idle ? opt.load : undefined}
+            className={`msl-option ${idle ? '' : 'msl-option-disable '}msl-loading ${cn.loading ?? ''}`}
+          >
+            {(retry) =>
+              failed
+                ? own
+                  ? errorLabel(failed, retry)
+                  : errorLabel
+                : idle
+                  ? opt.label
+                  : loadingLabel
+            }
+          </End>
+        ))
       } else {
         const idx = n++
         add(out, to, groups, idx, () => {
           // getLabel once: it may build JSX
-          const label = labelOf(opt)
+          const label = labelOf(opt, {
+            context: 'menu',
+            search: term,
+            selected: checkValueExist(opt)
+          })
           const off = isDisabled(opt)
           return (
             <div
@@ -460,6 +613,7 @@ function Options({
               }${focused(idx)} ${cn.option ?? ''}`}
               // @ts-expect-error value is not a div attribute; kept, users and tests read it
               value={valueOf(opt)}
+              {...attrs.get(opt)}
             >
               {label}
             </div>

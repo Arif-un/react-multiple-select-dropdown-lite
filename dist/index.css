@@ -123,8 +123,11 @@
   white-space: break-spaces;
   line-break: anywhere;
 
-  &:where([data-fixed]) {
+  &:where([data-fixed], [data-more]) {
     padding-inline-end: 6px;
+  }
+
+  &:where([data-fixed]) {
     background: var(--msl-chip-fixed-background);
   }
 }
@@ -270,6 +273,11 @@
 .msl-search {
   grid-column: 1 / -1;
   border: 0 solid var(--msl-divider-color);
+}
+
+.msl-menu-header,
+.msl-menu-footer {
+  grid-column: 1 / -1;
 }
 
 :where(.msl-active) > .msl-options,
